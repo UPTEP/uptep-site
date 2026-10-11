@@ -16,10 +16,40 @@ function mountChaine(context,data){
  const headerColumn=(row,label)=>columnOf(row,[...row.cells].find(c=>norm(c.textContent)===label));
  function clear(){for(const [anchor,node] of movedState)anchor.replaceWith(node);movedState.length=0;for(const [anchor,cell] of hiddenCells)anchor.replaceWith(cell);hiddenCells.length=0;for(const {cell,originals} of mergedStats){cell.remove();for(const [anchor,original] of originals)anchor.replaceWith(original);}mergedStats.length=0;for(const [cell,{row,next}] of removedNumbers)row.insertBefore(cell,next?.parentNode===row?next:null);removedNumbers.clear();for(const n of added)n.remove();added.clear();for(const row of marked)row.classList.remove('uptep-chain-self','uptep-chain-target');marked.clear();}
  function append(row,tag,text,cls){const cell=doc.createElement(tag);cell.className='uptep-chain-cell '+(cls||'');cell.textContent=text;row.append(cell);added.add(cell);return cell;}
+ const sortHeaders=new Map();let sortable=null,sortKey=null,sortDirection=1;
+ const collator=new Intl.Collator('fr',{sensitivity:'base',numeric:true});
+ function prepareSort(table,head,rows){
+  sortable={table,head,rows};
+  for(const cell of head.cells){const key=norm(cell.textContent);if(!['pseudo','terrain'].includes(key))continue;
+   if(!sortHeaders.has(cell))sortHeaders.set(cell,new Map(['tabindex','role','aria-sort','data-uptep-sort'].map(name=>[name,cell.getAttribute(name)])));
+   cell.setAttribute('tabindex','0');cell.setAttribute('role','button');cell.setAttribute('data-uptep-sort',key);
+   cell.setAttribute('aria-sort',key===sortKey?(sortDirection===1?'ascending':'descending'):'none');
+  }
+ }
+ function handleSort(event){
+  const cell=event.target?.closest?.('th,td');if(!sortable||!cell||cell.parentNode!==sortable.head)return;
+  // The native sorter caches old column indices and renumbers the first cell after sorting.
+  // Intercept its mouse and keyboard events before they reach the modified table.
+  if(event.type==='keydown'&&!['Enter',' '].includes(event.key))return;
+  event.stopImmediatePropagation();event.preventDefault();
+  if(event.type!=='click'&&!(event.type==='keydown'&&['Enter',' '].includes(event.key)))return;
+  const key=cell.getAttribute('data-uptep-sort');if(!key)return;
+  update();sortDirection=sortKey===key?-sortDirection:(key==='terrain'?-1:1);sortKey=key;
+  const compare=(a,b)=>key==='pseudo'?collator.compare(a.pseudo,b.pseudo):(a.field<b.field?-1:a.field>b.field?1:0);
+  const parents=new Map();for(const entry of sortable.rows){const parent=entry.row.parentNode;if(!parents.has(parent))parents.set(parent,[]);parents.get(parent).push(entry);}
+  for(const entries of parents.values()){
+   const anchors=entries.map(p=>{const anchor=doc.createComment('uptep-sort-row');p.row.before(anchor);return anchor;});
+   const ordered=[...entries].sort((a,b)=>sortDirection*compare(a,b)||collator.compare(a.pseudo,b.pseudo));
+   for(let i=0;i<anchors.length;i++)anchors[i].replaceWith(ordered[i].row);
+  }
+  update();prepareSort(sortable.table,sortable.head,sortable.rows);
+ }
+ const sortEvents=['click','mousedown','mouseup','keydown'];for(const name of sortEvents)win.addEventListener(name,handleSort,true);
+ style.textContent+=' th[data-uptep-sort]{cursor:pointer;background-image:none!important}th[data-uptep-sort][aria-sort="ascending"]::after{content:" ↑"}th[data-uptep-sort][aria-sort="descending"]::after{content:" ↓"}';
  function update(){
   let table,head,pseudoIndex,fieldIndex,stateIndex;
   for(const candidate of doc.querySelectorAll('#centre table, table')){const header=[...candidate.rows].find(r=>[...r.cells].some(c=>norm(c.textContent)==='pseudo')&&[...r.cells].some(c=>norm(c.textContent)==='terrain'));if(header){table=candidate;head=header;pseudoIndex=headerColumn(head,'pseudo');fieldIndex=headerColumn(head,'terrain');stateIndex=headerColumn(head,'etat');break;}}
-  if(!table){legend.remove();if(added.size)clear();previous='';return;}
+  if(!table){sortable=null;legend.remove();if(added.size)clear();previous='';return;}
   const rows=[];
   for(const row of table.rows){if(row===head)continue;const fieldCell=cellAt(row,fieldIndex);if(!fieldCell)continue;const cell=cellAt(row,pseudoIndex);if(!cell)continue;
    let pseudo='';for(const link of cell.querySelectorAll('a[href]')){try{const url=new URL(link.getAttribute('href'),win.location.href);for(const [key,value] of url.searchParams)if(key.toLowerCase()==='pseudo')pseudo=value;}catch{}if(!pseudo&&saved.has(link.textContent.trim()))pseudo=link.textContent.trim();if(pseudo)break;}
@@ -29,7 +59,8 @@ function mountChaine(context,data){
    const knownState=/vacanc|banni|actif|inactif/.test(hints);const blocked=knownState?/vacanc|banni/.test(hints):!!(player?.on_holiday||player?.is_banned);
    rows.push({row,cell,pseudo,field,blocked,id:String(player?.player_id||''),grade:player?.grade||null,order:player?.sort_order??null});
   }
-  if(!rows.some(p=>p.id===String(data.self))){legend.remove();return;}
+  if(!rows.some(p=>p.id===String(data.self))){sortable=null;legend.remove();return;}
+  prepareSort(table,head,rows);
   if(legend.nextSibling!==table)table.before(legend);
   const signature=JSON.stringify(rows.map(p=>[p.pseudo,String(p.field),p.blocked]));if(signature===previous&&head.querySelector('.uptep-chain-cell')&&rows.every(p=>p.row.querySelector('.uptep-chain-cell')))return;previous=signature;clear();
   const numberIndex=[...head.cells].findIndex(c=>norm(c.textContent)==='rang')-1;
@@ -83,5 +114,5 @@ function mountChaine(context,data){
    if(focus){p.row.classList.add('uptep-chain-'+focus);marked.add(p.row);}
   }
  }
- update();const timer=win.setInterval(update,1000);return ()=>{win.clearInterval(timer);clear();legend.remove();style.remove();};
+ update();const timer=win.setInterval(update,1000);return ()=>{win.clearInterval(timer);for(const name of sortEvents)win.removeEventListener(name,handleSort,true);for(const [cell,attrs] of sortHeaders)for(const [name,value] of attrs){if(value===null)cell.removeAttribute(name);else cell.setAttribute(name,value);}clear();legend.remove();style.remove();};
 }
