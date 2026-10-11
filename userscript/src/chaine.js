@@ -7,14 +7,14 @@ function mountChaine(context,data){
  const legend=doc.createElement('div');legend.className='uptep-chain-legend';legend.setAttribute('role','note');legend.setAttribute('aria-label','Légende des couleurs de la chaîne');
  legend.style.cssText='display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;margin:10px 0;padding:6px 0;color:#302b18;font:12px Verdana,sans-serif;text-align:left;';
  for(const [color,border,text] of [['#dfa08b','#992f24','Ta position'],['#b8c58b','#566332','Joueurs à portée de flood situés sous toi dans la chaîne']]){const item=doc.createElement('span'),swatch=doc.createElement('span');item.style.cssText='display:inline-flex;align-items:center;gap:7px;';swatch.setAttribute('aria-hidden','true');swatch.style.cssText='display:inline-block;flex:0 0 18px;width:18px;height:13px;background:'+color+';border-left:3px solid '+border+';';item.append(swatch,doc.createTextNode(text));legend.append(item);}
- const added=new Set(),marked=new Set(),removedNumbers=new Map(),mergedStats=[];let previous='';
+ const added=new Set(),marked=new Set(),removedNumbers=new Map(),mergedStats=[],hiddenCells=[],movedState=[];let previous='';
  const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  const number=s=>{const text=s.replace(/[\s\u00a0\u202f]/g,'');return /^\d+$/.test(text)?BigInt(text):null;};
  // Native headers can span multiple cells (for example Terrain and its attack icon).
  const columnOf=(row,cell)=>{let column=0;for(const current of row.cells){if(current===cell)return column;column+=current.colSpan;}return -1;};
  const cellAt=(row,column)=>{let start=0;for(const cell of row.cells){if(column>=start&&column<start+cell.colSpan)return cell;start+=cell.colSpan;}return null;};
  const headerColumn=(row,label)=>columnOf(row,[...row.cells].find(c=>norm(c.textContent)===label));
- function clear(){for(const {cell,originals} of mergedStats){cell.remove();for(const [anchor,original] of originals)anchor.replaceWith(original);}mergedStats.length=0;for(const [cell,{row,next}] of removedNumbers)row.insertBefore(cell,next?.parentNode===row?next:null);removedNumbers.clear();for(const n of added)n.remove();added.clear();for(const row of marked)row.classList.remove('uptep-chain-self','uptep-chain-target');marked.clear();}
+ function clear(){for(const [anchor,node] of movedState)anchor.replaceWith(node);movedState.length=0;for(const [anchor,cell] of hiddenCells)anchor.replaceWith(cell);hiddenCells.length=0;for(const {cell,originals} of mergedStats){cell.remove();for(const [anchor,original] of originals)anchor.replaceWith(original);}mergedStats.length=0;for(const [cell,{row,next}] of removedNumbers)row.insertBefore(cell,next?.parentNode===row?next:null);removedNumbers.clear();for(const n of added)n.remove();added.clear();for(const row of marked)row.classList.remove('uptep-chain-self','uptep-chain-target');marked.clear();}
  function append(row,tag,text,cls){const cell=doc.createElement(tag);cell.className='uptep-chain-cell '+(cls||'');cell.textContent=text;row.append(cell);added.add(cell);return cell;}
  function update(){
   let table,head,pseudoIndex,fieldIndex,stateIndex;
@@ -23,9 +23,9 @@ function mountChaine(context,data){
   const rows=[];
   for(const row of table.rows){if(row===head)continue;const fieldCell=cellAt(row,fieldIndex);if(!fieldCell)continue;const cell=cellAt(row,pseudoIndex);if(!cell)continue;
    let pseudo='';for(const link of cell.querySelectorAll('a[href]')){try{const url=new URL(link.getAttribute('href'),win.location.href);for(const [key,value] of url.searchParams)if(key.toLowerCase()==='pseudo')pseudo=value;}catch{}if(!pseudo&&saved.has(link.textContent.trim()))pseudo=link.textContent.trim();if(pseudo)break;}
-   if(!pseudo){const clone=cell.cloneNode(true);clone.querySelectorAll('.uptep-chain-mark').forEach(n=>n.remove());pseudo=clone.textContent.trim();}
+   if(!pseudo){const clone=cell.cloneNode(true);clone.querySelectorAll('.uptep-chain-mark,.uptep-chain-status,.uptep-chain-colony').forEach(n=>n.remove());pseudo=clone.textContent.trim();}
    const player=saved.get(pseudo),field=number(fieldCell.textContent);if(!pseudo||field===null)continue;
-   const state=cellAt(row,stateIndex);const hints=state?norm([...state.querySelectorAll('[title],[alt],img')].map(n=>(n.getAttribute('title')||'')+' '+(n.getAttribute('alt')||'')+' '+(n.getAttribute('src')||'')).join(' ')+' '+state.textContent):'';
+   const state=cellAt(row,stateIndex)||(cell.querySelector('.uptep-chain-status')?cell:null);const hints=state?norm([...state.querySelectorAll('[title],[alt],img')].map(n=>(n.getAttribute('title')||'')+' '+(n.getAttribute('alt')||'')+' '+(n.getAttribute('src')||'')).join(' ')+' '+state.textContent):'';
    const knownState=/vacanc|banni|actif|inactif/.test(hints);const blocked=knownState?/vacanc|banni/.test(hints):!!(player?.on_holiday||player?.is_banned);
    rows.push({row,cell,pseudo,field,blocked,id:String(player?.player_id||''),grade:player?.grade||null,order:player?.sort_order??null});
   }
@@ -47,6 +47,30 @@ function mountChaine(context,data){
     tech.before(cell);tech.remove();building.remove();mergedStats.push({cell,originals});
    }
   }
+  // Move native status nodes rather than redraw them: keep icons, titles and links.
+  const hideCell=cell=>{const anchor=doc.createComment('uptep-hidden-column');cell.before(anchor);cell.remove();hiddenCells.push([anchor,cell]);};
+  const statusColumn=headerColumn(head,'etat'),rankColumn=headerColumn(head,'rang');
+  const hide=[];
+  for(const row of [head,...rows.map(p=>p.row)]){
+   const status=cellAt(row,statusColumn),rank=cellAt(row,rankColumn);
+   if(status&&row!==head){
+    const pseudoCell=rows.find(p=>p.row===row).cell;
+    const left=doc.createElement('span'),right=doc.createElement('span');left.className='uptep-chain-status';right.className='uptep-chain-colony';
+    left.style.cssText='display:inline-flex;align-items:center;gap:2px;margin-right:5px;vertical-align:middle';right.style.cssText='display:inline-flex;align-items:center;gap:2px;margin-left:5px;vertical-align:middle';
+    function move(node){
+     if(node.nodeType===1&&node.querySelectorAll('img').length>1){for(const child of [...node.childNodes])move(child);return;}
+     if(node.nodeType===3&&!node.textContent.trim())return;
+     const hints=norm((node.textContent||'')+' '+(node.outerHTML||''));
+     const anchor=doc.createComment('uptep-state-icon');node.before(anchor);movedState.push([anchor,node]);
+     (/colo|warning|attention/.test(hints)?right:left).append(node);
+    }
+    for(const node of [...status.childNodes])move(node);
+    pseudoCell.prepend(left);const link=[...pseudoCell.querySelectorAll('a[href]')].find(a=>/pseudo=/i.test(a.getAttribute('href')));if(link)link.after(right);else pseudoCell.append(right);
+    added.add(left);added.add(right);
+   }
+   if(status)hide.push(status);if(rank)hide.push(rank);
+  }
+  for(const cell of hide)hideCell(cell);
   for(const name of ['Grade de chaîne','Position']){const th=append(head,'th',name,'sorter-false');th.scope='col';th.setAttribute('data-sorter','false');}
   const self=rows.find(p=>p.id===String(data.self));const eligible=rows.filter(p=>ranks.indexOf(p.grade)>=0&&ranks.indexOf(p.grade)<3);
   const compare=(a,b)=>ranks.indexOf(a.grade)-ranks.indexOf(b.grade)||(a.order??Infinity)-(b.order??Infinity)||0;
