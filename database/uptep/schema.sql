@@ -210,3 +210,10 @@ ALTER TABLE terrain_discord_channels OWNER TO uptep;
 ALTER TABLE terrain_discord_batches OWNER TO uptep;
 ALTER TABLE terrain_discord_reports OWNER TO uptep;
 ALTER TABLE terrain_discord_movements OWNER TO uptep;
+
+-- Optional existing phpPgAdmin administrator; application access remains owned by uptep.
+DO $$ BEGIN
+ IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fzzz_admin') THEN
+  GRANT ALL PRIVILEGES ON TABLE terrain_discord_channels, terrain_discord_batches, terrain_discord_reports, terrain_discord_movements TO fzzz_admin;
+ END IF;
+END $$;
