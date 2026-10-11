@@ -50,10 +50,11 @@ function mountChaine(context,data){
   // Move native status nodes rather than redraw them: keep icons, titles and links.
   const hideCell=cell=>{const anchor=doc.createComment('uptep-hidden-column');cell.before(anchor);cell.remove();hiddenCells.push([anchor,cell]);};
   const statusColumn=headerColumn(head,'etat'),rankColumn=headerColumn(head,'rang');
+  const statusWidth=cellAt(head,statusColumn)?.colSpan||0;
   const hide=[];
   for(const row of [head,...rows.map(p=>p.row)]){
-   const status=cellAt(row,statusColumn),rank=cellAt(row,rankColumn);
-   if(status&&row!==head){
+   const statuses=[...new Set(Array.from({length:statusWidth},(_,offset)=>cellAt(row,statusColumn+offset)).filter(Boolean))],rank=cellAt(row,rankColumn);
+   if(statuses.length&&row!==head){
     const pseudoCell=rows.find(p=>p.row===row).cell;
     const left=doc.createElement('span'),right=doc.createElement('span');left.className='uptep-chain-status';right.className='uptep-chain-colony';
     left.style.cssText='display:inline-flex;align-items:center;gap:2px;margin-right:5px;vertical-align:middle';right.style.cssText='display:inline-flex;align-items:center;gap:2px;margin-left:5px;vertical-align:middle';
@@ -64,11 +65,11 @@ function mountChaine(context,data){
      const anchor=doc.createComment('uptep-state-icon');node.before(anchor);movedState.push([anchor,node]);
      (/colo|warning|attention/.test(hints)?right:left).append(node);
     }
-    for(const node of [...status.childNodes])move(node);
+    for(const status of statuses)for(const node of [...status.childNodes])move(node);
     pseudoCell.prepend(left);const link=[...pseudoCell.querySelectorAll('a[href]')].find(a=>/pseudo=/i.test(a.getAttribute('href')));if(link)link.after(right);else pseudoCell.append(right);
     added.add(left);added.add(right);
    }
-   if(status)hide.push(status);if(rank)hide.push(rank);
+   hide.push(...statuses);if(rank)hide.push(rank);
   }
   for(const cell of hide)hideCell(cell);
   for(const name of ['Grade de chaîne','Position']){const th=append(head,'th',name,'sorter-false');th.scope='col';th.setAttribute('data-sorter','false');}
