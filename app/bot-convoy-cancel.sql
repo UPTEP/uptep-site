@@ -1,0 +1,13 @@
+BEGIN;
+ALTER TABLE demandes_convois ADD COLUMN fin_manuelle boolean NOT NULL DEFAULT false;
+ALTER TABLE demandes_convois ADD COLUMN discord_cloture bigint;
+ALTER TABLE demandes_convois ADD COLUMN pseudo_cloture text;
+ALTER TABLE demandes_convois DROP CONSTRAINT demandes_convois_check4;
+ALTER TABLE demandes_convois ADD CONSTRAINT demande_solde_fin CHECK(fini=(fin_manuelle OR (nbpomme_restant=0 AND nbmateriaux_restant=0)));
+ALTER TABLE demandes_convois ADD CONSTRAINT demande_fin_audit CHECK((fin_manuelle AND fini AND discord_cloture IS NOT NULL AND pseudo_cloture IS NOT NULL) OR (NOT fin_manuelle AND discord_cloture IS NULL AND pseudo_cloture IS NULL));
+ALTER TABLE convois_effectues ADD COLUMN annule boolean NOT NULL DEFAULT false;
+ALTER TABLE convois_effectues ADD COLUMN date_annulation timestamptz;
+ALTER TABLE convois_effectues ADD COLUMN discord_annulateur bigint;
+ALTER TABLE convois_effectues ADD COLUMN pseudo_annulateur text;
+ALTER TABLE convois_effectues ADD CONSTRAINT convoi_annulation_audit CHECK((annule AND date_annulation IS NOT NULL AND discord_annulateur IS NOT NULL AND pseudo_annulateur IS NOT NULL) OR (NOT annule AND date_annulation IS NULL AND discord_annulateur IS NULL AND pseudo_annulateur IS NULL));
+COMMIT;

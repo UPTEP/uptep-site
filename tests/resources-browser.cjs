@@ -1,0 +1,52 @@
+const puppeteer=require('/root/maudits-lighthouse/node_modules/puppeteer-core');
+const fs=require('fs');const assert=require('node:assert/strict');
+(async()=>{const browser=await puppeteer.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});try{
+const page=await browser.newPage();await page.setViewport({width:1440,height:1000});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.goto('https://uptep.top/ressources.php');assert(page.url().includes('login'));
+const user=JSON.parse(fs.readFileSync('/root/uptep-chaine-tests.json'))[0];
+await page.type('[name=username]',user.username);await page.type('[name=password]',user.password);
+await Promise.all([page.waitForNavigation(),page.click('button[type=submit]')]);
+const response=await page.goto('https://uptep.top/ressources.php');assert.equal(response.status(),200);
+await page.waitForSelector('#resource-simulate:not([disabled])');
+const requests=[];page.on('request',r=>requests.push(r.method()+' '+r.url()));
+const count=await page.$$eval('[data-resource-player]',r=>r.length);assert(count>0);
+for(let i=0;i<3;i++)await page.click('#resource-simulate');
+assert.equal(await page.$eval('#resource-hours',e=>e.textContent),'3');
+assert.equal(await page.$eval('#resource-total',e=>e.textContent),'0');
+const before=await page.$$eval('[data-value=balance]',r=>r.map(e=>e.textContent));
+await page.$eval('[data-resource-player] input',e=>{e.value='25';e.dispatchEvent(new Event('input',{bubbles:true}));});
+assert.deepEqual(await page.$$eval('[data-value=balance]',r=>r.map(e=>e.textContent)),before);
+await page.click('#resource-simulate');assert.equal(await page.$eval('#resource-total',e=>e.textContent),'0');
+await page.screenshot({path:'/root/uptep-site/previews/resources-desktop.png',fullPage:true});
+await page.$eval('[data-resource-player] input',e=>{e.value='-1';e.dispatchEvent(new Event('input',{bubbles:true}));});
+assert(await page.$eval('#resource-simulate',e=>e.disabled));
+await page.click('#resource-reset');assert.equal(await page.$eval('#resource-hours',e=>e.textContent),'0');
+assert((await page.$$eval('[data-value=balance]',r=>r.map(e=>e.textContent))).every(v=>v==='0'));
+// Sort without changing the original identity-to-balance mapping.
+for(const key of ['field','tdp','balance']){
+ await page.click('[data-resource-sort="'+key+'"]');
+ assert.equal(await page.$eval('[data-resource-sort="'+key+'"]',e=>e.parentElement.getAttribute('aria-sort')),'descending');
+ if(key==='field')assert(await page.$$eval('[data-resource-player]',rows=>rows.every((r,i)=>!i||BigInt(rows[i-1].dataset.field)>=BigInt(r.dataset.field))));
+ await page.click('[data-resource-sort="'+key+'"]');
+ assert.equal(await page.$eval('[data-resource-sort="'+key+'"]',e=>e.parentElement.getAttribute('aria-sort')),'ascending');
+}
+const ids=await page.$$eval('#convoy-sender option',rows=>rows.map(r=>r.value));
+await page.select('#convoy-sender',ids[0]);await page.select('#convoy-recipient',ids[1]);
+await page.type('#convoy-amount','12345');await page.click('#resource-convoy-form button');
+const getBalance=id=>page.$eval('[data-resource-player="'+id+'"] [data-value=balance]',e=>e.textContent.replace(/[^0-9+-]/g,''));
+assert.equal(await getBalance(ids[0]),'+12345');assert.equal(await getBalance(ids[1]),'-12345');
+assert.equal(await page.$eval('#resource-total',e=>e.textContent),'0');assert.equal(await page.$$eval('#convoy-history li',r=>r.length),1);
+await page.select('#convoy-recipient',ids[0]);await page.type('#convoy-amount','100');await page.click('#resource-convoy-form button');
+assert.equal(await page.$$eval('#convoy-history li',r=>r.length),1);assert.equal(await getBalance(ids[0]),'+12345');
+await page.select('#convoy-sender',ids[1]);await page.click('#resource-convoy-form button');
+assert.equal(await getBalance(ids[0]),'+12245');assert.equal(await getBalance(ids[1]),'-12245');
+assert.equal(await page.$$eval('#convoy-history li',r=>r.length),2);
+await page.click('#resource-reset');assert.equal(await page.$$eval('#convoy-history li',r=>r.length),0);assert.equal(await getBalance(ids[0]),'0');
+assert.deepEqual(requests,[]);
+await page.reload();await page.waitForSelector('#resource-simulate:not([disabled])');assert.equal(await page.$eval('#resource-hours',e=>e.textContent),'0');
+await page.setViewport({width:390,height:844});await page.screenshot({path:'/root/uptep-site/previews/resources-mobile.png',fullPage:true});
+assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+assert.deepEqual(errors,[]);
+console.log(`Resources browser OK: ${count} real members; auth, cumulative balances, edit, invalid input, reset, reload, no simulation requests, mobile width`);
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

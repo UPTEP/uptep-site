@@ -1,0 +1,6 @@
+{
+  "db_user": "uptep",
+  "db_password": "REPLACE_WITH_PRIVATE_PASSWORD",
+  "rate_key": "REPLACE_WITH_RANDOM_SECRET",
+  "dummy_hash": "REPLACE_WITH_PASSWORD_HASH"
+}

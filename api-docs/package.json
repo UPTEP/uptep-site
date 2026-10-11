@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@apidevtools/swagger-parser": "12.1.0",
+    "swagger-ui-dist": "5.33.1"
+  }
+}
