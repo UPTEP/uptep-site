@@ -1,8 +1,22 @@
+// Distance and one-way attack travel time, verified against https://toolzzz.fr/durees2.php.
+function chaineTravel(origin,target,speed){
+ const coord=value=>value!==null&&value!==undefined&&value!==''&&Number.isSafeInteger(Number(value))&&Number(value)>=0;
+ if(!origin||!target||![origin.x,origin.y,target.x,target.y].every(coord))return {distance:null,seconds:null};
+ const distance=Math.hypot(Number(target.x)-Number(origin.x),Number(target.y)-Number(origin.y));
+ const knownSpeed=typeof speed==='number'&&Number.isInteger(speed)&&speed>=0&&speed<=999;
+ return {distance,seconds:knownSpeed?Math.round(86400*(1-Math.exp(-distance/350))*7.375*Math.pow(0.9,speed)):null};
+}
+function chaineTravelDuration(seconds){
+ if(seconds===null)return '—';
+ const days=Math.floor(seconds/86400),hours=Math.floor(seconds%86400/3600),minutes=Math.floor(seconds%3600/60),remaining=seconds%60;
+ return (days?days+'j ':'')+String(hours).padStart(2,'0')+':'+String(minutes).padStart(2,'0')+':'+String(remaining).padStart(2,'0');
+}
 function mountChaine(context,data){
  const doc=context.document,win=context.window,params=new URLSearchParams(win.location.search);
  if(win.location.pathname.toLowerCase()!=='/alliance.php'||!params.has('Membres')||!data)return ()=>{};
  for(const [key,value] of params)if(/alliance|tag/i.test(key)&&value&&value!=='UPTEP')return ()=>{};
  const ranks=['Grenier','Passeur','Chasseur','A flooder','Ne pas toucher','Hors chaîne'],saved=new Map(data.players.map(p=>[p.pseudo,p]));
+ const origin=data.players.find(p=>String(p.player_id)===String(data.self));
  const style=doc.createElement('style');style.textContent='.uptep-chain-cell{white-space:nowrap;text-align:center!important;padding:2px 5px!important}.uptep-chain-badge{display:inline-block;border-radius:2px;padding:3px 7px;font:11px Verdana,sans-serif;box-shadow:inset 0 1px 0 #ffffff18}.uptep-chain-0{background:#805710;color:#fff1cc}.uptep-chain-1{background:#2b638c;color:#f1f7ff}.uptep-chain-2{background:#3c702f;color:#f1f7df}.uptep-chain-3{background:#a44e17;color:#fff3dc}.uptep-chain-4{background:#963a42;color:#fff0ed}.uptep-chain-5{background:#62616a;color:#f5f3f1}.uptep-chain-move{font-size:18px;font-weight:700}.uptep-chain-up{color:#355c3b}.uptep-chain-down{color:#883924}.uptep-chain-aligned{color:#486033}tr.uptep-chain-self>td,tr.uptep-chain-self>th{background:#dfa08b!important}tr.uptep-chain-self>td:first-child,tr.uptep-chain-self>th:first-child{box-shadow:inset 4px 0 #992f24}tr.uptep-chain-target>td,tr.uptep-chain-target>th{background:#b8c58b!important}tr.uptep-chain-target>td:first-child,tr.uptep-chain-target>th:first-child{box-shadow:inset 4px 0 #566332}.uptep-chain-mark{display:inline-block;font:10px Verdana;margin-left:5px;color:#39421e}tr.uptep-chain-self .uptep-chain-mark{color:#74251e}';doc.head.append(style);
  const legend=doc.createElement('div');legend.className='uptep-chain-legend';legend.setAttribute('role','note');legend.setAttribute('aria-label','Légende des couleurs de la chaîne');
  legend.style.cssText='display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;margin:10px 0;padding:6px 0;color:#302b18;font:12px Verdana,sans-serif;text-align:left;';
@@ -103,10 +117,15 @@ function mountChaine(context,data){
    hide.push(...statuses);if(rank)hide.push(rank);
   }
   for(const cell of hide)hideCell(cell);
-  for(const name of ['Grade de chaîne','Position']){const th=append(head,'th',name,'sorter-false');th.scope='col';th.setAttribute('data-sorter','false');}
+  for(const name of ['Distance','Trajet','Grade de chaîne','Position']){const th=append(head,'th',name,'sorter-false');th.scope='col';th.setAttribute('data-sorter','false');}
   const self=rows.find(p=>p.id===String(data.self));const eligible=rows.filter(p=>ranks.indexOf(p.grade)>=0&&ranks.indexOf(p.grade)<3);
   const compare=(a,b)=>ranks.indexOf(a.grade)-ranks.indexOf(b.grade)||(a.order??Infinity)-(b.order??Infinity)||0;
   for(const p of rows){
+   const target=saved.get(p.pseudo),travel=chaineTravel(origin,target,data.attack_speed);
+   const distanceCell=append(p.row,'td',travel.distance===null?'—':travel.distance.toLocaleString('fr-FR',{maximumFractionDigits:2}),'uptep-chain-distance');
+   distanceCell.title=travel.distance===null?'Coordonnées indisponibles dans les relevés UPTEP.':'Distance depuis '+origin.pseudo+' ('+origin.x+', '+origin.y+') vers '+p.pseudo+' ('+target.x+', '+target.y+').';
+   const travelCell=append(p.row,'td',chaineTravelDuration(travel.seconds),'uptep-chain-travel');
+   travelCell.title=travel.distance===null?'Coordonnées indisponibles dans les relevés UPTEP.':travel.seconds===null?'Vitesse d’attaque non renseignée : synchronise le laboratoire ou complète Mes stats sur UPTEP.':'Trajet aller estimé · Vitesse d’attaque '+data.attack_speed+(data.research_synced_at?' · Laboratoire relevé le '+new Date(data.research_synced_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'}):'');
    const cell=append(p.row,'td',''),badge=doc.createElement('span');badge.className='uptep-chain-badge uptep-chain-'+ranks.indexOf(p.grade);badge.textContent=p.grade?(p.grade+(p.order!==null?' · '+p.order:'')):'—';cell.append(badge);
    let movement='excluded';if(eligible.includes(p)){const actualStart=eligible.filter(o=>o.field>p.field).length+1,actualEnd=actualStart+eligible.filter(o=>o.field===p.field).length-1,targetStart=eligible.filter(o=>compare(o,p)<0).length+1,targetEnd=targetStart+eligible.filter(o=>compare(o,p)===0).length-1;movement=actualStart>targetEnd?'up':actualEnd<targetStart?'down':'aligned';}
    const position=append(p.row,'td',({up:'↑',down:'↓',aligned:'✓',excluded:'—'})[movement],'uptep-chain-move uptep-chain-'+movement);position.title=({up:'Monter',down:'Descendre',aligned:'À sa place',excluded:'Hors classement de position'})[movement];

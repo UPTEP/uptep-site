@@ -14,8 +14,10 @@ try{
  $header=$_SERVER['HTTP_AUTHORIZATION']??'';$token=str_starts_with($header,'Bearer ')?substr($header,7):'';
  $actor=authorizeScript($token,$body['pseudo'],$body['alliance']);
  $q=db()->query("SELECT player_id,grade,sort_order FROM chaine_members WHERE server='s5' ORDER BY player_id");$assignments=[];foreach($q->fetchAll(PDO::FETCH_ASSOC) as $row)$assignments[(string)$row['player_id']]=$row;
- $players=[];foreach(chainePlayers() as $player){$saved=$assignments[(string)$player['player_id']]??[];$players[]=['player_id'=>(string)$player['player_id'],'pseudo'=>$player['pseudo'],'grade'=>$saved['grade']??null,'sort_order'=>isset($saved['sort_order'])?(int)$saved['sort_order']:null,'on_holiday'=>$player['on_holiday'],'is_banned'=>$player['is_banned']];}
- $chainCode='const uptepChaineData='.json_encode(['self'=>(string)$actor['game_player_id'],'players'=>$players],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR).';';
+ $players=[];foreach(chainePlayers() as $player){$saved=$assignments[(string)$player['player_id']]??[];$players[]=['player_id'=>(string)$player['player_id'],'pseudo'=>$player['pseudo'],'x'=>isset($player['x'])?(int)$player['x']:null,'y'=>isset($player['y'])?(int)$player['y']:null,'grade'=>$saved['grade']??null,'sort_order'=>isset($saved['sort_order'])?(int)$saved['sort_order']:null,'on_holiday'=>$player['on_holiday'],'is_banned'=>$player['is_banned']];}
+ $q=db()->prepare("SELECT data->'research'->>'vitesse_attaque' AS speed,research_synced_at FROM user_stats WHERE user_id=?");$q->execute([(int)$actor['id']]);$research=$q->fetch(PDO::FETCH_ASSOC);
+ $speed=$research['speed']??null;$speed=is_string($speed)&&preg_match('/\A[0-9]{1,3}\z/',$speed)?(int)$speed:null;
+ $chainCode='const uptepChaineData='.json_encode(['self'=>(string)$actor['game_player_id'],'players'=>$players,'attack_speed'=>$speed,'research_synced_at'=>$research['research_synced_at']??null],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR).';';
  $code=file_get_contents('/home/uptep/private/app/script-runtime.min.js');if($code===false)throw new RuntimeException('Runtime missing');
  $prefs=scriptSettings((int)$actor['id'])['preferences'];
  $code='const uptepHourlyDue='.json_encode($prefs['economy']&&hourlyCollectionDue((int)$actor['id'])).';const uptepPreferences='.json_encode($prefs,JSON_THROW_ON_ERROR).';'.$chainCode.$code;

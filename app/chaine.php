@@ -33,7 +33,7 @@ function chaineMovements(array $players): array {
     return $result;
 }
 function chainePlayers(): array {
-    $q = db(true)->prepare("SELECT server,player_id,pseudo,field,grade AS game_grade,on_holiday,is_banned,export_version FROM players WHERE server = ? AND upper(alliance_tag) = 'UPTEP' AND is_present = true ORDER BY lower(pseudo),player_id");
+    $q = db(true)->prepare("SELECT server,player_id,pseudo,field,x,y,grade AS game_grade,on_holiday,is_banned,export_version FROM players WHERE server = ? AND upper(alliance_tag) = 'UPTEP' AND is_present = true ORDER BY lower(pseudo),player_id");
     $q->execute([CHAINE_SERVER]);
     return $q->fetchAll(PDO::FETCH_ASSOC);
 }
