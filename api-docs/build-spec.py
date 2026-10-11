@@ -68,6 +68,23 @@ paths['/convois']={'get':operation('Convois','Lister les convois annulables par 
 paths['/convois/{id}/annulation']={'post':operation('Convois','Annuler un convoi déclaré','convois:cancel','L’expéditeur ou un responsable chaîne peut annuler la déclaration. Les ressources sont réintégrées au restant une seule fois. Une demande soldée automatiquement est rouverte ; une demande annulée ou terminée manuellement reste fermée. L’historique et l’auteur de l’annulation sont conservés. Aucun effet sur le jeu.','convoi_annulation','post','Validation',[dict(idparam,description='ID du convoi déclaré.')])}
 for path,methods in paths.items():
  for method,op in methods.items():op['operationId']=method+'_'+path.replace('/','_').replace('{id}','id')
+# Read-only reports for the private bot admin allowlist (not the broader chain role).
+report_actor={'name':'discord_id','in':'query','required':True,'schema':identifier,'description':'Auteur réel de l’interaction Discord, associé à un joueur UPTEP et listé dans ADMIN_DISCORD_IDS.'}
+report_page={'name':'page','in':'query','schema':{'type':'integer','minimum':1,'maximum':10000,'default':1},'description':'Page de 8 résultats.'}
+report_period=[{'name':'periode','in':'query','schema':{'type':'string','enum':['7j','30j','personnalisee'],'default':'7j'}},*({'name':k,'in':'query','schema':{'type':'string','pattern':r'^\d{2}-\d{2}-\d{4}$'},'description':'JJ-MM-AAAA. Début et fin ensemble, inclusifs, maximum 366 jours, pas de date future.'} for k in ['debut','fin'])]
+report_stats={'joueur_id':identifier,'pseudo':{'type':'string'},'envois':{'type':'string'},'receptions':{'type':'string'}}
+for col in ['pommes_envoyees','materiaux_envoyes','pommes_recues','materiaux_recus']:
+ report_stats[col]={'type':'string','pattern':'^[0-9]+$','description':'Total exact, peut dépasser bigint.'}
+ report_stats['moyenne_'+col]={'type':'string','pattern':r'^[0-9]+\.[0-9]{2}$','description':'Total / nombre de jours calendaires, jours inactifs inclus.'}
+schemas['StatistiquesConvois']=obj(report_stats)
+for kind,item,filters in [('demandes',ref('Demande'),['joueur','etat']),('convois',ref('Convoi'),['expediteur','destinataire','demande']),('statistiques',ref('StatistiquesConvois'),['joueur'])]:
+ key='rapport_'+kind
+ responses[key]=obj({'ok':ok,'periode':obj({'debut':{'type':'string'},'fin':{'type':'string'},'jours':{'type':'integer'},'fuseau':{'type':'string'},'depuis':{'type':'string','format':'date-time'},'avant':{'type':'string','format':'date-time'}}),'lignes':{'type':'array','items':item},'page':{'type':'integer'},'pages':{'type':'integer'},'total':{'type':'integer'}})
+ params=[report_actor,report_page]+report_period+[{'name':f,'in':'query','schema':({'type':'string','enum':['toutes','attente','en_cours','terminee','annulee']} if f=='etat' else identifier if f=='demande' else {'type':'string','maxLength':100}),'description':'Pseudo exact insensible à la casse.' if f in ['joueur','expediteur','destinataire'] else 'Filtre facultatif.'} for f in filters]
+ paths['/rapports/'+kind]={'get':operation('Rapports','Lire le rapport '+kind,'rapports:read','Lecture réservée aux IDs de ADMIN_DISCORD_IDS associés à un membre actuel UPTEP. Le droit chaîne seul ne suffit pas. Dates civiles Europe/Paris, journée en cours incluse par défaut. Demandes filtrées par création ; convois et statistiques par date_convoi. Statistiques : envois déclarés, pas livraisons confirmées ; convois annulés exclus. Historique : annulations conservées. Moyennes sur tous les jours inclusifs. Joueurs sans activité absents du classement.',key,parameters=params)}
+responses['rapport_detail']=obj({'ok':ok,'demande':ref('Demande'),'lignes':{'type':'array','items':ref('Convoi')},'page':{'type':'integer'},'pages':{'type':'integer'},'total':{'type':'integer'}})
+paths['/rapports/demandes/{id}']={'get':operation('Rapports','Détail et convois d’une demande, même clôturée ou annulée','rapports:read','Mêmes droits que les rapports. Convois associés de toutes dates, 8 par page. date_fin correspond à la clôture des déclarations, pas à une livraison confirmée dans le jeu. fin_manuelle distingue la clôture manuelle.', 'rapport_detail',parameters=[idparam,report_actor,report_page])}
+
 spec={'openapi':'3.0.3','info':{'title':'UPTEP · API du bot Discord','version':'1.0.0','description':'''API privée pour le bot Discord de l’alliance UPTEP sur le serveur 5.
 
 ### Authentification

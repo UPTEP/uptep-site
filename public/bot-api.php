@@ -36,7 +36,18 @@ try {
         if(!in_array('health:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
         botReply(200,['ok'=>true,'service'=>'uptep-bot-api','version'=>'1','status'=>'healthy','time'=>gmdate('Y-m-d\TH:i:s\Z')]);
     }
-    $id=null;
+    $id=null;$reportKind=null;
+    if(preg_match('~\A/api/bot/v1/rapports/(demandes|convois|statistiques)(?:/([1-9][0-9]{0,18}))?\z~',$path,$reportMatch)){
+        $reportKind=$reportMatch[1];$id=$reportMatch[2]??null;
+        if($id!==null&&$reportKind!=='demandes')botReply(404,['ok'=>false,'error'=>'not_found']);
+        if($method!=='GET'){header('Allow: GET');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
+        if(!in_array('rapports:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
+        define('UPTEP_SCRIPT_API',true);
+        require '/home/uptep/private/app/bootstrap.php';
+        require '/home/uptep/private/app/bot-convoys.php';
+        require '/home/uptep/private/app/bot-reports.php';
+        botReply(200,botReports(db(),db(true),$reportKind,$_GET,$id));
+    }
     if($path==='/api/bot/v1/demandes'){$allowed=['GET','POST'];$action=$method==='GET'?'lecture':'demande';}
     elseif($path==='/api/bot/v1/convois'){$allowed=['GET'];$action='convois_annulables';}
     elseif(preg_match('~\A/api/bot/v1/convois/([1-9][0-9]{0,18})/annulation\z~',$path,$match)){$allowed=['POST'];$id=$match[1];$action='annulation_convoi';}

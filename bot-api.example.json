@@ -12,6 +12,7 @@
     "demandes:finish",
     "convois:read",
     "convois:create",
-    "convois:cancel"
+    "convois:cancel",
+    "rapports:read"
   ]
 }

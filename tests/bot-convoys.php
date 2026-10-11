@@ -119,5 +119,6 @@ try{
  file_put_contents(UPTEP_BOT_ENV_FILE,"ADMIN_DISCORD_IDS=103,103\n");check(botMember($p,$p,'103')['membre']['is_chaine'],'overlapping roles accepted');
  file_put_contents(UPTEP_BOT_ENV_FILE,"ADMIN_DISCORD_IDS=102,not-an-id\n");check(botConfiguredAdmins()===[],'invalid allowlist fails closed');
  unlink(UPTEP_BOT_ENV_FILE);
+ require __DIR__.'/bot-reports-checks.php';
  echo "OK: creation, validation permissions, membership, precise integers, pagination filters, partial/completed convoys, replays/conflicts, date checks and concurrent over-send protection.\n";
 }finally{$p->exec('DROP SCHEMA '.$schema.' CASCADE');}

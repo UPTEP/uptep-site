@@ -1859,6 +1859,869 @@
         },
         "operationId": "post__convois_id_annulation"
       }
+    },
+    "/rapports/demandes": {
+      "get": {
+        "tags": [
+          "Rapports"
+        ],
+        "summary": "Lire le rapport demandes",
+        "description": "**Permission du secret : `rapports:read`.**\n\nLecture réservée aux IDs de ADMIN_DISCORD_IDS associés à un membre actuel UPTEP. Le droit chaîne seul ne suffit pas. Dates civiles Europe/Paris, journée en cours incluse par défaut. Demandes filtrées par création ; convois et statistiques par date_convoi. Statistiques : envois déclarés, pas livraisons confirmées ; convois annulés exclus. Historique : annulations conservées. Moyennes sur tous les jours inclusifs. Joueurs sans activité absents du classement.",
+        "responses": {
+          "200": {
+            "description": "Succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "periode": {
+                      "type": "object",
+                      "properties": {
+                        "debut": {
+                          "type": "string"
+                        },
+                        "fin": {
+                          "type": "string"
+                        },
+                        "jours": {
+                          "type": "integer"
+                        },
+                        "fuseau": {
+                          "type": "string"
+                        },
+                        "depuis": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "avant": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "debut",
+                        "fin",
+                        "jours",
+                        "fuseau",
+                        "depuis",
+                        "avant"
+                      ]
+                    },
+                    "lignes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Demande"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "periode",
+                    "lignes",
+                    "page",
+                    "pages",
+                    "total"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Secret absent, invalide, désactivé ou expiré.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission du secret insuffisante, association Discord invalide ou droit utilisateur absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Méthode HTTP refusée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de requêtes dépassée (réponse Nginx HTML).",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service momentanément indisponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Route ou demande introuvable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Valeurs, champs ou paramètres invalides.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "discord_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "maxLength": 19,
+              "description": "Entier exact transmis comme chaîne JSON, maximum 9223372036854775807.",
+              "example": "123456789012345678"
+            },
+            "description": "Auteur réel de l’interaction Discord, associé à un joueur UPTEP et listé dans ADMIN_DISCORD_IDS."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            },
+            "description": "Page de 8 résultats."
+          },
+          {
+            "name": "periode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7j",
+                "30j",
+                "personnalisee"
+              ],
+              "default": "7j"
+            }
+          },
+          {
+            "name": "debut",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{2}-\\d{2}-\\d{4}$"
+            },
+            "description": "JJ-MM-AAAA. Début et fin ensemble, inclusifs, maximum 366 jours, pas de date future."
+          },
+          {
+            "name": "fin",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{2}-\\d{2}-\\d{4}$"
+            },
+            "description": "JJ-MM-AAAA. Début et fin ensemble, inclusifs, maximum 366 jours, pas de date future."
+          },
+          {
+            "name": "joueur",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Pseudo exact insensible à la casse."
+          },
+          {
+            "name": "etat",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "toutes",
+                "attente",
+                "en_cours",
+                "terminee",
+                "annulee"
+              ]
+            },
+            "description": "Filtre facultatif."
+          }
+        ]
+      }
+    },
+    "/rapports/convois": {
+      "get": {
+        "tags": [
+          "Rapports"
+        ],
+        "summary": "Lire le rapport convois",
+        "description": "**Permission du secret : `rapports:read`.**\n\nLecture réservée aux IDs de ADMIN_DISCORD_IDS associés à un membre actuel UPTEP. Le droit chaîne seul ne suffit pas. Dates civiles Europe/Paris, journée en cours incluse par défaut. Demandes filtrées par création ; convois et statistiques par date_convoi. Statistiques : envois déclarés, pas livraisons confirmées ; convois annulés exclus. Historique : annulations conservées. Moyennes sur tous les jours inclusifs. Joueurs sans activité absents du classement.",
+        "responses": {
+          "200": {
+            "description": "Succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "periode": {
+                      "type": "object",
+                      "properties": {
+                        "debut": {
+                          "type": "string"
+                        },
+                        "fin": {
+                          "type": "string"
+                        },
+                        "jours": {
+                          "type": "integer"
+                        },
+                        "fuseau": {
+                          "type": "string"
+                        },
+                        "depuis": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "avant": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "debut",
+                        "fin",
+                        "jours",
+                        "fuseau",
+                        "depuis",
+                        "avant"
+                      ]
+                    },
+                    "lignes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Convoi"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "periode",
+                    "lignes",
+                    "page",
+                    "pages",
+                    "total"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Secret absent, invalide, désactivé ou expiré.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission du secret insuffisante, association Discord invalide ou droit utilisateur absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Méthode HTTP refusée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de requêtes dépassée (réponse Nginx HTML).",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service momentanément indisponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Route ou demande introuvable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Valeurs, champs ou paramètres invalides.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "discord_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "maxLength": 19,
+              "description": "Entier exact transmis comme chaîne JSON, maximum 9223372036854775807.",
+              "example": "123456789012345678"
+            },
+            "description": "Auteur réel de l’interaction Discord, associé à un joueur UPTEP et listé dans ADMIN_DISCORD_IDS."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            },
+            "description": "Page de 8 résultats."
+          },
+          {
+            "name": "periode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7j",
+                "30j",
+                "personnalisee"
+              ],
+              "default": "7j"
+            }
+          },
+          {
+            "name": "debut",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{2}-\\d{2}-\\d{4}$"
+            },
+            "description": "JJ-MM-AAAA. Début et fin ensemble, inclusifs, maximum 366 jours, pas de date future."
+          },
+          {
+            "name": "fin",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{2}-\\d{2}-\\d{4}$"
+            },
+            "description": "JJ-MM-AAAA. Début et fin ensemble, inclusifs, maximum 366 jours, pas de date future."
+          },
+          {
+            "name": "expediteur",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Pseudo exact insensible à la casse."
+          },
+          {
+            "name": "destinataire",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Pseudo exact insensible à la casse."
+          },
+          {
+            "name": "demande",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "maxLength": 19,
+              "description": "Entier exact transmis comme chaîne JSON, maximum 9223372036854775807.",
+              "example": "123456789012345678"
+            },
+            "description": "Filtre facultatif."
+          }
+        ]
+      }
+    },
+    "/rapports/statistiques": {
+      "get": {
+        "tags": [
+          "Rapports"
+        ],
+        "summary": "Lire le rapport statistiques",
+        "description": "**Permission du secret : `rapports:read`.**\n\nLecture réservée aux IDs de ADMIN_DISCORD_IDS associés à un membre actuel UPTEP. Le droit chaîne seul ne suffit pas. Dates civiles Europe/Paris, journée en cours incluse par défaut. Demandes filtrées par création ; convois et statistiques par date_convoi. Statistiques : envois déclarés, pas livraisons confirmées ; convois annulés exclus. Historique : annulations conservées. Moyennes sur tous les jours inclusifs. Joueurs sans activité absents du classement.",
+        "responses": {
+          "200": {
+            "description": "Succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "periode": {
+                      "type": "object",
+                      "properties": {
+                        "debut": {
+                          "type": "string"
+                        },
+                        "fin": {
+                          "type": "string"
+                        },
+                        "jours": {
+                          "type": "integer"
+                        },
+                        "fuseau": {
+                          "type": "string"
+                        },
+                        "depuis": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "avant": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "debut",
+                        "fin",
+                        "jours",
+                        "fuseau",
+                        "depuis",
+                        "avant"
+                      ]
+                    },
+                    "lignes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StatistiquesConvois"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "periode",
+                    "lignes",
+                    "page",
+                    "pages",
+                    "total"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Secret absent, invalide, désactivé ou expiré.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission du secret insuffisante, association Discord invalide ou droit utilisateur absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Méthode HTTP refusée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de requêtes dépassée (réponse Nginx HTML).",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service momentanément indisponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Route ou demande introuvable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Valeurs, champs ou paramètres invalides.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "discord_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "maxLength": 19,
+              "description": "Entier exact transmis comme chaîne JSON, maximum 9223372036854775807.",
+              "example": "123456789012345678"
+            },
+            "description": "Auteur réel de l’interaction Discord, associé à un joueur UPTEP et listé dans ADMIN_DISCORD_IDS."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            },
+            "description": "Page de 8 résultats."
+          },
+          {
+            "name": "periode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7j",
+                "30j",
+                "personnalisee"
+              ],
+              "default": "7j"
+            }
+          },
+          {
+            "name": "debut",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{2}-\\d{2}-\\d{4}$"
+            },
+            "description": "JJ-MM-AAAA. Début et fin ensemble, inclusifs, maximum 366 jours, pas de date future."
+          },
+          {
+            "name": "fin",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{2}-\\d{2}-\\d{4}$"
+            },
+            "description": "JJ-MM-AAAA. Début et fin ensemble, inclusifs, maximum 366 jours, pas de date future."
+          },
+          {
+            "name": "joueur",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Pseudo exact insensible à la casse."
+          }
+        ]
+      }
+    },
+    "/rapports/demandes/{id}": {
+      "get": {
+        "tags": [
+          "Rapports"
+        ],
+        "summary": "Détail et convois d’une demande, même clôturée ou annulée",
+        "description": "**Permission du secret : `rapports:read`.**\n\nMêmes droits que les rapports. Convois associés de toutes dates, 8 par page. date_fin correspond à la clôture des déclarations, pas à une livraison confirmée dans le jeu. fin_manuelle distingue la clôture manuelle.",
+        "responses": {
+          "200": {
+            "description": "Succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "demande": {
+                      "$ref": "#/components/schemas/Demande"
+                    },
+                    "lignes": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Convoi"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "demande",
+                    "lignes",
+                    "page",
+                    "pages",
+                    "total"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Secret absent, invalide, désactivé ou expiré.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission du secret insuffisante, association Discord invalide ou droit utilisateur absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Méthode HTTP refusée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de requêtes dépassée (réponse Nginx HTML).",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service momentanément indisponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Route ou demande introuvable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Valeurs, champs ou paramètres invalides.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "maxLength": 19,
+              "description": "Entier exact transmis comme chaîne JSON, maximum 9223372036854775807.",
+              "example": "1"
+            },
+            "description": "ID de la demande."
+          },
+          {
+            "name": "discord_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "maxLength": 19,
+              "description": "Entier exact transmis comme chaîne JSON, maximum 9223372036854775807.",
+              "example": "123456789012345678"
+            },
+            "description": "Auteur réel de l’interaction Discord, associé à un joueur UPTEP et listé dans ADMIN_DISCORD_IDS."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "default": 1
+            },
+            "description": "Page de 8 résultats."
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2259,6 +3122,81 @@
           "nbmateriaux"
         ],
         "additionalProperties": false
+      },
+      "StatistiquesConvois": {
+        "type": "object",
+        "properties": {
+          "joueur_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "maxLength": 19,
+            "description": "Entier exact transmis comme chaîne JSON, maximum 9223372036854775807.",
+            "example": "123456789012345678"
+          },
+          "pseudo": {
+            "type": "string"
+          },
+          "envois": {
+            "type": "string"
+          },
+          "receptions": {
+            "type": "string"
+          },
+          "pommes_envoyees": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Total exact, peut dépasser bigint."
+          },
+          "moyenne_pommes_envoyees": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "description": "Total / nombre de jours calendaires, jours inactifs inclus."
+          },
+          "materiaux_envoyes": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Total exact, peut dépasser bigint."
+          },
+          "moyenne_materiaux_envoyes": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "description": "Total / nombre de jours calendaires, jours inactifs inclus."
+          },
+          "pommes_recues": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Total exact, peut dépasser bigint."
+          },
+          "moyenne_pommes_recues": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "description": "Total / nombre de jours calendaires, jours inactifs inclus."
+          },
+          "materiaux_recus": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Total exact, peut dépasser bigint."
+          },
+          "moyenne_materiaux_recus": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]{2}$",
+            "description": "Total / nombre de jours calendaires, jours inactifs inclus."
+          }
+        },
+        "required": [
+          "joueur_id",
+          "pseudo",
+          "envois",
+          "receptions",
+          "pommes_envoyees",
+          "moyenne_pommes_envoyees",
+          "materiaux_envoyes",
+          "moyenne_materiaux_envoyes",
+          "pommes_recues",
+          "moyenne_pommes_recues",
+          "materiaux_recus",
+          "moyenne_materiaux_recus"
+        ]
       }
     }
   }
