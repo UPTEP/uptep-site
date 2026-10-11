@@ -34,7 +34,7 @@ function mountChaine(context,data){
  const collator=new Intl.Collator('fr',{sensitivity:'base',numeric:true});
  function prepareSort(table,head,rows){
   sortable={table,head,rows};
-  for(const cell of head.cells){const key=norm(cell.textContent);if(!['pseudo','terrain'].includes(key))continue;
+  for(const cell of head.cells){const key=norm(cell.textContent);if(!['pseudo','terrain','distance'].includes(key))continue;
    if(!sortHeaders.has(cell))sortHeaders.set(cell,new Map(['tabindex','role','aria-sort','data-uptep-sort'].map(name=>[name,cell.getAttribute(name)])));
    cell.setAttribute('tabindex','0');cell.setAttribute('role','button');cell.setAttribute('data-uptep-sort',key);
    cell.setAttribute('aria-sort',key===sortKey?(sortDirection===1?'ascending':'descending'):'none');
@@ -49,11 +49,11 @@ function mountChaine(context,data){
   if(event.type!=='click'&&!(event.type==='keydown'&&['Enter',' '].includes(event.key)))return;
   const key=cell.getAttribute('data-uptep-sort');if(!key)return;
   update();sortDirection=sortKey===key?-sortDirection:(key==='terrain'?-1:1);sortKey=key;
-  const compare=(a,b)=>key==='pseudo'?collator.compare(a.pseudo,b.pseudo):(a.field<b.field?-1:a.field>b.field?1:0);
+  const compare=(a,b)=>{if(key==='pseudo')return collator.compare(a.pseudo,b.pseudo);const av=key==='distance'?a.distance:a.field,bv=key==='distance'?b.distance:b.field;return av<bv?-1:av>bv?1:0;};
   const parents=new Map();for(const entry of sortable.rows){const parent=entry.row.parentNode;if(!parents.has(parent))parents.set(parent,[]);parents.get(parent).push(entry);}
   for(const entries of parents.values()){
    const anchors=entries.map(p=>{const anchor=doc.createComment('uptep-sort-row');p.row.before(anchor);return anchor;});
-   const ordered=[...entries].sort((a,b)=>sortDirection*compare(a,b)||collator.compare(a.pseudo,b.pseudo));
+   const ordered=[...entries].sort((a,b)=>(key==='distance'&&(a.distance===null||b.distance===null)?(a.distance===null?1:0)-(b.distance===null?1:0):sortDirection*compare(a,b))||collator.compare(a.pseudo,b.pseudo));
    for(let i=0;i<anchors.length;i++)anchors[i].replaceWith(ordered[i].row);
   }
   update();prepareSort(sortable.table,sortable.head,sortable.rows);
@@ -71,7 +71,7 @@ function mountChaine(context,data){
    const player=saved.get(pseudo),field=number(fieldCell.textContent);if(!pseudo||field===null)continue;
    const state=cellAt(row,stateIndex)||(cell.querySelector('.uptep-chain-status')?cell:null);const hints=state?norm([...state.querySelectorAll('[title],[alt],img')].map(n=>(n.getAttribute('title')||'')+' '+(n.getAttribute('alt')||'')+' '+(n.getAttribute('src')||'')).join(' ')+' '+state.textContent):'';
    const knownState=/vacanc|banni|actif|inactif/.test(hints);const blocked=knownState?/vacanc|banni/.test(hints):!!(player?.on_holiday||player?.is_banned);
-   rows.push({row,cell,pseudo,field,blocked,id:String(player?.player_id||''),grade:player?.grade||null,order:player?.sort_order??null});
+   rows.push({row,cell,pseudo,field,blocked,distance:chaineTravel(origin,player,data.attack_speed).distance,id:String(player?.player_id||''),grade:player?.grade||null,order:player?.sort_order??null});
   }
   if(!rows.some(p=>p.id===String(data.self))){sortable=null;legend.remove();return;}
   prepareSort(table,head,rows);
@@ -122,7 +122,7 @@ function mountChaine(context,data){
   const compare=(a,b)=>ranks.indexOf(a.grade)-ranks.indexOf(b.grade)||(a.order??Infinity)-(b.order??Infinity)||0;
   for(const p of rows){
    const target=saved.get(p.pseudo),travel=chaineTravel(origin,target,data.attack_speed);
-   const distanceCell=append(p.row,'td',travel.distance===null?'—':travel.distance.toLocaleString('fr-FR',{maximumFractionDigits:2}),'uptep-chain-distance');
+   const distanceCell=append(p.row,'td',travel.distance===null?'—':Math.ceil(travel.distance).toLocaleString('fr-FR'),'uptep-chain-distance');
    distanceCell.title=travel.distance===null?'Coordonnées indisponibles dans les relevés UPTEP.':'Distance depuis '+origin.pseudo+' ('+origin.x+', '+origin.y+') vers '+p.pseudo+' ('+target.x+', '+target.y+').';
    const travelCell=append(p.row,'td',chaineTravelDuration(travel.seconds),'uptep-chain-travel');
    travelCell.title=travel.distance===null?'Coordonnées indisponibles dans les relevés UPTEP.':travel.seconds===null?'Vitesse d’attaque non renseignée : synchronise le laboratoire ou complète Mes stats sur UPTEP.':'Trajet aller estimé · Vitesse d’attaque '+data.attack_speed+(data.research_synced_at?' · Laboratoire relevé le '+new Date(data.research_synced_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'}):'');
@@ -132,6 +132,7 @@ function mountChaine(context,data){
    let focus='';if(p===self)focus='self';else if(self&&eligible.includes(self)&&!self.blocked&&self.field>0n&&!p.blocked&&p.field>0n&&ranks.indexOf(p.grade)>=0&&ranks.indexOf(p.grade)<4){const difference=ranks.indexOf(p.grade)-ranks.indexOf(self.grade),below=difference>0||(difference===0&&self.order!==null&&p.order!==null&&p.order>self.order);if(below&&p.field*2n>=self.field&&p.field<=self.field*3n)focus='target';}
    if(focus){p.row.classList.add('uptep-chain-'+focus);marked.add(p.row);}
   }
+  prepareSort(table,head,rows);
  }
  update();const timer=win.setInterval(update,1000);return ()=>{win.clearInterval(timer);for(const name of sortEvents)win.removeEventListener(name,handleSort,true);for(const [cell,attrs] of sortHeaders)for(const [name,value] of attrs){if(value===null)cell.removeAttribute(name);else cell.setAttribute(name,value);}clear();legend.remove();style.remove();};
 }
