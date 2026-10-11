@@ -14,6 +14,9 @@
     "convois:create",
     "convois:cancel",
     "rapports:read",
-    "demandes:adjust"
-  ]
+    "demandes:adjust",
+    "terrain:read",
+    "terrain:write"
+  ],
+  "terrain_guild_id": "YOUR_DISCORD_GUILD_ID"
 }

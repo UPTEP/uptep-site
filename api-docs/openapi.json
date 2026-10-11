@@ -2895,6 +2895,290 @@
           }
         }
       }
+    },
+    "/terrain/{guild_id}/{channel_id}": {
+      "get": {
+        "tags": [
+          "Terrain Discord"
+        ],
+        "summary": "Lire le curseur, le solde et la publication en attente",
+        "description": "Scopes terrain:read (GET) ou terrain:write (POST). Réservé à discord_id 1544667516364652659 et au terrain_guild_id configuré. Les identifiants et totaux sont des chaînes. Un lot est idempotent par batch_id et contenu identique ; un curseur périmé ou une publication en attente renvoie 409. GET retourne last_message_id, totals (gains, losses, balance) et pending (lot non publié ou null). POST lots retourne batch_id, last_message_id, totals et duplicate_reports. POST publication retourne ok. Les recopies intégrales datées du même auteur sont dédupliquées. Les anciens messages modifiés ne sont pas relus.",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$"
+            }
+          },
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$"
+            }
+          },
+          {
+            "name": "discord_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "État ou enregistrement réussi"
+          },
+          "403": {
+            "description": "Compte, serveur ou scope non autorisé"
+          },
+          "409": {
+            "description": "Conflit de lot, curseur ou publication"
+          },
+          "422": {
+            "description": "Rapport ou mouvement invalide"
+          }
+        }
+      }
+    },
+    "/terrain/{guild_id}/{channel_id}/lots": {
+      "post": {
+        "tags": [
+          "Terrain Discord"
+        ],
+        "summary": "Enregistrer atomiquement les rapports et avancer le curseur",
+        "description": "Scopes terrain:read (GET) ou terrain:write (POST). Réservé à discord_id 1544667516364652659 et au terrain_guild_id configuré. Les identifiants et totaux sont des chaînes. Un lot est idempotent par batch_id et contenu identique ; un curseur périmé ou une publication en attente renvoie 409. GET retourne last_message_id, totals (gains, losses, balance) et pending (lot non publié ou null). POST lots retourne batch_id, last_message_id, totals et duplicate_reports. POST publication retourne ok. Les recopies intégrales datées du même auteur sont dédupliquées. Les anciens messages modifiés ne sont pas relus.",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$"
+            }
+          },
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "État ou enregistrement réussi"
+          },
+          "403": {
+            "description": "Compte, serveur ou scope non autorisé"
+          },
+          "409": {
+            "description": "Conflit de lot, curseur ou publication"
+          },
+          "422": {
+            "description": "Rapport ou mouvement invalide"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "discord_id": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,19}$"
+                  },
+                  "batch_id": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,19}$"
+                  },
+                  "expected_message_id": {
+                    "type": "string"
+                  },
+                  "last_message_id": {
+                    "type": "string"
+                  },
+                  "reports": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]{0,19}$"
+                        },
+                        "author": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "text"
+                      ]
+                    }
+                  },
+                  "movements": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "message_id:position"
+                        },
+                        "source_id": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]{0,19}$"
+                        },
+                        "direction": {
+                          "enum": [
+                            "gain",
+                            "loss"
+                          ]
+                        },
+                        "amount": {
+                          "type": "string",
+                          "pattern": "^[1-9][0-9]{0,18}$"
+                        },
+                        "quote": {
+                          "type": "string"
+                        },
+                        "enemy": {
+                          "type": "string"
+                        },
+                        "member": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "date": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "source_id",
+                        "direction",
+                        "amount",
+                        "quote",
+                        "enemy"
+                      ]
+                    }
+                  },
+                  "warnings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "discord_id",
+                  "batch_id",
+                  "expected_message_id",
+                  "last_message_id",
+                  "reports",
+                  "movements"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/terrain/{guild_id}/{channel_id}/publication": {
+      "post": {
+        "tags": [
+          "Terrain Discord"
+        ],
+        "summary": "Confirmer la publication du solde",
+        "description": "Scopes terrain:read (GET) ou terrain:write (POST). Réservé à discord_id 1544667516364652659 et au terrain_guild_id configuré. Les identifiants et totaux sont des chaînes. Un lot est idempotent par batch_id et contenu identique ; un curseur périmé ou une publication en attente renvoie 409. GET retourne last_message_id, totals (gains, losses, balance) et pending (lot non publié ou null). POST lots retourne batch_id, last_message_id, totals et duplicate_reports. POST publication retourne ok. Les recopies intégrales datées du même auteur sont dédupliquées. Les anciens messages modifiés ne sont pas relus.",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$"
+            }
+          },
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,19}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "État ou enregistrement réussi"
+          },
+          "403": {
+            "description": "Compte, serveur ou scope non autorisé"
+          },
+          "409": {
+            "description": "Conflit de lot, curseur ou publication"
+          },
+          "422": {
+            "description": "Rapport ou mouvement invalide"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "discord_id": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,19}$"
+                  },
+                  "batch_id": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,19}$"
+                  },
+                  "published_message_id": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,19}$"
+                  }
+                },
+                "required": [
+                  "discord_id",
+                  "batch_id",
+                  "published_message_id"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

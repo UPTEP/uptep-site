@@ -36,6 +36,19 @@ try {
         if(!in_array('health:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
         botReply(200,['ok'=>true,'service'=>'uptep-bot-api','version'=>'1','status'=>'healthy','time'=>gmdate('Y-m-d\TH:i:s\Z')]);
     }
+    if(preg_match('~\A/api/bot/v1/terrain/([1-9][0-9]{0,19})/([1-9][0-9]{0,19})(?:/(lots|publication))?\z~',$path,$tm)){
+        $action=$tm[3]??'state';$required=$action==='state'?'GET':'POST';
+        if($method!==$required){header('Allow: '.$required);botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
+        if(!in_array($required==='GET'?'terrain:read':'terrain:write',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
+        if($required==='POST'){
+            if(strtolower(trim(explode(';',$_SERVER['CONTENT_TYPE']??'')[0]))!=='application/json')botReply(415,['ok'=>false,'error'=>'application_json_required']);
+            $raw=file_get_contents('php://input',false,null,0,2000001);if(strlen($raw)>2000000)botReply(413,['ok'=>false,'error'=>'Lot trop volumineux.']);
+            $input=json_decode($raw,true,32,JSON_THROW_ON_ERROR);
+        }else $input=$_GET;
+        if(!is_array($input)||($input['discord_id']??null)!=='1544667516364652659'||$tm[1]!==($config['terrain_guild_id']??null))botReply(403,['ok'=>false,'error'=>'Suivi terrain réservé au compte et au serveur autorisés.']);
+        define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-terrain.php';
+        botReply(200,$action==='state'?terrainState(db(),$tm[1],$tm[2]):($action==='lots'?terrainCommit(db(),$tm[1],$tm[2],$input):terrainPublished(db(),$tm[1],$tm[2],$input)));
+    }
     $id=null;$reportKind=null;
     if(preg_match('~\A/api/bot/v1/rapports/(demandes|convois|statistiques)(?:/([1-9][0-9]{0,18}))?\z~',$path,$reportMatch)){
         $reportKind=$reportMatch[1];$id=$reportMatch[2]??null;
