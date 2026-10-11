@@ -94,7 +94,7 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
             if($action==='ajustement'){
                 if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true);
                 if(!$d['valide']||$d['fini'])throw new DomainException('Seule une demande validée et en cours peut être ajustée.',409);
-                if((string)$d['nbpomme_restant']!==$payload['nbpomme_attendu']||(string)$d['nbmateriaux_restant']!==$payload['nbmateriaux_attendu'])throw new DomainException('Le restant a changé depuis l’ouverture du formulaire. Rouvre Ajuster le restant pour utiliser les nouvelles quantités.',409);
+                if((string)$d['nbpomme_restant']!==$payload['nbpomme_attendu']||(string)$d['nbmateriaux_restant']!==$payload['nbmateriaux_attendu'])throw new DomainException('Le restant a changé depuis l’ouverture du formulaire. Rouvre Modifier une demande pour utiliser les nouvelles quantités.',409);
                 $q=$p->prepare('SELECT (?::numeric-COALESCE(sum(nbpomme),0))::text AS pommes,(?::numeric-COALESCE(sum(nbmateriaux),0))::text AS materiaux FROM convois_effectues WHERE iddemande=? AND NOT annule');$q->execute([$d['nbpomme_original'],$d['nbmateriaux_original'],$id]);$maximum=$q->fetch(PDO::FETCH_ASSOC);
                 $apple=$payload['nbpomme_restant'];$wood=$payload['nbmateriaux_restant'];
                 if((int)$apple>(int)$maximum['pommes']||(int)$wood>(int)$maximum['materiaux'])throw new DomainException('Le restant ne peut pas dépasser les quantités initiales moins les convois déjà déclarés et non annulés.',422);
