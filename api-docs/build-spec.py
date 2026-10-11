@@ -85,6 +85,14 @@ for kind,item,filters in [('demandes',ref('Demande'),['joueur','etat']),('convoi
 responses['rapport_detail']=obj({'ok':ok,'demande':ref('Demande'),'lignes':{'type':'array','items':ref('Convoi')},'page':{'type':'integer'},'pages':{'type':'integer'},'total':{'type':'integer'}})
 paths['/rapports/demandes/{id}']={'get':operation('Rapports','Détail et convois d’une demande, même clôturée ou annulée','rapports:read','Mêmes droits que les rapports. Convois associés de toutes dates, 8 par page. date_fin correspond à la clôture des déclarations, pas à une livraison confirmée dans le jeu. fin_manuelle distingue la clôture manuelle.', 'rapport_detail',parameters=[idparam,report_actor,report_page])}
 
+# Adjust remaining need without changing original quantities or recording fictitious convoys.
+schemas['AjustementRestant']=dict(obj(actor|{key:ref('Quantite') for key in ['nbpomme_restant','nbmateriaux_restant','nbpomme_attendu','nbmateriaux_attendu']}),additionalProperties=False)
+schemas['AjustementHistorique']=obj({'id':identifier,'discord_acteur':identifier,'pseudo_acteur':{'type':'string'},'pommes_avant':ref('Quantite'),'pommes_apres':ref('Quantite'),'materiaux_avant':ref('Quantite'),'materiaux_apres':ref('Quantite'),'date_ajustement':stamp})
+schemas['Demande']['properties']['ajustements']={'type':'array','maxItems':10,'items':ref('AjustementHistorique'),'description':'Les dix derniers ajustements du restant, du plus récent au plus ancien. Les anciens restent en base.'}
+adjust_operation=operation('Demandes','Ajuster les quantités restantes','demandes:adjust','Demande validée et en cours uniquement. Demandeur ou responsable effectif (droit chaîne ou ADMIN_DISCORD_IDS, avec association actuelle). Envoyer les NOUVEAUX restants et les valeurs attendues lues avant saisie. Transaction et verrou : si le restant a changé entre-temps, 409 ; rouvrir le formulaire, ne pas rejouer avec des valeurs périmées. Entre zéro et quantité originale moins les convois non annulés. Les originaux et les statistiques de convois restent inchangés. Zéro pour les deux ressources clôture manuellement. Historique séparé dans demandes_ajustements. Idempotence par commande_id.', 'demande','post','AjustementRestant',parameters=[idparam])
+adjust_operation['responses']['200']=adjust_operation['responses'].pop('201')
+paths['/demandes/{id}/ajustement']={'post':adjust_operation}
+
 spec={'openapi':'3.0.3','info':{'title':'UPTEP · API du bot Discord','version':'1.0.0','description':'''API privée pour le bot Discord de l’alliance UPTEP sur le serveur 5.
 
 ### Authentification

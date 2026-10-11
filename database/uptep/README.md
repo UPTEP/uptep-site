@@ -20,3 +20,5 @@ Ce fichier regroupe la structure et ses évolutions : **ne pas le réexécuter i
 ## Différence avec FZZZ
 
 UPTEP conserve les données propres à l’alliance et accepte les écritures de l’application. La base [FZZZ](../fzzz/README.md) fournit les relevés du jeu ; le compte `uptep` ne doit y avoir qu’un accès en lecture sur les cinq tables prévues.
+
+La table `demandes_ajustements` conserve les modifications manuelles du restant (auteur, date, quantités avant/après), séparément des convois. Sur une base existante, appliquer uniquement `app/bot-demand-adjustments.sql` pour cette évolution ; ne pas rejouer le schéma complet.

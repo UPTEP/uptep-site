@@ -119,6 +119,30 @@ try{
  file_put_contents(UPTEP_BOT_ENV_FILE,"ADMIN_DISCORD_IDS=103,103\n");check(botMember($p,$p,'103')['membre']['is_chaine'],'overlapping roles accepted');
  file_put_contents(UPTEP_BOT_ENV_FILE,"ADMIN_DISCORD_IDS=102,not-an-id\n");check(botConfiguredAdmins()===[],'invalid allowlist fails closed');
  unlink(UPTEP_BOT_ENV_FILE);
+ // Adjustments reduce or correct the remaining need, without inventing convoy deliveries.
+ $adjId=botConvoyAction($p,$p,'demande',null,array_replace($create,['commande_id'=>'adjust-create']))[1]['demande']['id'];
+ $adjust=['commande_id'=>'adjust-1','discord_id'=>'101','nbpomme_restant'=>'30','nbmateriaux_restant'=>'80','nbpomme_attendu'=>'60','nbmateriaux_attendu'=>'150'];
+ rejects(fn()=>botConvoyAction($p,$p,'ajustement',$adjId,$adjust),409);
+ botConvoyAction($p,$p,'validation',$adjId,['commande_id'=>'adjust-validate','discord_id'=>'103']);
+ $sendId=botConvoyAction($p,$p,'convoi',$adjId,['commande_id'=>'adjust-send','discord_id'=>'102','nbpomme'=>'40','nbmateriaux'=>'50'])[1]['convoi']['id'];
+ rejects(fn()=>botConvoyAction($p,$p,'ajustement',$adjId,array_replace($adjust,['discord_id'=>'102'])),403);
+ rejects(fn()=>botConvoyAction($p,$p,'ajustement',$adjId,array_replace($adjust,['nbpomme_restant'=>'61'])),422);
+ rejects(fn()=>botConvoyAction($p,$p,'ajustement',$adjId,array_replace($adjust,['nbpomme_restant'=>'-1'])),422);
+ $adjusted=botConvoyAction($p,$p,'ajustement',$adjId,$adjust)[1]['demande'];
+ check($adjusted['nbpomme_restant']==='30'&&$adjusted['nbmateriaux_restant']==='80'&&$adjusted['nbpomme_original']==='100','remaining adjusted without altering original');
+ check(count($adjusted['ajustements'])===1&&$adjusted['ajustements'][0]['pommes_avant']==='60','audit trail');
+ check(botConvoyAction($p,$p,'ajustement',$adjId,$adjust)[2],'adjustment idempotent replay');
+ check(count(botListConvoys($p,$adjId,[])['convois'])===1,'adjustment creates no convoy');
+ rejects(fn()=>botConvoyAction($p,$p,'ajustement',$adjId,array_replace($adjust,['commande_id'=>'adjust-stale'])),409);
+ $up=array_replace($adjust,['commande_id'=>'adjust-correct','discord_id'=>'103','nbpomme_attendu'=>'30','nbmateriaux_attendu'=>'80','nbpomme_restant'=>'50','nbmateriaux_restant'=>'100']);
+ check(botConvoyAction($p,$p,'ajustement',$adjId,$up)[1]['demande']['nbpomme_restant']==='50','responsible can correct within original minus sent');
+ botConvoyAction($p,$p,'convoi',$adjId,['commande_id'=>'adjust-new-send','discord_id'=>'102','nbpomme'=>'10','nbmateriaux'=>'10']);
+ rejects(fn()=>botConvoyAction($p,$p,'ajustement',$adjId,array_replace($up,['commande_id'=>'adjust-after-send','nbpomme_attendu'=>'50','nbmateriaux_attendu'=>'100'])),409);
+ $zero=array_replace($adjust,['commande_id'=>'adjust-zero','nbpomme_attendu'=>'40','nbmateriaux_attendu'=>'90','nbpomme_restant'=>'0','nbmateriaux_restant'=>'0']);
+ $closed=botConvoyAction($p,$p,'ajustement',$adjId,$zero)[1]['demande'];check($closed['fini']&&$closed['fin_manuelle'],'zero remaining closes manually');
+ $cancelled=botCancelConvoy($p,$p,$sendId,['commande_id'=>'adjust-cancel-send','discord_id'=>'102'])[1]['demande'];check($cancelled['fini']&&$cancelled['nbpomme_restant']==='40','cancellation credits real send, manual closure retained');
+ rejects(fn()=>botConvoyAction($p,$p,'ajustement',$adjId,array_replace($zero,['commande_id'=>'adjust-closed'])),409);
+ echo "OK: adjustment ownership, admin permissions, bounds, stale forms, audit, idempotency and unchanged convoy accounting.\n";
  require __DIR__.'/bot-reports-checks.php';
  echo "OK: creation, validation permissions, membership, precise integers, pagination filters, partial/completed convoys, replays/conflicts, date checks and concurrent over-send protection.\n";
 }finally{$p->exec('DROP SCHEMA '.$schema.' CASCADE');}

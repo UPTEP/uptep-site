@@ -52,10 +52,10 @@ try {
     elseif($path==='/api/bot/v1/convois'){$allowed=['GET'];$action='convois_annulables';}
     elseif(preg_match('~\A/api/bot/v1/convois/([1-9][0-9]{0,18})/annulation\z~',$path,$match)){$allowed=['POST'];$id=$match[1];$action='annulation_convoi';}
     elseif(preg_match('~\A/api/bot/v1/membres/([1-9][0-9]{0,18})\z~',$path,$match)){$allowed=['GET'];$id=$match[1];$action='membre';}
-    elseif(preg_match('~\A/api/bot/v1/demandes/([1-9][0-9]{0,18})/(validation|annulation|terminaison|convois)\z~',$path,$match)){$allowed=$match[2]==='convois'?['GET','POST']:['POST'];$id=$match[1];$action=$match[2]!=='convois'?$match[2]:($method==='GET'?'lecture_convois':'convoi');}
+    elseif(preg_match('~\A/api/bot/v1/demandes/([1-9][0-9]{0,18})/(validation|annulation|terminaison|ajustement|convois)\z~',$path,$match)){$allowed=$match[2]==='convois'?['GET','POST']:['POST'];$id=$match[1];$action=$match[2]!=='convois'?$match[2]:($method==='GET'?'lecture_convois':'convoi');}
     else botReply(404,['ok'=>false,'error'=>'not_found']);
     if(!in_array($method,$allowed,true)){header('Allow: '.implode(', ',$allowed));botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
-    $scope=['terminaison'=>'demandes:finish','annulation_convoi'=>'convois:cancel','convois_annulables'=>'convois:read','membre'=>'membres:read','annulation'=>'demandes:cancel','lecture'=>'demandes:read','lecture_convois'=>'convois:read','demande'=>'demandes:create','validation'=>'demandes:validate','convoi'=>'convois:create'][$action];
+    $scope=['ajustement'=>'demandes:adjust','terminaison'=>'demandes:finish','annulation_convoi'=>'convois:cancel','convois_annulables'=>'convois:read','membre'=>'membres:read','annulation'=>'demandes:cancel','lecture'=>'demandes:read','lecture_convois'=>'convois:read','demande'=>'demandes:create','validation'=>'demandes:validate','convoi'=>'convois:create'][$action];
     if(!in_array($scope,$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
     define('UPTEP_SCRIPT_API',true);
     require '/home/uptep/private/app/bootstrap.php';

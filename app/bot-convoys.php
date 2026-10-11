@@ -36,10 +36,11 @@ function botDemand(PDO $p,string $id): array {
     if(!$r)throw new DomainException('Demande introuvable.',404);
     foreach(['id','iddemandeur','discord_demandeur','nbpomme_original','nbpomme_restant','nbmateriaux_original','nbmateriaux_restant','idvalidateur','discord_validateur','idannulateur','discord_annulateur','discord_cloture'] as $key)if($r[$key]!==null)$r[$key]=(string)$r[$key];
     $r['etat']=$r['annulee']?'annulee':($r['fini']?'terminee':($r['valide']?'en_cours':'attente'));
+    $q=$p->prepare('SELECT id::text,discord_acteur::text,pseudo_acteur,pommes_avant::text,pommes_apres::text,materiaux_avant::text,materiaux_apres::text,date_ajustement FROM demandes_ajustements WHERE iddemande=? ORDER BY id DESC LIMIT 10');$q->execute([$id]);$r['ajustements']=$q->fetchAll(PDO::FETCH_ASSOC);
     return $r;
 }
 function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body): array {
-    $allowed=['terminaison'=>['commande_id','discord_id'],'demande'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee'],'annulation'=>['commande_id','discord_id'],'validation'=>['commande_id','discord_id'],'convoi'=>['commande_id','discord_id','nbpomme','nbmateriaux','date_convoi','date_arrivee']][$action];
+    $allowed=['ajustement'=>['commande_id','discord_id','nbpomme_restant','nbmateriaux_restant','nbpomme_attendu','nbmateriaux_attendu'],'terminaison'=>['commande_id','discord_id'],'demande'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee'],'annulation'=>['commande_id','discord_id'],'validation'=>['commande_id','discord_id'],'convoi'=>['commande_id','discord_id','nbpomme','nbmateriaux','date_convoi','date_arrivee']][$action];
     if(array_diff(array_keys($body),$allowed))throw new DomainException('Champ inconnu dans la requête.',422);
     $command=$body['commande_id']??null;
     if(!is_string($command)||!preg_match('/\A[A-Za-z0-9_.:-]{1,100}\z/',$command))throw new DomainException('commande_id obligatoire : identifiant unique de la commande Discord.',422);
@@ -50,6 +51,7 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
         if($apple==='0'&&$wood==='0')throw new DomainException('Au moins une quantité doit être supérieure à zéro.',422);
         $payload+=['nbpomme'=>$apple,'nbmateriaux'=>$wood];
     }
+    if($action==='ajustement')foreach(['nbpomme_restant','nbmateriaux_restant','nbpomme_attendu','nbmateriaux_attendu'] as $key)$payload[$key]=botNumber($body[$key]??null);
     $date=null;
     if($action==='convoi' && isset($body['date_convoi'])){
         $raw=$body['date_convoi'];
@@ -80,7 +82,7 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
         // Same command is serialized even across different endpoints or requests.
         $q=$p->prepare('SELECT pg_advisory_xact_lock(hashtextextended(?,0))');$q->execute(['uptep-bot:'.$command]);
         $q=$p->prepare('SELECT empreinte,statut,reponse FROM bot_commandes WHERE commande_id=?');$q->execute([$command]);$prior=$q->fetch(PDO::FETCH_ASSOC);
-        if($prior){if(in_array($action,['annulation','terminaison'],true)){$priorDemand=botDemand($p,$id);if($actor['id']!==$priorDemand['iddemandeur'])botActor($p,$game,$discord,true);}if(!hash_equals($prior['empreinte'],$hash))throw new DomainException('commande_id déjà utilisé pour une autre action ou un autre contenu.',409);$p->commit();return [(int)$prior['statut'],json_decode($prior['reponse'],true,512,JSON_THROW_ON_ERROR),true];}
+        if($prior){if(in_array($action,['annulation','terminaison','ajustement'],true)){$priorDemand=botDemand($p,$id);if($actor['id']!==$priorDemand['iddemandeur'])botActor($p,$game,$discord,true);}if(!hash_equals($prior['empreinte'],$hash))throw new DomainException('commande_id déjà utilisé pour une autre action ou un autre contenu.',409);$p->commit();return [(int)$prior['statut'],json_decode($prior['reponse'],true,512,JSON_THROW_ON_ERROR),true];}
         $status=200;
         if($action==='demande'){
             $q=$p->prepare('INSERT INTO demandes_convois(iddemandeur,pseudo_demandeur,discord_demandeur,nbpomme_original,nbpomme_restant,nbmateriaux_original,nbmateriaux_restant,objet,niveau,date_souhaitee) VALUES(?,?,?,?,?,?,?,?,?,?) RETURNING id');
@@ -89,7 +91,18 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
             $q=$p->prepare('SELECT * FROM demandes_convois WHERE id=? FOR UPDATE');$q->execute([$id]);$d=$q->fetch(PDO::FETCH_ASSOC);
             if(!$d)throw new DomainException('Demande introuvable.',404);
             if($d['annulee'])throw new DomainException('Cette demande a été annulée.',409);
-            if($action==='annulation'){
+            if($action==='ajustement'){
+                if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true);
+                if(!$d['valide']||$d['fini'])throw new DomainException('Seule une demande validée et en cours peut être ajustée.',409);
+                if((string)$d['nbpomme_restant']!==$payload['nbpomme_attendu']||(string)$d['nbmateriaux_restant']!==$payload['nbmateriaux_attendu'])throw new DomainException('Le restant a changé depuis l’ouverture du formulaire. Rouvre Ajuster le restant pour utiliser les nouvelles quantités.',409);
+                $q=$p->prepare('SELECT (?::numeric-COALESCE(sum(nbpomme),0))::text AS pommes,(?::numeric-COALESCE(sum(nbmateriaux),0))::text AS materiaux FROM convois_effectues WHERE iddemande=? AND NOT annule');$q->execute([$d['nbpomme_original'],$d['nbmateriaux_original'],$id]);$maximum=$q->fetch(PDO::FETCH_ASSOC);
+                $apple=$payload['nbpomme_restant'];$wood=$payload['nbmateriaux_restant'];
+                if((int)$apple>(int)$maximum['pommes']||(int)$wood>(int)$maximum['materiaux'])throw new DomainException('Le restant ne peut pas dépasser les quantités initiales moins les convois déjà déclarés et non annulés.',422);
+                if($apple===(string)$d['nbpomme_restant']&&$wood===(string)$d['nbmateriaux_restant'])throw new DomainException('Les quantités restantes sont inchangées.',422);
+                $q=$p->prepare('INSERT INTO demandes_ajustements(iddemande,discord_acteur,pseudo_acteur,pommes_avant,pommes_apres,materiaux_avant,materiaux_apres) VALUES(?,?,?,?,?,?,?) RETURNING id::text');$q->execute([$id,$discord,$actor['pseudo'],$d['nbpomme_restant'],$apple,$d['nbmateriaux_restant'],$wood]);
+                $done=$apple==='0'&&$wood==='0';
+                $q=$p->prepare('UPDATE demandes_convois SET nbpomme_restant=?,nbmateriaux_restant=?,fini=?::boolean,fin_manuelle=?::boolean,date_fin=CASE WHEN ?::boolean THEN now() ELSE NULL END,discord_cloture=?,pseudo_cloture=? WHERE id=?');$q->execute([$apple,$wood,$done?'true':'false',$done?'true':'false',$done?'true':'false',$done?$discord:null,$done?$actor['pseudo']:null,$id]);
+            }elseif($action==='annulation'){
                 if($d['fini'])throw new DomainException('Une demande terminée ne peut pas être annulée.',409);
                 if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true);
                 $q=$p->prepare('UPDATE demandes_convois SET annulee=true,date_annulation=now(),idannulateur=?,pseudo_annulateur=?,discord_annulateur=? WHERE id=?');$q->execute([$actor['id'],$actor['pseudo'],$discord,$id]);
