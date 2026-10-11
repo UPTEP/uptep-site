@@ -60,6 +60,7 @@ function mountChaine(context,data){
  }
  const sortEvents=['click','mousedown','mouseup','keydown'];for(const name of sortEvents)win.addEventListener(name,handleSort,true);
  style.textContent+=' .uptep-chain-pseudo,th[data-uptep-sort="pseudo"]{text-align:left!important;padding-left:12px!important}th[data-uptep-sort]{cursor:pointer;background-image:none!important}th[data-uptep-sort][aria-sort="ascending"]::after{content:" ↑"}th[data-uptep-sort][aria-sort="descending"]::after{content:" ↓"}';
+ style.textContent+=' .uptep-chain-grade,.uptep-chain-heading-grade{text-align:left!important;padding-left:12px!important;padding-right:8px!important}th.uptep-chain-heading-grade{width:14%}th[data-uptep-sort="pseudo"]{width:24%}th[data-uptep-sort="terrain"]{width:14%}th.uptep-bat-tech{width:11%}th.uptep-chain-heading-distance{width:10%}th.uptep-chain-heading-trajet{width:18%}th.uptep-chain-heading-position{width:9%}';
  function update(){
   let table,head,pseudoIndex,fieldIndex,stateIndex;
   for(const candidate of doc.querySelectorAll('#centre table, table')){const header=[...candidate.rows].find(r=>[...r.cells].some(c=>norm(c.textContent)==='pseudo')&&[...r.cells].some(c=>norm(c.textContent)==='terrain'));if(header){table=candidate;head=header;pseudoIndex=headerColumn(head,'pseudo');fieldIndex=headerColumn(head,'terrain');stateIndex=headerColumn(head,'etat');break;}}
@@ -117,7 +118,7 @@ function mountChaine(context,data){
    hide.push(...statuses);if(rank)hide.push(rank);
   }
   for(const cell of hide)hideCell(cell);
-  for(const name of ['Distance','Trajet','Grade','Position']){const th=append(head,'th',name,'sorter-false');th.scope='col';th.setAttribute('data-sorter','false');if(name==='Grade')head.prepend(th);}
+  for(const name of ['Distance','Trajet','Grade','Position']){const th=append(head,'th',name,'sorter-false uptep-chain-heading-'+norm(name));th.scope='col';th.setAttribute('data-sorter','false');if(name==='Grade')head.prepend(th);}
   const self=rows.find(p=>p.id===String(data.self));const eligible=rows.filter(p=>ranks.indexOf(p.grade)>=0&&ranks.indexOf(p.grade)<3);
   const compare=(a,b)=>ranks.indexOf(a.grade)-ranks.indexOf(b.grade)||(a.order??Infinity)-(b.order??Infinity)||0;
   for(const p of rows){
@@ -126,7 +127,7 @@ function mountChaine(context,data){
    distanceCell.title=travel.distance===null?'Coordonnées indisponibles dans les relevés UPTEP.':'Distance depuis '+origin.pseudo+' ('+origin.x+', '+origin.y+') vers '+p.pseudo+' ('+target.x+', '+target.y+').';
    const travelCell=append(p.row,'td',chaineTravelDuration(travel.seconds),'uptep-chain-travel');
    travelCell.title=travel.distance===null?'Coordonnées indisponibles dans les relevés UPTEP.':travel.seconds===null?'Vitesse d’attaque non renseignée : synchronise le laboratoire ou complète Mes stats sur UPTEP.':'Trajet aller estimé · Vitesse d’attaque '+data.attack_speed+(data.research_synced_at?' · Laboratoire relevé le '+new Date(data.research_synced_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'}):'');
-   const cell=append(p.row,'td',''),badge=doc.createElement('span');badge.className='uptep-chain-badge uptep-chain-'+ranks.indexOf(p.grade);badge.textContent=p.grade?(p.grade+(p.order!==null?' · '+p.order:'')):'—';cell.append(badge);p.row.prepend(cell);
+   const cell=append(p.row,'td','','uptep-chain-grade'),badge=doc.createElement('span');badge.className='uptep-chain-badge uptep-chain-'+ranks.indexOf(p.grade);badge.textContent=p.grade?(p.grade+(p.order!==null?' · '+p.order:'')):'—';cell.append(badge);p.row.prepend(cell);
    let movement='excluded';if(eligible.includes(p)){const actualStart=eligible.filter(o=>o.field>p.field).length+1,actualEnd=actualStart+eligible.filter(o=>o.field===p.field).length-1,targetStart=eligible.filter(o=>compare(o,p)<0).length+1,targetEnd=targetStart+eligible.filter(o=>compare(o,p)===0).length-1;movement=actualStart>targetEnd?'up':actualEnd<targetStart?'down':'aligned';}
    const position=append(p.row,'td',({up:'↑',down:'↓',aligned:'✓',excluded:'—'})[movement],'uptep-chain-move uptep-chain-'+movement);position.title=({up:'Monter',down:'Descendre',aligned:'À sa place',excluded:'Hors classement de position'})[movement];
    let focus='';if(p===self)focus='self';else if(self&&eligible.includes(self)&&!self.blocked&&self.field>0n&&!p.blocked&&p.field>0n&&ranks.indexOf(p.grade)>=0&&ranks.indexOf(p.grade)<4){const difference=ranks.indexOf(p.grade)-ranks.indexOf(self.grade),below=difference>0||(difference===0&&self.order!==null&&p.order!==null&&p.order>self.order);if(below&&p.field*2n>=self.field&&p.field<=self.field*3n)focus='target';}
