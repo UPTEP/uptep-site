@@ -10,7 +10,7 @@ Site privé de l’alliance UPTEP sur Fourmizzz, serveur 5 : comptes, chaîne, s
 - `tests/` : tests existants ; certains nécessitent un environnement local reproduisant les chemins du serveur.
 - `licenses/` : licences des polices livrées.
 
-Le bot Discord est maintenu dans le dépôt `discord-bot`. Les sources du userscript sont dans `userscript/` et la documentation interactive de l’API dans `api-docs/`.
+Le bot Discord est maintenu dans le dépôt `uptep-discord-bot`. Les sources du userscript sont dans `userscript/` et la documentation interactive de l’API dans `api-docs/`.
 
 ## Prérequis et installation
 
