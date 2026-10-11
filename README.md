@@ -47,3 +47,7 @@ Les routes GET `/api/bot/v1/rapports/demandes`, `/rapports/convois`, `/rapports/
 `app/bot-reports.php` effectue des lectures sur les tables existantes, sans migration. La documentation dans `api-docs/openapi.json` détaille les filtres, dates JJ-MM-AAAA inclusives en heure de Paris, pages de 8 résultats et moyennes. Les statistiques portent sur les déclarations non annulées à leur date d’envoi. Les historiques conservent les annulations et les dates de clôture, qui ne prouvent pas une livraison dans Fourmizzz.
 
 Les tests `tests/run-bot-convoys.py` créent puis suppriment un schéma de test isolé via l’utilisateur PostgreSQL local ; ils couvrent aussi les droits des rapports, limites de dates, changement d’heure, pagination et totaux supérieurs à bigint. Ne pas les exécuter avec une connexion non isolée modifiée.
+
+## Taille des lots de rapports Discord
+
+L’emplacement Nginx `/api/bot/v1/terrain/` doit accepter `client_max_body_size 2m;` et reprendre le même routage FastCGI, authentification et limitation de débit que `/api/bot/v1/`. Conserver les limites plus basses sur les autres routes. Le contrôleur PHP limite lui-même ces lots à 2 000 000 octets. Une limite serveur de 16 Ko provoque un HTTP 413 avant l’exécution PHP lors de l’initialisation d’un historique. Valider avec `nginx -t` avant de recharger Nginx.
