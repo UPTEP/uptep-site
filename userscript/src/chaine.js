@@ -7,14 +7,14 @@ function mountChaine(context,data){
  const legend=doc.createElement('div');legend.className='uptep-chain-legend';legend.setAttribute('role','note');legend.setAttribute('aria-label','Légende des couleurs de la chaîne');
  legend.style.cssText='display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;margin:10px 0;padding:6px 0;color:#302b18;font:12px Verdana,sans-serif;text-align:left;';
  for(const [color,border,text] of [['#dfa08b','#992f24','Ta position'],['#b8c58b','#566332','Joueurs à portée de flood situés sous toi dans la chaîne']]){const item=doc.createElement('span'),swatch=doc.createElement('span');item.style.cssText='display:inline-flex;align-items:center;gap:7px;';swatch.setAttribute('aria-hidden','true');swatch.style.cssText='display:inline-block;flex:0 0 18px;width:18px;height:13px;background:'+color+';border-left:3px solid '+border+';';item.append(swatch,doc.createTextNode(text));legend.append(item);}
- const added=new Set(),marked=new Set(),removedNumbers=new Map(),mergedStats=[],hiddenCells=[],movedState=[];let previous='';
+ const added=new Set(),marked=new Set(),pseudoCells=new Set(),removedNumbers=new Map(),mergedStats=[],hiddenCells=[],movedState=[];let previous='';
  const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  const number=s=>{const text=s.replace(/[\s\u00a0\u202f]/g,'');return /^\d+$/.test(text)?BigInt(text):null;};
  // Native headers can span multiple cells (for example Terrain and its attack icon).
  const columnOf=(row,cell)=>{let column=0;for(const current of row.cells){if(current===cell)return column;column+=current.colSpan;}return -1;};
  const cellAt=(row,column)=>{let start=0;for(const cell of row.cells){if(column>=start&&column<start+cell.colSpan)return cell;start+=cell.colSpan;}return null;};
  const headerColumn=(row,label)=>columnOf(row,[...row.cells].find(c=>norm(c.textContent)===label));
- function clear(){for(const [anchor,node] of movedState)anchor.replaceWith(node);movedState.length=0;for(const [anchor,cell] of hiddenCells)anchor.replaceWith(cell);hiddenCells.length=0;for(const {cell,originals} of mergedStats){cell.remove();for(const [anchor,original] of originals)anchor.replaceWith(original);}mergedStats.length=0;for(const [cell,{row,next}] of removedNumbers)row.insertBefore(cell,next?.parentNode===row?next:null);removedNumbers.clear();for(const n of added)n.remove();added.clear();for(const row of marked)row.classList.remove('uptep-chain-self','uptep-chain-target');marked.clear();}
+ function clear(){for(const cell of pseudoCells)cell.classList.remove('uptep-chain-pseudo');pseudoCells.clear();for(const [anchor,node] of movedState)anchor.replaceWith(node);movedState.length=0;for(const [anchor,cell] of hiddenCells)anchor.replaceWith(cell);hiddenCells.length=0;for(const {cell,originals} of mergedStats){cell.remove();for(const [anchor,original] of originals)anchor.replaceWith(original);}mergedStats.length=0;for(const [cell,{row,next}] of removedNumbers)row.insertBefore(cell,next?.parentNode===row?next:null);removedNumbers.clear();for(const n of added)n.remove();added.clear();for(const row of marked)row.classList.remove('uptep-chain-self','uptep-chain-target');marked.clear();}
  function append(row,tag,text,cls){const cell=doc.createElement(tag);cell.className='uptep-chain-cell '+(cls||'');cell.textContent=text;row.append(cell);added.add(cell);return cell;}
  const sortHeaders=new Map();let sortable=null,sortKey=null,sortDirection=1;
  const collator=new Intl.Collator('fr',{sensitivity:'base',numeric:true});
@@ -45,7 +45,7 @@ function mountChaine(context,data){
   update();prepareSort(sortable.table,sortable.head,sortable.rows);
  }
  const sortEvents=['click','mousedown','mouseup','keydown'];for(const name of sortEvents)win.addEventListener(name,handleSort,true);
- style.textContent+=' th[data-uptep-sort]{cursor:pointer;background-image:none!important}th[data-uptep-sort][aria-sort="ascending"]::after{content:" ↑"}th[data-uptep-sort][aria-sort="descending"]::after{content:" ↓"}';
+ style.textContent+=' .uptep-chain-pseudo,th[data-uptep-sort="pseudo"]{text-align:left!important;padding-left:12px!important}th[data-uptep-sort]{cursor:pointer;background-image:none!important}th[data-uptep-sort][aria-sort="ascending"]::after{content:" ↑"}th[data-uptep-sort][aria-sort="descending"]::after{content:" ↓"}';
  function update(){
   let table,head,pseudoIndex,fieldIndex,stateIndex;
   for(const candidate of doc.querySelectorAll('#centre table, table')){const header=[...candidate.rows].find(r=>[...r.cells].some(c=>norm(c.textContent)==='pseudo')&&[...r.cells].some(c=>norm(c.textContent)==='terrain'));if(header){table=candidate;head=header;pseudoIndex=headerColumn(head,'pseudo');fieldIndex=headerColumn(head,'terrain');stateIndex=headerColumn(head,'etat');break;}}
@@ -86,7 +86,7 @@ function mountChaine(context,data){
   for(const row of [head,...rows.map(p=>p.row)]){
    const statuses=[...new Set(Array.from({length:statusWidth},(_,offset)=>cellAt(row,statusColumn+offset)).filter(Boolean))],rank=cellAt(row,rankColumn);
    if(statuses.length&&row!==head){
-    const pseudoCell=rows.find(p=>p.row===row).cell;
+    const pseudoCell=rows.find(p=>p.row===row).cell;pseudoCell.classList.add('uptep-chain-pseudo');pseudoCells.add(pseudoCell);
     const left=doc.createElement('span'),right=doc.createElement('span');left.className='uptep-chain-status';right.className='uptep-chain-colony';
     left.style.cssText='display:inline-flex;align-items:center;gap:2px;margin-right:5px;vertical-align:middle';right.style.cssText='display:inline-flex;align-items:center;gap:2px;margin-left:5px;vertical-align:middle';
     function move(node){
