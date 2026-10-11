@@ -7,10 +7,10 @@ function mountChaine(context,data){
  const legend=doc.createElement('div');legend.className='uptep-chain-legend';legend.setAttribute('role','note');legend.setAttribute('aria-label','Légende des couleurs de la chaîne');
  legend.style.cssText='display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;margin:10px 0;padding:6px 0;color:#302b18;font:12px Verdana,sans-serif;text-align:left;';
  for(const [color,border,text] of [['#dfa08b','#992f24','Ta position'],['#b8c58b','#566332','Joueurs à portée de flood situés sous toi dans la chaîne']]){const item=doc.createElement('span'),swatch=doc.createElement('span');item.style.cssText='display:inline-flex;align-items:center;gap:7px;';swatch.setAttribute('aria-hidden','true');swatch.style.cssText='display:inline-block;flex:0 0 18px;width:18px;height:13px;background:'+color+';border-left:3px solid '+border+';';item.append(swatch,doc.createTextNode(text));legend.append(item);}
- const added=new Set(),marked=new Set(),removedNumbers=new Map();let previous='';
+ const added=new Set(),marked=new Set(),removedNumbers=new Map(),mergedStats=[];let previous='';
  const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  const number=s=>{const text=s.replace(/[\s\u00a0\u202f]/g,'');return /^\d+$/.test(text)?BigInt(text):null;};
- function clear(){for(const [cell,{row,next}] of removedNumbers)row.insertBefore(cell,next?.parentNode===row?next:null);removedNumbers.clear();for(const n of added)n.remove();added.clear();for(const row of marked)row.classList.remove('uptep-chain-self','uptep-chain-target');marked.clear();}
+ function clear(){for(const {cell,originals} of mergedStats){cell.remove();for(const [anchor,original] of originals)anchor.replaceWith(original);}mergedStats.length=0;for(const [cell,{row,next}] of removedNumbers)row.insertBefore(cell,next?.parentNode===row?next:null);removedNumbers.clear();for(const n of added)n.remove();added.clear();for(const row of marked)row.classList.remove('uptep-chain-self','uptep-chain-target');marked.clear();}
  function append(row,tag,text,cls){const cell=doc.createElement(tag);cell.className='uptep-chain-cell '+(cls||'');cell.textContent=text;row.append(cell);added.add(cell);return cell;}
  function update(){
   let table,head,pseudoIndex,fieldIndex,stateIndex;
@@ -30,6 +30,18 @@ function mountChaine(context,data){
   const signature=JSON.stringify(rows.map(p=>[p.pseudo,String(p.field),p.blocked]));if(signature===previous&&head.querySelector('.uptep-chain-cell')&&rows.every(p=>p.row.querySelector('.uptep-chain-cell')))return;previous=signature;clear();
   const numberIndex=[...head.cells].findIndex(c=>norm(c.textContent)==='rang')-1;
   if(numberIndex>=0){for(const row of [head,...rows.map(p=>p.row)]){const cell=row.cells[numberIndex];if(cell){removedNumbers.set(cell,{row,next:cell.nextSibling});cell.remove();}}}
+  const labels=[...head.cells].map(c=>norm(c.textContent)),techIndex=labels.indexOf('technologie'),buildingIndex=labels.indexOf('fourmiliere');
+  if(techIndex>=0&&buildingIndex>=0){
+   for(const row of [head,...rows.map(p=>p.row)]){
+    const tech=row.cells[techIndex],building=row.cells[buildingIndex];if(!tech||!building)continue;
+    const cell=doc.createElement(row===head?'th':'td');cell.className='uptep-bat-tech sorter-false';cell.style.cssText='white-space:nowrap;text-align:center;padding:2px 5px';
+    cell.textContent=row===head?'Bat/Tech':building.textContent.trim()+' / '+tech.textContent.trim();
+    cell.title=row===head?'Points de fourmilière / Points de technologie':'Fourmilière : '+building.textContent.trim()+' · Technologie : '+tech.textContent.trim();
+    if(row===head){cell.scope='col';cell.setAttribute('data-sorter','false');}
+    const originals=[tech,building].map(original=>{const anchor=doc.createComment('uptep-bat-tech');original.before(anchor);return [anchor,original];});
+    tech.before(cell);tech.remove();building.remove();mergedStats.push({cell,originals});
+   }
+  }
   for(const name of ['Grade de chaîne','Position']){const th=append(head,'th',name,'sorter-false');th.scope='col';th.setAttribute('data-sorter','false');}
   const self=rows.find(p=>p.id===String(data.self));const eligible=rows.filter(p=>ranks.indexOf(p.grade)>=0&&ranks.indexOf(p.grade)<3);
   const compare=(a,b)=>ranks.indexOf(a.grade)-ranks.indexOf(b.grade)||(a.order??Infinity)-(b.order??Infinity)||0;
