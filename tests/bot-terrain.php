@@ -6,12 +6,13 @@ function reject($fn,$code){try{$fn();throw new RuntimeException('Expected reject
 $p=new PDO('pgsql:dbname=uptep','postgres',null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);$schema='qa_terrain_'.bin2hex(random_bytes(6));$p->exec('CREATE SCHEMA '.$schema);$p->exec('SET search_path TO '.$schema);
 function batch(string $id,string $expected,string $last,string $mid='100',string $author='11'): array {
  $text="11/10/26\nVol par Cible : 4 153 cm²\nCible vous a pris 800 cm² lors de sa dernière attaque.\nCible vous a pris 800 cm² lors de sa dernière attaque.\nCible vous a pris 800 cm² lors de sa dernière attaque.";
- return ['batch_id'=>$id,'expected_message_id'=>$expected,'last_message_id'=>$last,'reports'=>[['id'=>$mid,'author'=>$author,'text'=>$text]],'movements'=>array_map(fn($offset)=>['id'=>$mid.':'.$offset,'source_id'=>$mid,'direction'=>'loss','amount'=>'800','enemy'=>'Cible','member'=>null,'date'=>null,'quote'=>'Cible vous a pris 800 cm² lors de sa dernière attaque.'],[10,80,150]),'warnings'=>['Test répété']];
+ return ['batch_id'=>$id,'expected_message_id'=>$expected,'last_message_id'=>$last,'reports'=>[['id'=>$mid,'author'=>$author,'text'=>$text]],'movements'=>array_map(fn($offset)=>['id'=>$mid.':'.$offset,'source_id'=>$mid,'direction'=>'loss','amount'=>'800','enemy'=>'Cible','member'=>null,'member_discord_id'=>$author,'date'=>null,'quote'=>'Cible vous a pris 800 cm² lors de sa dernière attaque.'],[10,80,150]),'warnings'=>['Test répété']];
 }
 try{
  $sql=preg_replace('/^ALTER TABLE .* OWNER TO uptep;$/m','',file_get_contents(__DIR__.'/bot-terrain.sql'));$p->exec($sql);$p->exec($sql);
  check(terrainState($p,'1','2')['last_message_id']==='0','initial cursor');
  $b=batch('1000','0','100');$r=terrainCommit($p,'1','2',$b);check($r['totals']['balance']==='-2400','three equal attacks');check(terrainCommit($p,'1','2',$b)==$r,'idempotent replay');
+ check($p->query("SELECT member_discord_id FROM terrain_discord_movements LIMIT 1")->fetchColumn()==='11','Discord member ID preserved');
  reject(fn()=>terrainCommit($p,'1','2',array_replace($b,['last_message_id'=>'101'])),409);
  check(terrainState($p,'1','2')['pending']['batch_id']==='1000','pending publication');
  reject(fn()=>terrainCommit($p,'1','2',batch('1001','100','110','110')),409);

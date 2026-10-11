@@ -44,8 +44,9 @@ function terrainCommit(PDO $p,string $g,string $c,array $b): array {
    if(!is_string($event)||!preg_match('/\A'.preg_quote($mid,'/').':[0-9]{1,9}\z/',$event)||isset($seen[$event])||!isset($sources[$mid])||!is_string($amount)||!preg_match('/\A[1-9][0-9]{0,18}\z/',$amount)||!in_array($m['direction']??null,['gain','loss'],true)||!is_string($quote)||$quote===''||!str_contains($sources[$mid],$quote)||!is_string($enemy)||$enemy===''||strlen($enemy)>400)throw new DomainException('Mouvement sans preuve valide.',422);
    foreach(['member','date'] as $field)if(isset($m[$field])&&(!is_string($m[$field])||strlen($m[$field])>400))throw new DomainException('Information de rapport invalide.',422);
    preg_match_all('/[0-9]+/',preg_replace('/\s+/u','',$quote),$numbers);if(!in_array($amount,$numbers[0],true))throw new DomainException('Montant absent de la citation.',422);
+   $memberDiscord=isset($m['member_discord_id'])?terrainId($m['member_discord_id']):null;
    $seen[$event]=true;if(isset($duplicates[$mid]))continue;
-   $q=$p->prepare('INSERT INTO terrain_discord_movements(guild_id,channel_id,event_id,message_id,direction,amount,enemy,member,occurred_at_text,quote) VALUES (?,?,?,?,?,?,?,?,?,?)');$q->execute([$g,$c,$event,$mid,$m['direction'],$amount,$enemy,$m['member']??null,$m['date']??null,$quote]);
+   $q=$p->prepare('INSERT INTO terrain_discord_movements(guild_id,channel_id,event_id,message_id,direction,amount,enemy,member,member_discord_id,occurred_at_text,quote) VALUES (?,?,?,?,?,?,?,?,?,?,?)');$q->execute([$g,$c,$event,$mid,$m['direction'],$amount,$enemy,$m['member']??null,$memberDiscord,$m['date']??null,$quote]);
   }
   $q=$p->prepare('UPDATE terrain_discord_channels SET last_message_id=?,updated_at=now() WHERE guild_id=? AND channel_id=?');$q->execute([$last,$g,$c]);
   $out=['ok'=>true,'batch_id'=>$id,'last_message_id'=>$last,'totals'=>terrainTotals($p,$g,$c),'duplicate_reports'=>count($duplicates)];

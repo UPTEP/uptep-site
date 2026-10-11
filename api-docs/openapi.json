@@ -3070,6 +3070,13 @@
                             "null"
                           ]
                         },
+                        "member_discord_id": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "ID Discord du membre identifié ; null si ambigu. Distinct de reports.author."
+                        },
                         "date": {
                           "type": [
                             "string",

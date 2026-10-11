@@ -217,3 +217,6 @@ DO $$ BEGIN
   GRANT ALL PRIVILEGES ON TABLE terrain_discord_channels, terrain_discord_batches, terrain_discord_reports, terrain_discord_movements TO fzzz_admin;
  END IF;
 END $$;
+
+-- Discord identity of the identified report owner (not necessarily its poster).
+ALTER TABLE terrain_discord_movements ADD COLUMN IF NOT EXISTS member_discord_id text;
