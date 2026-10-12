@@ -24,3 +24,5 @@ UPTEP conserve les données propres à l’alliance et accepte les écritures de
 La table `demandes_ajustements` conserve les modifications manuelles du restant (auteur, date, quantités avant/après), séparément des convois. Sur une base existante, appliquer uniquement `app/bot-demand-adjustments.sql` pour cette évolution ; ne pas rejouer le schéma complet.
 
 Les numéros des Passeurs sont classés en ordre décroissant (5 → 1), les autres grades gardent leur ordre croissant. Le 12 octobre 2026, les affectations s5 existantes ont été inversées une seule fois (1 ↔ 5, 2 ↔ 4, 3 inchangé), avec incrément de version pour invalider les formulaires anciens. Ce changement de données ne doit pas être réappliqué à chaque installation.
+
+Le suivi des floods utilise `floods` (attaques déclarées et arrivées) et `bot_flood_batches` (idempotence des confirmations). Les attaques arrivées sont conservées ; les listes actives filtrent `arrival_at > now()`. Migration pour une installation existante : `app/bot-floods.sql`.

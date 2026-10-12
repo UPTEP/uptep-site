@@ -49,6 +49,19 @@ try {
         define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-terrain.php';
         botReply(200,$action==='state'?terrainState(db(),$tm[1],$tm[2]):($action==='lots'?terrainCommit(db(),$tm[1],$tm[2],$input):terrainPublished(db(),$tm[1],$tm[2],$input)));
     }
+    if(in_array($path,['/api/bot/v1/floods','/api/bot/v1/floods/preview'],true)){
+        $preview=str_ends_with($path,'/preview');
+        if(!in_array($method,$preview?['POST']:['GET','POST'],true))botReply(405,['ok'=>false,'error'=>'method_not_allowed']);
+        if(!in_array($method==='GET'?'floods:read':'floods:write',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
+        if($method==='POST'){
+            if(strtolower(trim(explode(';',$_SERVER['CONTENT_TYPE']??'')[0]))!=='application/json')botReply(415,['ok'=>false,'error'=>'application_json_required']);
+            $raw=file_get_contents('php://input',false,null,0,16001);if(strlen($raw)>16000)botReply(413,['ok'=>false,'error'=>'Déclaration trop longue.']);
+            $input=json_decode($raw,true,32,JSON_THROW_ON_ERROR);if(!is_array($input))botReply(422,['ok'=>false,'error'=>'Déclaration invalide.']);
+        }else $input=$_GET;
+        define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-convoys.php';require '/home/uptep/private/app/bot-floods.php';
+        if($preview){botActor(db(),db(true),botNumber($input['discord_id']??null,true),false);botReply(200,['ok'=>true,'floods'=>floodResolve(db(),db(true),$input)]);}
+        botReply(200,$method==='GET'?floodList(db(),db(true),$input):floodCreate(db(),db(true),$input));
+    }
     if($path==='/api/bot/v1/chaine'){
         if($method!=='GET'){header('Allow: GET');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
         if(!in_array('membres:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);

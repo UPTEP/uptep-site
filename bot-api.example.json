@@ -16,7 +16,9 @@
     "rapports:read",
     "demandes:adjust",
     "terrain:read",
-    "terrain:write"
+    "terrain:write",
+    "floods:read",
+    "floods:write"
   ],
   "terrain_guild_id": "YOUR_DISCORD_GUILD_ID"
 }
