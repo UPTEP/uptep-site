@@ -1,3 +1,4 @@
+function chaineOrderValue(p){return p.order===null||p.order===undefined?Infinity:(p.grade==='Passeur'?-p.order:p.order);}
 // Distance and one-way attack travel time, verified against https://toolzzz.fr/durees2.php.
 function chaineTravel(origin,target,speed){
  const coord=value=>value!==null&&value!==undefined&&value!==''&&Number.isSafeInteger(Number(value))&&Number(value)>=0;
@@ -49,7 +50,7 @@ function mountChaine(context,data){
   if(event.type!=='click'&&!(event.type==='keydown'&&['Enter',' '].includes(event.key)))return;
   const key=cell.getAttribute('data-uptep-sort');if(!key)return;
   update();sortDirection=sortKey===key?-sortDirection:(key==='terrain'?-1:1);sortKey=key;
-  const compare=(a,b)=>{if(key==='pseudo')return collator.compare(a.pseudo,b.pseudo);if(key==='grade')return ranks.indexOf(a.grade)-ranks.indexOf(b.grade)||(a.order??Infinity)-(b.order??Infinity)||0;const av=key==='distance'?a.distance:a.field,bv=key==='distance'?b.distance:b.field;return av<bv?-1:av>bv?1:0;};
+  const compare=(a,b)=>{if(key==='pseudo')return collator.compare(a.pseudo,b.pseudo);if(key==='grade')return ranks.indexOf(a.grade)-ranks.indexOf(b.grade)||chaineOrderValue(a)-chaineOrderValue(b)||0;const av=key==='distance'?a.distance:a.field,bv=key==='distance'?b.distance:b.field;return av<bv?-1:av>bv?1:0;};
   const parents=new Map();for(const entry of sortable.rows){const parent=entry.row.parentNode;if(!parents.has(parent))parents.set(parent,[]);parents.get(parent).push(entry);}
   for(const entries of parents.values()){
    const anchors=entries.map(p=>{const anchor=doc.createComment('uptep-sort-row');p.row.before(anchor);return anchor;});
@@ -120,7 +121,7 @@ function mountChaine(context,data){
   for(const cell of hide)hideCell(cell);
   for(const name of ['Distance','Trajet','Grade','Position']){const th=append(head,'th',name,'sorter-false uptep-chain-heading-'+norm(name));th.scope='col';th.setAttribute('data-sorter','false');if(name==='Grade')head.prepend(th);}
   const self=rows.find(p=>p.id===String(data.self));const eligible=rows.filter(p=>ranks.indexOf(p.grade)>=0&&ranks.indexOf(p.grade)<3);
-  const compare=(a,b)=>ranks.indexOf(a.grade)-ranks.indexOf(b.grade)||(a.order??Infinity)-(b.order??Infinity)||0;
+  const compare=(a,b)=>ranks.indexOf(a.grade)-ranks.indexOf(b.grade)||chaineOrderValue(a)-chaineOrderValue(b)||0;
   for(const p of rows){
    const target=saved.get(p.pseudo),travel=chaineTravel(origin,target,data.attack_speed);
    const distanceCell=append(p.row,'td',travel.distance===null?'—':Math.ceil(travel.distance).toLocaleString('fr-FR'),'uptep-chain-distance');
@@ -130,7 +131,7 @@ function mountChaine(context,data){
    const cell=append(p.row,'td','','uptep-chain-grade'),badge=doc.createElement('span');badge.className='uptep-chain-badge uptep-chain-'+ranks.indexOf(p.grade);badge.textContent=p.grade?(p.grade+(p.order!==null?' · '+p.order:'')):'—';cell.append(badge);p.row.prepend(cell);
    let movement='excluded';if(eligible.includes(p)){const actualStart=eligible.filter(o=>o.field>p.field).length+1,actualEnd=actualStart+eligible.filter(o=>o.field===p.field).length-1,targetStart=eligible.filter(o=>compare(o,p)<0).length+1,targetEnd=targetStart+eligible.filter(o=>compare(o,p)===0).length-1;movement=actualStart>targetEnd?'up':actualEnd<targetStart?'down':'aligned';}
    const position=append(p.row,'td',({up:'↑',down:'↓',aligned:'✓',excluded:'—'})[movement],'uptep-chain-move uptep-chain-'+movement);position.title=({up:'Monter',down:'Descendre',aligned:'À sa place',excluded:'Hors classement de position'})[movement];
-   let focus='';if(p===self)focus='self';else if(self&&eligible.includes(self)&&!self.blocked&&self.field>0n&&!p.blocked&&p.field>0n&&ranks.indexOf(p.grade)>=0&&ranks.indexOf(p.grade)<4){const difference=ranks.indexOf(p.grade)-ranks.indexOf(self.grade),below=difference>0||(difference===0&&self.order!==null&&p.order!==null&&p.order>self.order);if(below&&p.field*2n>=self.field&&p.field<=self.field*3n)focus='target';}
+   let focus='';if(p===self)focus='self';else if(self&&eligible.includes(self)&&!self.blocked&&self.field>0n&&!p.blocked&&p.field>0n&&ranks.indexOf(p.grade)>=0&&ranks.indexOf(p.grade)<4){const difference=ranks.indexOf(p.grade)-ranks.indexOf(self.grade),below=difference>0||(difference===0&&self.order!==null&&p.order!==null&&(self.grade==='Passeur'?p.order<self.order:p.order>self.order));if(below&&p.field*2n>=self.field&&p.field<=self.field*3n)focus='target';}
    if(focus){p.row.classList.add('uptep-chain-'+focus);marked.add(p.row);}
   }
   prepareSort(table,head,rows);

@@ -19,7 +19,7 @@ function chaineFocus(array $players, ?int $playerId): array {
         $id=(int)$target['player_id'];$grade=$target['chaine_grade'];
         if($id===$playerId || !isset($grades[$grade??'']) || $target['on_holiday'] || $target['is_banned'])continue;
         $gradeComparison=$grades[$grade]<=>$grades[$self['chaine_grade']];
-        $below=$gradeComparison>0 || ($gradeComparison===0 && $self['sort_order']!==null && $target['sort_order']!==null && (int)$target['sort_order']>(int)$self['sort_order']);
+        $below=$gradeComparison>0 || ($gradeComparison===0 && $self['sort_order']!==null && $target['sort_order']!==null && ($self['chaine_grade']==='Passeur'?(int)$target['sort_order']<(int)$self['sort_order']:(int)$target['sort_order']>(int)$self['sort_order']));
         $field=(int)($target['field']??0);
         if($below && $field>0 && $field>=$min && $field<=$max)$result['targets'][]=$id;
     }

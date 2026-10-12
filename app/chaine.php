@@ -2,6 +2,12 @@
 declare(strict_types=1);
 const CHAINE_SERVER = 's5';
 const CHAINE_GRADES = ['Grenier','Passeur','Chasseur','A flooder','Ne pas toucher','Hors chaîne'];
+function chaineOrderCompare(array $a,array $b): int {
+    $x=$a['sort_order']??null;$y=$b['sort_order']??null;
+    if($x===null)return $y===null?0:1;
+    if($y===null)return -1;
+    return ($a['chaine_grade']==='Passeur'?-1:1)*($x<=>$y);
+}
 /** Compare the TDC ranking with the saved chain, independently of table sorting. */
 function chaineMovements(array $players): array {
     $grades=['Grenier'=>0,'Passeur'=>1,'Chasseur'=>2];
@@ -17,7 +23,7 @@ function chaineMovements(array $players): array {
         foreach($eligible as $other) {
             if((int)$other['field']>(int)$player['field'])$actualStart++;
             if((int)$other['field']===(int)$player['field'])$actualEqual++;
-            $cmp=($grades[$other['chaine_grade']]<=>$grades[$player['chaine_grade']]) ?: (($other['sort_order']??PHP_INT_MAX)<=>($player['sort_order']??PHP_INT_MAX));
+            $cmp=($grades[$other['chaine_grade']]<=>$grades[$player['chaine_grade']]) ?: chaineOrderCompare($other,$player);
             if($cmp<0)$targetStart++;
             if($cmp===0)$targetEqual++;
         }

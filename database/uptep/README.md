@@ -22,3 +22,5 @@ Ce fichier regroupe la structure et ses évolutions : **ne pas le réexécuter i
 UPTEP conserve les données propres à l’alliance et accepte les écritures de l’application. La base [FZZZ](../fzzz/README.md) fournit les relevés du jeu ; le compte `uptep` ne doit y avoir qu’un accès en lecture sur les cinq tables prévues.
 
 La table `demandes_ajustements` conserve les modifications manuelles du restant (auteur, date, quantités avant/après), séparément des convois. Sur une base existante, appliquer uniquement `app/bot-demand-adjustments.sql` pour cette évolution ; ne pas rejouer le schéma complet.
+
+Les numéros des Passeurs sont classés en ordre décroissant (5 → 1), les autres grades gardent leur ordre croissant. Le 12 octobre 2026, les affectations s5 existantes ont été inversées une seule fois (1 ↔ 5, 2 ↔ 4, 3 inchangé), avec incrément de version pour invalider les formulaires anciens. Ce changement de données ne doit pas être réappliqué à chaque installation.

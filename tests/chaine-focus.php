@@ -6,7 +6,7 @@ $players=[p(1,'Grenier',2,100),p(2,'Grenier',1,100),p(3,'Grenier',3,50),p(4,'Pas
 $f=chaineFocus($players,1);ok($f['self']===1);ok($f['targets']===[3,4,8]);
 $reverse=chaineFocus(array_reverse($players),1);$ids=$reverse['targets'];sort($ids);ok($ids===[3,4,8]);
 ok(chaineFocus($players,null)['reason']==='unlinked');ok(chaineFocus($players,999)['reason']==='absent');ok(chaineFocus($players,9)['reason']==='unranked');
-ok(chaineFocus([p(1,'Passeur',1,101),p(2,'Passeur',2,50),p(3,'Passeur',3,51)],1)['targets']===[3]);
+ok(chaineFocus([p(1,'Passeur',5,101),p(2,'Passeur',4,50),p(3,'Passeur',3,51)],1)['targets']===[3]);
 ok(chaineFocus([p(1,'Grenier',1,PHP_INT_MAX),p(2,'Passeur',1,PHP_INT_MAX)],1)['targets']===[2]);
 ok(chaineFocus([p(1,'Grenier',1,100,true),p(2,'Passeur',1,100)],1)['targets']===[]);
 echo "OK : position personnelle, bornes 50–300 %, grades/ordres, exclusions, égalités et indépendance du tri.\n";

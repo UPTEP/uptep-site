@@ -38,18 +38,18 @@ document.querySelectorAll('.chaine-table').forEach(table => {
     button.addEventListener('click', () => {
       const key = button.dataset.sort;
       // Grade restores the canonical groups; Order only reverses inside groups.
-      direction = key === 'grade' ? 1 : (active === key ? -direction : 1);
+      direction = key === 'grade' ? 1 : (active === key ? -direction : key === 'order' ? -1 : 1);
       active = key;
       const grouped = key === 'grade' || key === 'order';
       const rows = [...body.rows].sort((a, b) => (grouped
-        ? compare(a, b, 'grade', 1) || compare(a, b, 'order', direction) || compare(a, b, 'player', 1)
+        ? compare(a, b, 'grade', 1) || compare(a, b, 'order', direction * (key === 'grade' && value(a, 'grade') === 1 ? -1 : 1)) || compare(a, b, 'player', 1)
         : compare(a, b, key, direction)) || initialOrder.get(a) - initialOrder.get(b));
       body.append(...rows);
       table.querySelectorAll('[data-sort]').forEach(other => {
         other.closest('th').setAttribute('aria-sort', other === button ? (direction === 1 ? 'ascending' : 'descending') : 'none');
       });
       const status = table.closest('.users-panel').querySelector('[data-sort-status]');
-      if (status) status.textContent = grouped
+      if (status) status.textContent = key === 'grade' ? 'Ordre de chaîne : passeurs du plus grand numéro au plus petit, autres grades en ordre croissant.' : grouped
         ? table.dataset.chaineGroup === 'outside' ? `Hors chaîne, puis ordre ${direction === 1 ? 'croissant' : 'décroissant'}.` : `Grenier → Passeur → Chasseur → A flooder → Ne pas toucher, puis ordre ${direction === 1 ? 'croissant' : 'décroissant'} dans chaque groupe.`
         : `Tri : ${button.textContent.trim()}, ordre ${direction === 1 ? 'croissant' : 'décroissant'}.`;
     });

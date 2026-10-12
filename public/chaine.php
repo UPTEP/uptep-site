@@ -48,7 +48,7 @@ try {
     $focus=chaineFocus($players,$u['game_player_id']===null?null:(int)$u['game_player_id']);
     usort($players,static function(array $a,array $b):int {
         $ga=array_search($a['chaine_grade'],CHAINE_GRADES,true);$gb=array_search($b['chaine_grade'],CHAINE_GRADES,true);
-        return (($ga===false?99:$ga)<=>($gb===false?99:$gb)) ?: (($a['sort_order']??PHP_INT_MAX)<=>($b['sort_order']??PHP_INT_MAX)) ?: strnatcasecmp($a['pseudo'],$b['pseudo']) ?: ((int)$a['player_id']<=>(int)$b['player_id']);
+        return (($ga===false?99:$ga)<=>($gb===false?99:$gb)) ?: chaineOrderCompare($a,$b) ?: strnatcasecmp($a['pseudo'],$b['pseudo']) ?: ((int)$a['player_id']<=>(int)$b['player_id']);
     });
 } catch(Throwable $ex) {error_log('UPTEP chaine read: '.$ex->getMessage());http_response_code(503);$unavailable=true;}
 $groups=['main'=>[], 'outside'=>[]];

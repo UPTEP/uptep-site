@@ -11,3 +11,6 @@ expect([member(1,'Passeur',1,100),member(2,'Passeur',1,200)],[1=>'aligned',2=>'a
 expect([member(1,'Chasseur',1,100),member(2,'Chasseur',null,200),member(3,'Grenier',1,null)],[1=>'up',2=>'down',3=>'excluded']);
 echo "OK : grades prioritaires, ordres internes, positions correctes, égalités, grades exclus et données manquantes.\n";
 expect([member(1,'Grenier',1,100),member(2,'Hors chaîne',1,999)],[1=>'aligned',2=>'excluded']);
+
+expect([member(1,'Passeur',5,300),member(2,'Passeur',4,200),member(3,'Passeur',1,100)],[1=>'aligned',2=>'aligned',3=>'aligned']);
+if(chaineOrderCompare(member(1,'Passeur',null,1),member(2,'Passeur',5,1))!==1)throw new RuntimeException('Unnumbered last');

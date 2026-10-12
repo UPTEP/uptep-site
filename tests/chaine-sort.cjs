@@ -12,7 +12,9 @@ for(const edit of [false,true]){
  await sort('player',['A','B','C','D']);await sort('player',['D','C','B','A']);
  await sort('order',['A','D','B','C']);await sort('order',['A','D','B','C']);
  await sort('grade',['A','D','B','C']);await sort('grade',['A','D','B','C']);
- if(edit){await p.select('[data-player-id=B] select','Grenier');await p.$eval('[data-player-id=B] input',e=>e.value='1');await sort('grade',['B','A','D','C']);assert.equal(await p.$eval('[data-player-id=B] input',e=>e.value),'1');await sort('order',['B','A','D','C']);await sort('order',['A','B','D','C']);}
+ if(edit){await p.select('[data-player-id=B] select','Grenier');await p.$eval('[data-player-id=B] input',e=>e.value='1');await sort('grade',['B','A','D','C']);assert.equal(await p.$eval('[data-player-id=B] input',e=>e.value),'1');await sort('order',['A','B','D','C']);await sort('order',['B','A','D','C']);}
+ await p.evaluate(()=>{const source=document.querySelector('[data-player-id=D]');for(const [id,n] of [['E','5'],['F','1']]){const r=source.cloneNode(true);r.dataset.playerId=id;r.dataset.player=id;r.dataset.order=n;const input=r.querySelector('input');if(input)input.value=n;source.parentNode.append(r);}});
+ await p.click('[data-sort=grade]');assert.deepEqual(await p.$$eval('tbody tr[data-grade=Passeur]',rs=>rs.map(r=>r.dataset.playerId)),['D','E','F']);
  assert.equal(await p.$$eval('th[aria-sort]:not([aria-sort=none])',es=>es.length),1);
  await p.close();
 }console.log('OK : 4 colonnes, deux sens, tri numérique exact, valeurs vides en dernier, lecture/édition et saisies conservées.');
