@@ -3186,6 +3186,56 @@
           }
         }
       }
+    },
+    "/livraisons": {
+      "get": {
+        "tags": [
+          "Demandes"
+        ],
+        "summary": "Demandes validées classées par distance depuis le joueur Discord",
+        "description": "Scope demandes:read. Association Discord unique à un joueur présent dans UPTEP requise, aucun compte site nécessaire. Exclut les demandes propres, non validées, terminées ou annulées. Tri par distance euclidienne non arrondie ; coordonnées absentes en dernier. Temps aller estimé selon la formule du userscript : round(86400 × (1 − exp(−distance / 350)) × 7.375 × 0.9^vitesse). Vitesse fournie à chaque appel, jamais enregistrée. Pagination de 8 demandes. Réponse : joueur, vitesse, page, pages, total, lignes (id, iddemandeur, pseudo_demandeur, nbpomme_restant, nbmateriaux_restant, distance, seconds). distance et seconds peuvent être null. Identifiants et ressources sont des chaînes.",
+        "parameters": [
+          {
+            "name": "discord_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vitesse",
+            "in": "query",
+            "required": true,
+            "description": "Niveau de Vitesse d’attaque",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 999
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste triée paginée"
+          },
+          "403": {
+            "description": "Association absente, ambiguë ou joueur hors alliance"
+          },
+          "422": {
+            "description": "Paramètres invalides"
+          }
+        }
+      }
     }
   },
   "components": {
