@@ -3527,6 +3527,34 @@
           }
         }
       }
+    },
+    "/demandes/statuts": {
+      "get": {
+        "tags": [
+          "Demandes"
+        ],
+        "summary": "Lire les états de demandes pour nettoyer les annonces",
+        "description": "Scope demandes:read. Inclut les demandes terminées et annulées, sans limite de date. Retourne ok et demandes (id chaîne, fini booléen, annulee booléen). Les IDs inexistants sont absents ; leur absence ne doit pas être interprétée comme une clôture.",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "description": "De 1 à 100 IDs séparés par des virgules",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "États des demandes existantes"
+          },
+          "422": {
+            "description": "Liste invalide"
+          }
+        }
+      }
     }
   },
   "components": {

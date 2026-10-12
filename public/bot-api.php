@@ -49,6 +49,16 @@ try {
         define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-terrain.php';
         botReply(200,$action==='state'?terrainState(db(),$tm[1],$tm[2]):($action==='lots'?terrainCommit(db(),$tm[1],$tm[2],$input):terrainPublished(db(),$tm[1],$tm[2],$input)));
     }
+    if($path==='/api/bot/v1/demandes/statuts'){
+        if($method!=='GET')botReply(405,['ok'=>false,'error'=>'method_not_allowed']);
+        if(!in_array('demandes:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
+        $ids=$_GET['ids']??'';
+        if(!is_string($ids)||!preg_match('/\A[1-9][0-9]{0,18}(?:,[1-9][0-9]{0,18}){0,99}\z/',$ids))botReply(422,['ok'=>false,'error'=>'Liste de demandes invalide (100 maximum).']);
+        define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-convoys.php';
+        $ids=array_map(fn($id)=>botNumber($id,true),explode(',',$ids));
+        $q=db()->prepare('SELECT id::text,fini,annulee FROM demandes_convois WHERE id IN ('.implode(',',array_fill(0,count($ids),'?')).')');$q->execute($ids);
+        botReply(200,['ok'=>true,'demandes'=>$q->fetchAll(PDO::FETCH_ASSOC)]);
+    }
     if(in_array($path,['/api/bot/v1/floods','/api/bot/v1/floods/preview'],true)){
         $preview=str_ends_with($path,'/preview');
         if(!in_array($method,$preview?['POST']:['GET','POST'],true))botReply(405,['ok'=>false,'error'=>'method_not_allowed']);
