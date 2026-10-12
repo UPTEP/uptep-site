@@ -3236,6 +3236,36 @@
           }
         }
       }
+    },
+    "/chaine": {
+      "get": {
+        "tags": [
+          "Demandes"
+        ],
+        "summary": "Membres présents de l’alliance dans l’ordre de chaîne",
+        "description": "Scope membres:read. discord_id doit être associé à un membre UPTEP. Retourne ok, total et membres (player_id chaîne, pseudo, chaine_grade nullable, sort_order nullable). Ordre identique au site : grades prioritaires, Passeurs décroissants, autres grades croissants, non attribués en dernier. Lecture seule.",
+        "parameters": [
+          {
+            "name": "discord_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste complète triée"
+          },
+          "403": {
+            "description": "Association ou scope absent"
+          },
+          "422": {
+            "description": "Paramètre invalide"
+          }
+        }
+      }
     }
   },
   "components": {

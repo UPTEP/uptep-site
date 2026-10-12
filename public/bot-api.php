@@ -49,6 +49,12 @@ try {
         define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-terrain.php';
         botReply(200,$action==='state'?terrainState(db(),$tm[1],$tm[2]):($action==='lots'?terrainCommit(db(),$tm[1],$tm[2],$input):terrainPublished(db(),$tm[1],$tm[2],$input)));
     }
+    if($path==='/api/bot/v1/chaine'){
+        if($method!=='GET'){header('Allow: GET');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
+        if(!in_array('membres:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
+        define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-convoys.php';require '/home/uptep/private/app/bot-chain.php';
+        botReply(200,botChain(db(),db(true),$_GET));
+    }
     if($path==='/api/bot/v1/livraisons'){
         if($method!=='GET'){header('Allow: GET');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
         if(!in_array('demandes:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
