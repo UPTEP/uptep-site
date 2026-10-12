@@ -470,7 +470,7 @@
           "Demandes"
         ],
         "summary": "Valider une demande",
-        "description": "**Permission du secret : `demandes:validate`.**\n\nLe validateur doit avoir une association Discord unique et être membre UPTEP. Il doit soit figurer dans ADMIN_DISCORD_IDS du fichier privé .env du bot, soit posséder un unique compte du site lié à son joueur, actif, avec le droit **chaine** et son mot de passe initial changé. Une validation déjà effectuée est refusée, sauf retry identique de la même commande.",
+        "description": "**Permission du secret : `demandes:validate`.**\n\nLe validateur doit avoir une association Discord unique et être membre UPTEP. Il doit soit figurer dans ADMIN_DISCORD_IDS du fichier privé .env du bot, soit posséder un unique compte du site lié à son joueur, actif, avec le droit **chaine** et son mot de passe initial changé. Une validation déjà effectuée est refusée, sauf retry identique de la même commande. Le bot transmet version_attendue : si le contenu a changé depuis sa lecture, la validation est refusée avec 409. Facultatif pour les anciens clients.",
         "responses": {
           "200": {
             "description": "Succès.",
@@ -630,7 +630,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Validation"
+                "$ref": "#/components/schemas/ValidationDemande"
               }
             }
           }
@@ -2896,6 +2896,180 @@
         }
       }
     },
+    "/demandes/{id}/modification": {
+      "post": {
+        "tags": [
+          "Demandes"
+        ],
+        "summary": "Modifier une demande en attente de validation",
+        "description": "**Permission du secret : `demandes:adjust`.**\n\nDemandeur ou responsable effectif uniquement. Remplace les quantités originales et restantes, objet, niveau et date souhaitée. Fournir tous les champs ; objet et niveau peuvent être null ensemble, date_souhaitee peut être null pour supprimer la date. Au moins une quantité positive ; date non passée, niveau de 1 à 999. La demande conserve son identifiant, son auteur, sa date de création et son état attente. Aucun convoi ni notification de validation. Verrou transactionnel et version_attendue obligatoire : 409 si la demande a changé, a été validée, clôturée ou annulée. Reçus idempotents dans bot_commandes ; droits revérifiés lors des retries.",
+        "responses": {
+          "401": {
+            "description": "Secret absent, invalide, désactivé ou expiré.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission du secret insuffisante, association Discord invalide ou droit utilisateur absent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Méthode HTTP refusée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de requêtes dépassée (réponse Nginx HTML).",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service momentanément indisponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "JSON invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Route ou demande introuvable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflit : commande réutilisée avec un autre contenu, validation déjà faite, demande non validée/terminée ou dépassement du restant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type application/json requis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Valeurs, champs ou paramètres invalides.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erreur"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Succès.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "demande": {
+                      "$ref": "#/components/schemas/Demande"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "demande"
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true si la réponse initiale est rejouée, false pour une nouvelle écriture.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$",
+              "maxLength": 19,
+              "description": "Entier exact transmis comme chaîne JSON, maximum 9223372036854775807.",
+              "example": "1"
+            },
+            "description": "ID de la demande."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModificationDemande"
+              }
+            }
+          }
+        },
+        "operationId": "post__demandes_id_modification"
+      }
+    },
     "/terrain/{guild_id}/{channel_id}": {
       "get": {
         "tags": [
@@ -3755,6 +3929,11 @@
               "$ref": "#/components/schemas/AjustementHistorique"
             },
             "description": "Les dix derniers ajustements du restant, du plus récent au plus ancien. Les anciens restent en base."
+          },
+          "version_modification": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Empreinte opaque version_modification retournée avec la demande ; renvoyer la valeur lue avant ouverture du formulaire."
           }
         },
         "required": [
@@ -4127,6 +4306,92 @@
           "materiaux_apres",
           "date_ajustement"
         ]
+      },
+      "ModificationDemande": {
+        "type": "object",
+        "properties": {
+          "commande_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.:-]{1,100}$",
+            "maxLength": 100,
+            "description": "Identifiant unique de l’interaction Discord. Réutiliser le même identifiant et le même contenu lors des retries.",
+            "example": "EXEMPLE-remplacer-par-interaction-id"
+          },
+          "discord_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "maxLength": 19,
+            "description": "ID Discord de l’auteur réel de la commande. Le bot doit le lire depuis l’interaction Discord, jamais depuis un champ libre.",
+            "example": "123456789012345678"
+          },
+          "nbpomme": {
+            "$ref": "#/components/schemas/Quantite"
+          },
+          "nbmateriaux": {
+            "$ref": "#/components/schemas/Quantite"
+          },
+          "objet": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "nullable": true
+          },
+          "niveau": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,2}$",
+            "nullable": true
+          },
+          "date_souhaitee": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "version_attendue": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Empreinte opaque version_modification retournée avec la demande ; renvoyer la valeur lue avant ouverture du formulaire."
+          }
+        },
+        "required": [
+          "commande_id",
+          "discord_id",
+          "nbpomme",
+          "nbmateriaux",
+          "objet",
+          "niveau",
+          "date_souhaitee",
+          "version_attendue"
+        ],
+        "additionalProperties": false
+      },
+      "ValidationDemande": {
+        "type": "object",
+        "properties": {
+          "commande_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.:-]{1,100}$",
+            "maxLength": 100,
+            "description": "Identifiant unique de l’interaction Discord. Réutiliser le même identifiant et le même contenu lors des retries.",
+            "example": "EXEMPLE-remplacer-par-interaction-id"
+          },
+          "discord_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "maxLength": 19,
+            "description": "ID Discord de l’auteur réel de la commande. Le bot doit le lire depuis l’interaction Discord, jamais depuis un champ libre.",
+            "example": "123456789012345678"
+          },
+          "version_attendue": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Empreinte opaque version_modification retournée avec la demande ; renvoyer la valeur lue avant ouverture du formulaire."
+          }
+        },
+        "required": [
+          "commande_id",
+          "discord_id"
+        ],
+        "additionalProperties": false
       }
     }
   }

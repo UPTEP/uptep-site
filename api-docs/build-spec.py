@@ -93,6 +93,19 @@ adjust_operation=operation('Demandes','Ajuster les quantités restantes','demand
 adjust_operation['responses']['200']=adjust_operation['responses'].pop('201')
 paths['/demandes/{id}/ajustement']={'post':adjust_operation}
 
+# Editing before approval replaces the requested totals and leaves the request pending.
+version={'type':'string','pattern':'^[a-f0-9]{64}$','description':'Empreinte opaque version_modification retournée avec la demande ; renvoyer la valeur lue avant ouverture du formulaire.'}
+schemas['Demande']['properties']['version_modification']=version
+schemas['ModificationDemande']=dict(obj(actor|{'nbpomme':ref('Quantite'),'nbmateriaux':ref('Quantite')}|{k:nullable(v) for k,v in metadata.items()}|{'version_attendue':version}),additionalProperties=False)
+modify_operation=operation('Demandes','Modifier une demande en attente de validation','demandes:adjust','Demandeur ou responsable effectif uniquement. Remplace les quantités originales et restantes, objet, niveau et date souhaitée. Fournir tous les champs ; objet et niveau peuvent être null ensemble, date_souhaitee peut être null pour supprimer la date. Au moins une quantité positive ; date non passée, niveau de 1 à 999. La demande conserve son identifiant, son auteur, sa date de création et son état attente. Aucun convoi ni notification de validation. Verrou transactionnel et version_attendue obligatoire : 409 si la demande a changé, a été validée, clôturée ou annulée. Reçus idempotents dans bot_commandes ; droits revérifiés lors des retries.', 'demande','post','ModificationDemande',parameters=[idparam])
+modify_operation['responses']['200']=modify_operation['responses'].pop('201')
+modify_operation['operationId']='post__demandes_id_modification'
+paths['/demandes/{id}/modification']={'post':modify_operation}
+schemas['ValidationDemande']=dict(obj(actor|{'version_attendue':version},list(actor)),additionalProperties=False)
+validation=paths['/demandes/{id}/validation']['post']
+validation['requestBody']['content']['application/json']['schema']=ref('ValidationDemande')
+validation['description']+=' Le bot transmet version_attendue : si le contenu a changé depuis sa lecture, la validation est refusée avec 409. Facultatif pour les anciens clients.'
+
 # Persistent Discord terrain tracking; reserved to the configured guild and test actor.
 snow={'type':'string','pattern':'^[1-9][0-9]{0,19}$'}
 terrain_params=[{'name':n,'in':'path','required':True,'schema':snow} for n in ['guild_id','channel_id']]
