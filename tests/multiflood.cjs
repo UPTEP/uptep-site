@@ -91,3 +91,7 @@ const reinforced={...splitDraft,targets:splitDraft.targets.map((p,i)=>({...p,use
 series=campaign(reinforced,{army:'50000',slots:10},{},arrivals);assert.equal(series[0].result.sent+series[1].result.sent,50000n);assert(series[1].result.sent>series[1].result.gain);
 series=campaign({self:{field:'1000'},observed:0,excluded:[],targets:[{id:'2',field:'1000'},{id:'3',field:'500'}]},{army:'50000',slots:10},{},arrivals);assert.equal(series[1].result.attacks.length,0,'Earlier planned gains can put a later target out of range');
 console.log('OK: shared campaign army, slots and goals; planned terrain; deselection; arrival order; reverse sends; confirmed/arrived gains; remainder and changing range.');
+series=campaign({...campaignDraft,self:{field:'10721',max:'200'}},{army:'361',slots:2},{'9':{state:'done',gain:'300',arrivalAt:3000}},arrivals);
+assert.equal(series[0].result.gain,200n);assert.equal(series[0].result.initial,11021n,'Older unrelated selections affect arrival terrain, not the new cap');
+series=campaign({...campaignDraft,self:{field:'10721',max:'200'}},{army:'361',slots:2},{'history:0':{state:'done',gain:'300',arrivalAt:3000,countsTowardGoal:false}},arrivals);
+assert.equal(series[0].result.gain,200n);assert.equal(series[1].result.gain,0n);assert.match(series[1].result.groups[0].reason,/Prise maximale totale/);

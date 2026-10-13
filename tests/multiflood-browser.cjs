@@ -144,6 +144,22 @@ const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Sel
   await page.goto('https://s5.fourmizzz.fr/alliance.php?Membres');await mount(true);
   await Promise.all([page.waitForNavigation(),page.click('[data-id="2"] .uptep-mf-launch')]);
   assert.equal(new URL(page.url()).searchParams.get('uptepMultiflood'),'1');assert.equal(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('uptep:multiflood:Self:draft')).targets.length),1);
+  const newSelectionLedger=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('uptep:multiflood:Self:submission')));
+  assert.deepEqual(newSelectionLedger.targets,{});assert.equal(newSelectionLedger.history.at(-1).sent,'50000','New member selection archives confirmed sends, including a reselected player');
+  // Old confirmed floods from a different selection must not consume a new cap.
+  army='361';slots=2;
+  await page.evaluate(()=>{sessionStorage.setItem('uptep:multiflood:Self:submission',JSON.stringify({version:2,targets:{'9':{state:'done',gain:'300',sent:'300',arrivalAt:Date.now()+1000}}}));});
+  await mount();await page.waitForFunction(()=>!document.querySelector('#uptep-multiflood fieldset').disabled);
+  await page.click('#uptep-multiflood button[aria-expanded]');await page.type('#joueur0max','200');
+  assert.equal(await page.$eval('[data-target="2"] tr:last-child td:last-child',n=>n.textContent),'+200','Legacy unrelated sends do not consume the new 200 limit');
+  assert.equal(await page.$eval('[data-target="2"] tr:nth-child(2) td:nth-child(2)',n=>n.textContent),'11\u202f021','Their pending arrival still increases projected terrain');
+  await page.evaluate(()=>cleanupMF());
+  await page.goto('https://s5.fourmizzz.fr/alliance.php?Membres');
+  await page.evaluate(()=>sessionStorage.setItem('uptep:multiflood:Self:submission',JSON.stringify({version:2,targets:{'9':{state:'uncertain',gain:'300',arrivalAt:Date.now()+1000}}})));
+  await mount(true);await Promise.all([page.waitForNavigation(),page.click('[data-id="2"] .uptep-mf-launch')]);await mount();
+  await page.waitForFunction(()=>document.querySelector('.uptep-mf-status').textContent.includes('reste à vérifier'));
+  assert.equal(await page.$eval('#uptep-multiflood fieldset',n=>n.disabled),true,'Changing selection never clears an uncertain submission');
+  await page.evaluate(()=>cleanupMF());
   await page.goto('https://s5.fourmizzz.fr/alliance.php?Membres');
   const runtime=fs.readFileSync(root+'/app/script-runtime.min.js','utf8');
   await page.evaluate(({runtime,data})=>{

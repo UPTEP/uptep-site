@@ -114,13 +114,14 @@ function multifloodTargetPlan(draft,native,target,records,arrivalAt){
  const done=Object.values(records).filter(r=>r.state==='done');
  let forecast=0n,future=0n,alreadySent=0n;
  for(const record of done){
-  const gain=multifloodNumber(record.gain);alreadySent+=gain;
+  const gain=multifloodNumber(record.gain);if(record.countsTowardGoal!==false)alreadySent+=gain;
   if(record.arrivalAt>observed){future+=gain;if(record.arrivalAt<=arrivalAt)forecast+=gain;}
  }
  let cap=multifloodNumber(draft.self.max,true),final=multifloodNumber(draft.self.final,true);
  if(cap!==null)cap=max(0n,cap-alreadySent);
  if(final!==null){const remaining=max(0n,final-actual-future);cap=cap===null?remaining:min(cap,remaining);}
  const result=multifloodPlan({self:{field:String(actual+forecast),max:cap===null?'':String(cap)},targets:[target],army:native.army,slots:native.slots,excluded:draft.excluded});
+ if(cap===0n&&result.groups[0]?.reason==='Objectif atteint ou prise nulle.')result.groups[0].reason=final!==null?'Objectif de terrain final déjà couvert par les floods prévus ou envoyés.':'Prise maximale totale déjà réservée ou envoyée dans cette sélection. Augmente cette limite ou réduis les floods précédents.';
  if(target.useRemainingArmy&&result.attacks.length&&result.armyLeft>0n){
   const last=result.attacks[result.attacks.length-1],group=result.groups[0];
   last.amount+=result.armyLeft;result.sent+=result.armyLeft;result.armyLeft=0n;
@@ -134,7 +135,10 @@ function multifloodTargetPlan(draft,native,target,records,arrivalAt){
 function multifloodCampaignPlan(draft,native,records,arrivals){
  const pending=draft.targets.filter(target=>!records[target.id]).map(target=>({target,arrivalAt:arrivals[target.id]??Infinity}));
  pending.sort((a,b)=>(a.arrivalAt-b.arrivalAt)||((a.target.distance??Infinity)-(b.target.distance??Infinity)));
- const projected={...records},remaining={...native},plans=[];
+ // Older versions kept completed targets from other selections in this map.
+ // Keep their arrivals in the forecast, without spending this selection's cap.
+ const ids=new Set(draft.targets.map(target=>target.id));
+ const projected=Object.fromEntries(Object.entries(records).map(([id,record])=>[id,{...record,countsTowardGoal:ids.has(id)&&record.countsTowardGoal!==false}])),remaining={...native},plans=[];
  for(const {target,arrivalAt} of pending){
   const result=multifloodTargetPlan(draft,remaining,target,projected,arrivalAt);
   plans.push({target,arrivalAt,result});
@@ -174,6 +178,7 @@ function mountMultiflood(context,data){
    if(!targets.length)throw Error('Sélectionne au moins un joueur à portée.');
    write('draft',{self:cleanPlayer(members.self),targets:targets.map(cleanPlayer),observed:Date.now(),observedServer:multifloodClock(win)?.now??Date.now(),excluded:[],options:false});
    // A previous uncertain submission must be reviewed on the preparation page.
+   if(!unresolved())startSelection();
    win.location.assign(pageURL);
   }catch(e){message.textContent=e.message;}
  }
@@ -201,10 +206,15 @@ function mountMultiflood(context,data){
  const previousSubmission=read('submission');
  let ledger=previousSubmission?.version===2?previousSubmission:{version:2,targets:{},legacy:previousSubmission||null};
  if(!ledger.targets||typeof ledger.targets!=='object'||Array.isArray(ledger.targets))ledger.targets={};
+ if(!Array.isArray(ledger.history))ledger.history=[];
  const controls=new Map(),targetStatus=new Map();
  const unresolved=()=>!!ledger.legacy||Object.values(ledger.targets).some(r=>r.state!=='done');
  const saveLedger=()=>write('submission',ledger);
  const serverNow=()=>multifloodClock(win)?.now??Date.now();
+ function startSelection(){
+  const history=[...ledger.history,...Object.values(ledger.targets).filter(record=>record.state==='done')];
+  ledger={version:2,targets:{},history};saveLedger();
+ }
  function alive(){
   if(disposed)throw Error('Préparation interrompue.');
   if(doc.getElementById('pseudo')?.textContent.trim()!==context.pseudo||doc.getElementById('tag_alliance')?.textContent.trim()!=='UPTEP')throw Error('Le compte du jeu a changé ou la session a expiré.');
@@ -261,7 +271,8 @@ function mountMultiflood(context,data){
    const seconds=travel(target).seconds;
    arrivals[target.id]=target.id===targetId&&Number.isFinite(at)?at:seconds===null?Infinity:multifloodTiming(seconds,now).arrivalAt;
   }
-  return multifloodCampaignPlan(draft,native,ledger.targets,arrivals);
+  const records={...Object.fromEntries(ledger.history.map((record,i)=>['history:'+i,{...record,countsTowardGoal:false}])),...ledger.targets};
+  return multifloodCampaignPlan(draft,native,records,arrivals);
  }
  function targetPlan(target,at){
   return campaignPlans(target.id,at).find(plan=>plan.target.id===target.id).result;
@@ -398,7 +409,7 @@ function mountMultiflood(context,data){
   for(const child of centre.children){if(child.matches('script,style,link,nav,#menu,#menuBoite')||child.querySelector('#menu,#menuBoite'))continue;hidden.set(child,[child.style.getPropertyValue('display'),child.style.getPropertyPriority('display')]);child.style.setProperty('display','none','important');}
   centre.append(page);make('h2','Multiflood UPTEP+',page);
   const toolbar=make('div',null,page);toolbar.className='uptep-mf-toolbar';const back=make('a','← Membres',toolbar);back.href='/alliance.php?Membres';refresh=button('Actualiser les terrains',toolbar,refreshData);const armyLink=make('a','Voir mon armée',toolbar);armyLink.href='/Armee.php';armyLink.target='_blank';armyLink.rel='noopener';
-  reset=button('Nouvelle préparation',toolbar,()=>{if(unresolved()&&!win.confirm('As-tu vérifié dans Armée les attaques déjà parties ? Une nouvelle préparation peut sinon les doubler.'))return;ledger={version:2,targets:{}};saveLedger();prepared=null;refreshData();});
+  reset=button('Nouvelle préparation',toolbar,()=>{if(unresolved()&&!win.confirm('As-tu vérifié dans Armée les attaques déjà parties ? Une nouvelle préparation peut sinon les doubler.'))return;startSelection();prepared=null;refreshData();});
   status=make('p','',page);status.className='uptep-mf-status';status.setAttribute('role','status');
   availability=make('p','',page);availability.className='uptep-mf-note';
   make('p','Pour chaque joueur : prépare les floods, puis clique sur son bouton Envoyer à la seconde indiquée. Règle du tutoriel : 59 − secondes du trajet. Le délai réseau peut décaler l’arrivée.',page).className='uptep-mf-note';
