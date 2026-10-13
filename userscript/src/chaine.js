@@ -77,7 +77,9 @@ function mountChaine(context,data){
   }
   if(!rows.some(p=>p.id===String(data.self))){sortable=null;legend.remove();return;}
   prepareSort(table,head,rows);
-  if(legend.nextSibling!==table)table.before(legend);
+  // Keep the legend above the multiflood toolbar so their refreshes never swap them.
+  const anchor=table.previousElementSibling?.classList.contains('uptep-mf-tools')?table.previousElementSibling:table;
+  if(legend.nextElementSibling!==anchor)anchor.before(legend);
   const signature=JSON.stringify(rows.map(p=>[p.pseudo,String(p.field),p.blocked]));if(signature===previous&&head.querySelector('.uptep-chain-cell')&&rows.every(p=>p.row.querySelector('.uptep-chain-cell')))return;previous=signature;clear();
   const numberIndex=[...head.cells].findIndex(c=>norm(c.textContent)==='rang')-1;
   if(numberIndex>=0){for(const row of [head,...rows.map(p=>p.row)]){const cell=row.cells[numberIndex];if(cell){removedNumbers.set(cell,{row,next:cell.nextSibling});cell.remove();}}}

@@ -175,7 +175,7 @@ function mountMultiflood(context,data){
   }
   const headers=['select','launch'].map(n=>head.querySelector('[data-mf-column="'+n+'"]'));
   if(head.lastElementChild!==headers[1]||headers[1].previousElementSibling!==headers[0])head.append(...headers);
-  const n=players.filter(p=>selected.has(p.id)).length;selectButton.disabled=n===0;selectButton.textContent='Multiflood la sélection ('+n+')';
+  const n=players.filter(p=>selected.has(p.id)).length;selectButton.disabled=n===0;const label='Multiflood la sélection ('+n+')';if(selectButton.textContent!==label)selectButton.textContent=label;
  }
  let page=null,draft=null,native=null,busy=false,prepared=null,status,fieldset,availability,results,refresh,options,form,reset,timingTimer;
  const previousSubmission=read('submission');

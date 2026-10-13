@@ -31,6 +31,15 @@ const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Sel
   await page.click('[data-id="2"] .uptep-mf-select');await page.click('[data-uptep-sort=terrain]');
   await page.waitForFunction(()=>document.querySelector('[data-id="2"] .uptep-mf-select')?.checked);
   assert.equal((await page.$$('.uptep-mf-cell')).length,12);
+  const stability=await page.evaluate(async()=>{
+   const legend=document.querySelector('.uptep-chain-legend'),tools=document.querySelector('.uptep-mf-tools'),table=document.querySelector('#members'),checkbox=document.querySelector('[data-id="2"] .uptep-mf-select');
+   const button=tools.querySelector('button');button.focus();let moves=0;
+   const observer=new MutationObserver(records=>{for(const record of records)for(const node of [...record.addedNodes,...record.removedNodes])if(node===legend||node===tools)moves++;});
+   observer.observe(table.parentNode,{childList:true});
+   await new Promise(resolve=>setTimeout(resolve,2200));observer.disconnect();
+   return {moves,ordered:legend.nextElementSibling===tools&&tools.nextElementSibling===table,focused:document.activeElement===button,selected:checkbox.checked};
+  });
+  assert.deepEqual(stability,{moves:0,ordered:true,focused:true,selected:true},'Legend and multiflood toolbar stay fixed across refreshes after sorting');
   await page.click('[data-id="3"] .uptep-mf-select');
   await Promise.all([page.waitForNavigation(),page.click('.uptep-mf-tools button')]);await mount();
   await page.waitForFunction(()=>!document.querySelector('#uptep-multiflood fieldset').disabled);
