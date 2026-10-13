@@ -26,3 +26,25 @@ for(let a=1;a<=50;a++)for(let b=1;b<=150;b++)for(const slots of [1,2,5]){
  assert(gain<=20n);assert(p.attacks.length<=slots);assert.equal(own,p.final);
 }
 console.log('OK: optimal boundary series, limited army/slots, deselection recomputation, range, goals, rounding, target deduplication, exact integers, 22,500 small-case invariants.');
+
+const {multifloodTiming:timing,multifloodDuration:duration,multifloodTargetPlan:targetPlan,multifloodClock:clock}=scope;
+assert.equal(timing(15*3600+9*60+8,NaN).clickSecond,51);
+assert.equal(timing(0,NaN).clickSecond,59);
+assert.equal(timing(59,NaN).clickSecond,0);
+assert.equal(timing(null,0),null);
+assert.equal(duration('15:09:08',0),54548);assert.equal(duration('',123),123);
+assert.throws(()=>duration('15:60:08'));assert.throws(()=>duration('abc'));
+for(let seconds=0;seconds<3600;seconds++)for(const now of [59999,60000,1234567890000]){
+ const t=timing(seconds,now);assert.equal(Math.floor(t.arrivalAt/1000)%60,59);assert(t.clickAt>=Math.floor(now/1000)*1000);assert(t.clickAt-now<60000);
+}
+assert(timing(8,51000).inWindow);assert(timing(8,51999).inWindow);assert.equal(timing(8,52000).clickAt,111000);
+const target={id:'3',pseudo:'Morel',field:'20000'},draft={self:{field:'10721'},excluded:[],observed:1000};
+const records={'2':{state:'done',gain:'3528',arrivalAt:2000}};
+let per=targetPlan(draft,{army:'50000',slots:10},target,records,3000);assert.equal(per.initial,14249n);assert.equal(per.forecast,3528n);
+per=targetPlan(draft,{army:'50000',slots:10},target,records,1500);assert.equal(per.initial,10721n,'Later arrivals do not inflate an earlier flood');
+per=targetPlan({...draft,self:{field:'14249'},observed:2500},{army:'50000',slots:10},target,records,3000);assert.equal(per.initial,14249n,'Arrived gains already in the member snapshot are not added twice');
+per=targetPlan({...draft,self:{field:'10721',max:'3600'}},{army:'50000',slots:10},target,records,3000);assert.equal(per.gain,72n,'Global max subtracts previously sent amounts');
+per=targetPlan({...draft,self:{field:'10721',final:'14299'}},{army:'50000',slots:10},target,records,1500);assert.equal(per.gain,50n,'Later pending gains still count toward a final terrain goal');
+const fake={performance:{timeOrigin:0,now:()=>100},sessionStorage:{getItem:()=>JSON.stringify({version:1,globalAtReference:0,wallAtReference:Date.now()-100,serverAtReference:1000,model:{consistent:true,uncertainty:20}})}};
+assert.equal(clock(fake).now,1100);fake.performance.now=()=>600001;assert.equal(clock(fake),null);
+console.log('OK: tutorial :59 timing, minute rollover, exact duration override, pending arrival order, no double counting, shared objectives and stale clock.');
