@@ -48,3 +48,19 @@ per=targetPlan({...draft,self:{field:'10721',final:'14299'}},{army:'50000',slots
 const fake={performance:{timeOrigin:0,now:()=>100},sessionStorage:{getItem:()=>JSON.stringify({version:1,globalAtReference:0,wallAtReference:Date.now()-100,serverAtReference:1000,model:{consistent:true,uncertainty:20}})}};
 assert.equal(clock(fake).now,1100);fake.performance.now=()=>600001;assert.equal(clock(fake),null);
 console.log('OK: tutorial :59 timing, minute rollover, exact duration override, pending arrival order, no double counting, shared objectives and stale clock.');
+
+const remainderTarget={id:'2',pseudo:'Khan',field:'8711',useRemainingArmy:true},remainderDraft={self:{field:'10721'},excluded:[],observed:1000};
+per=targetPlan(remainderDraft,{army:'50000',slots:10},remainderTarget,{},3000);
+assert.deepEqual(Array.from(per.attacks,r=>r.amount),[1742n,491n,47767n]);
+assert.equal(per.sent,50000n);assert.equal(per.armyLeft,0n);assert.equal(per.gain,3528n);assert.equal(per.attacks.at(-1).capture,1295n);
+per=targetPlan({...remainderDraft,excluded:['2:2']},{army:'50000',slots:10},remainderTarget,{},3000);
+assert.deepEqual(Array.from(per.attacks,r=>r.amount),[1742n,48258n],'Surplus moves to the last checked flood');
+assert.equal(per.gain,3135n,'A reinforced bridge takes up to 20%, not its former small amount');assert.equal(per.final,13856n);
+per=targetPlan({...remainderDraft,excluded:['2:0','2:1','2:2']},{army:'50000',slots:10},remainderTarget,{},3000);
+assert.equal(per.sent,0n);assert.equal(per.armyLeft,50000n);assert.equal(per.attacks.length,0);
+per=targetPlan({...remainderDraft,self:{field:'10721',max:'50'}},{army:'50000',slots:10},remainderTarget,{},3000);
+assert.equal(per.sent,50000n);assert.equal(per.gain,1742n,'Actual capture reflects the larger last flood even with a smaller goal');
+per=targetPlan(remainderDraft,{army:'351',slots:2},remainderTarget,{},3000);assert.equal(per.sent,351n);assert.equal(per.gain,351n);
+per=targetPlan(remainderDraft,{army:'50000',slots:0},remainderTarget,{},3000);assert.equal(per.sent,0n);
+per=targetPlan(remainderDraft,{army:'50000',slots:10},{...remainderTarget,useRemainingArmy:false},{},3000);assert.equal(per.sent,3528n);assert.equal(per.armyLeft,46472n);
+console.log('OK: remaining army on last checked flood, capture ceiling, bridge reinforcement, smaller objectives, empty selection and no free slots.');

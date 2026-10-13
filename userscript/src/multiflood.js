@@ -47,13 +47,13 @@ function multifloodPlan(input){
    if(!multifloodRange(own,field))break;
    const amount=next(own,field,goal-group.gain,count-i);if(amount<=0n)break;
    const key=target.id+':'+i,checked=!excluded.has(key);
-   group.rows.push({key,id:String(target.id),pseudo:target.pseudo,amount,own,field,checked,percent:Number(amount*10000n/field)/100});
+   group.rows.push({key,id:String(target.id),pseudo:target.pseudo,amount,capture:amount,own,field,checked,percent:Number(amount*10000n/field)/100});
    if(checked){own+=amount;field-=amount;army-=amount;slots--;gained+=amount;group.gain+=amount;}
   }
   group.final=field;
   if(!group.rows.length)group.reason=slots===0?'Aucune attaque disponible.':army===0n?'Aucune fourmi disponible.':original===final?'Terrain final déjà atteint.':'Objectif atteint ou prise nulle.';
  }
- return {groups,initial,final:own,gain:gained,armyLeft:army,slotsLeft:slots,attacks:groups.flatMap(g=>g.rows).filter(r=>r.checked)};
+ return {groups,initial,final:own,gain:gained,sent:gained,armyLeft:army,slotsLeft:slots,attacks:groups.flatMap(g=>g.rows).filter(r=>r.checked)};
 }
 function readMultifloodMembers(doc,data,base){
  const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
@@ -121,6 +121,14 @@ function multifloodTargetPlan(draft,native,target,records,arrivalAt){
  if(cap!==null)cap=max(0n,cap-alreadySent);
  if(final!==null){const remaining=max(0n,final-actual-future);cap=cap===null?remaining:min(cap,remaining);}
  const result=multifloodPlan({self:{field:String(actual+forecast),max:cap===null?'':String(cap)},targets:[target],army:native.army,slots:native.slots,excluded:draft.excluded});
+ if(target.useRemainingArmy&&result.attacks.length&&result.armyLeft>0n){
+  const last=result.attacks[result.attacks.length-1],group=result.groups[0];
+  last.amount+=result.armyLeft;result.sent+=result.armyLeft;result.armyLeft=0n;
+  const capture=min(last.amount,last.field/5n),extra=capture-last.capture;
+  last.capture=capture;last.percent=Number(capture*10000n/last.field)/100;
+  result.gain+=extra;result.final+=extra;group.gain+=extra;group.final-=extra;
+  for(const row of group.rows.slice(group.rows.indexOf(last)+1)){row.own+=extra;row.field-=extra;}
+ }
  result.forecast=forecast;return result;
 }
 function mountMultiflood(context,data){
@@ -244,13 +252,17 @@ function mountMultiflood(context,data){
    for(const target of [...draft.targets].sort((a,b)=>(a.distance??Infinity)-(b.distance??Infinity))){
     const section=make('section',null,results);section.dataset.target=target.id;make('h3',target.pseudo,section);
     const record=ledger.targets[target.id];
-    if(record){make('p',record.state==='done'?'✓ '+record.count+' attaque(s) envoyée(s) · '+fmt(record.gain)+' fourmis':'Envoi à vérifier dans Armée. Aucun renvoi automatique.',section).className='uptep-mf-summary';continue;}
+    if(record){make('p',record.state==='done'?'✓ '+record.count+' attaque(s) envoyée(s) · '+fmt(record.sent??record.gain)+' fourmis':'Envoi à vérifier dans Armée. Aucun renvoi automatique.',section).className='uptep-mf-summary';continue;}
+    const remainderLabel=make('label',null,section),remainder=make('input',null,remainderLabel);remainder.type='checkbox';remainder.checked=!!target.useRemainingArmy;remainder.dataset.remainingArmy=target.id;
+    remainderLabel.append(doc.createTextNode(' Ajouter le reste de mon armée au dernier flood'));
+    remainder.addEventListener('change',()=>{prepared=null;target.useRemainingArmy=remainder.checked;calculate();});
+    if(target.useRemainingArmy)make('p','Toute l’armée disponible partira vers ce joueur. La prise du dernier flood reste limitée à 20 % et peut dépasser l’objectif saisi.',section).className='uptep-mf-note';
     const result=prepared?.id===target.id?prepared.plan:targetPlan(target),group=result.groups[0];
     if(group.reason)make('p',group.reason,section);
     else{
-     const scroll=make('div',null,section);scroll.className='uptep-mf-scroll';const table=make('table',null,scroll),head=make('tr',null,table);for(const label of ['Attaque','Mon terrain','Terrain de '+target.pseudo,'Prise'])make('th',label,head);
-     group.rows.forEach((row,i)=>{const tr=make('tr',null,table);if(!row.checked)tr.className='uptep-mf-unchecked';const td=make('td',null,tr),label=make('label',null,td),check=make('input',null,label);check.type='checkbox';check.checked=row.checked;check.dataset.attack=row.key;label.append(doc.createTextNode(' Attaque '+(i+1)+' ('+row.percent.toLocaleString('fr-FR')+' %)'));check.addEventListener('change',()=>{prepared=null;const set=new Set(draft.excluded);if(check.checked)set.delete(row.key);else set.add(row.key);draft.excluded=[...set];calculate();});for(const val of [row.own,row.field,row.amount])make('td',fmt(val),tr);});
-     const total=make('tr',null,table);make('th','Résultat pour cette cible',total);make('td',fmt(result.final),total);make('td',fmt(group.final),total);make('td','+'+fmt(group.gain),total);
+     const scroll=make('div',null,section);scroll.className='uptep-mf-scroll';const table=make('table',null,scroll),head=make('tr',null,table);for(const label of ['Attaque','Mon terrain','Terrain de '+target.pseudo,'Fourmis','Prise'])make('th',label,head);
+     group.rows.forEach((row,i)=>{const tr=make('tr',null,table);if(!row.checked)tr.className='uptep-mf-unchecked';const td=make('td',null,tr),label=make('label',null,td),check=make('input',null,label);check.type='checkbox';check.checked=row.checked;check.dataset.attack=row.key;label.append(doc.createTextNode(' Attaque '+(i+1)+' ('+row.percent.toLocaleString('fr-FR')+' %)'));check.addEventListener('change',()=>{prepared=null;const set=new Set(draft.excluded);if(check.checked)set.delete(row.key);else set.add(row.key);draft.excluded=[...set];calculate();});for(const val of [row.own,row.field,row.amount,row.capture])make('td',fmt(val),tr);});
+     const total=make('tr',null,table);make('th','Résultat pour cette cible',total);make('td',fmt(result.final),total);make('td',fmt(group.final),total);make('td',fmt(result.sent),total);make('td','+'+fmt(group.gain),total);
     }
     const timing=make('div',null,section);timing.className='uptep-mf-timing';
     const when=make('strong','',timing),clockLine=make('div','',timing);clockLine.className='uptep-mf-note';
@@ -334,7 +346,7 @@ function mountMultiflood(context,data){
    alive();
    const at=serverNow(),result=targetPlan(target,at+batch.seconds*1000);
    if(fingerprint(result)!==fingerprint(batch.plan)){prepared=null;calculate();showStatus('L’ordre d’arrivée a changé le calcul. Prépare à nouveau cette cible.');return;}
-   const record={state:'sending',at,arrivalAt:at+batch.seconds*1000,count:batch.plan.attacks.length,gain:String(batch.plan.gain),pseudo:target.pseudo};
+   const record={state:'sending',at,arrivalAt:at+batch.seconds*1000,count:batch.plan.attacks.length,gain:String(batch.plan.gain),sent:String(batch.plan.sent),pseudo:target.pseudo};
    ledger.targets[id]=record;saveLedger();attempted=true;prepared=null;
    const responsePromise=request('/appelAjaxFlood.php?'+batch.payload);
    showStatus('Envoi des floods à '+target.pseudo+'…');
@@ -346,7 +358,7 @@ function mountMultiflood(context,data){
    }
    if(/erreur|error|incorrect|insuffisan|impossible|refus|loginForm/i.test(response))throw Error('Le jeu n’a pas confirmé toute la série.');
    const after=await getNative();
-   if(batch.before.slots-after.slots!==batch.plan.attacks.length||BigInt(batch.before.army)-BigInt(after.army)!==batch.plan.gain)throw Error('Le résultat complet n’a pas pu être confirmé.');
+   if(batch.before.slots-after.slots!==batch.plan.attacks.length||BigInt(batch.before.army)-BigInt(after.army)!==batch.plan.sent)throw Error('Le résultat complet n’a pas pu être confirmé.');
    record.state='done';saveLedger();native=after;
    showStatus(target.pseudo+' : '+record.count+' attaque(s) enregistrée(s). Tu peux préparer le joueur suivant.');
   }catch(e){

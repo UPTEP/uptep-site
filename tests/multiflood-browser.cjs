@@ -115,6 +115,21 @@ const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Sel
   await page.evaluate(()=>{cleanupMF();sessionStorage.setItem('uptep:multiflood:Self:submission','null');});await mount();await page.waitForFunction(()=>!document.querySelector('#uptep-multiflood fieldset').disabled);await prepare('2');await launch('2');
   await page.waitForFunction(()=>document.querySelector('.uptep-mf-status').textContent.includes('Aucun renvoi automatique'));
   assert.equal(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('uptep:multiflood:Self:submission')).targets['2'].state),'uncertain');reject=false;
+  // The remaining army is added to this player's last checked flood only.
+  await page.evaluate(()=>{cleanupMF();sessionStorage.setItem('uptep:multiflood:Self:submission','null');const key='uptep:multiflood:Self:draft',draft=JSON.parse(sessionStorage.getItem(key));draft.excluded=[];sessionStorage.setItem(key,JSON.stringify(draft));});
+  army='50000';slots=10;await mount();await page.waitForFunction(()=>!document.querySelector('#uptep-multiflood fieldset').disabled);
+  await prepare('2');await page.click('[data-remaining-army="2"]');
+  assert.equal(await page.$eval('[data-send="2"]',n=>n.disabled),true,'Changing remainder option invalidates preparation');
+  assert.equal(await page.$eval('[data-remaining-army="3"]',n=>n.checked),false,'Option is per player');
+  await page.evaluate(()=>cleanupMF());await mount();await page.waitForFunction(()=>!document.querySelector('#uptep-multiflood fieldset').disabled);
+  assert.equal(await page.$eval('[data-remaining-army="2"]',n=>n.checked),true,'Remainder option survives runtime refresh');
+  await prepare('2');const withRemainder=sent.length;await launch('2');
+  await page.waitForFunction(()=>document.querySelector('.uptep-mf-status').textContent.includes('enregistrée'));
+  const batch=sent[withRemainder];assert(batch.filter((_,i)=>i%2===0).every(id=>id==='2'));
+  assert.equal(batch.filter((_,i)=>i%2===1).reduce((sum,n)=>sum+BigInt(n),0n),50000n);assert.equal(batch.at(-1),'47767');
+  const record=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('uptep:multiflood:Self:submission')).targets['2']);
+  assert.equal(record.sent,'50000');assert.equal(record.gain,'3528');assert.equal(record.state,'done','Server verification uses sent army, not captured terrain');
+  assert.equal(army,'0');assert.equal(await page.$eval('[data-prepare="3"]',n=>n.disabled),true,'Other target cannot send the already consumed army');
   await page.evaluate(()=>cleanupMF());assert.equal((await page.$$('#uptep-multiflood')).length,0);assert.equal(await page.$eval('#members',n=>n.style.display),'','Cleanup restores native page');
   // Direct per-player entry uses exactly the same preparation page.
   await page.goto('https://s5.fourmizzz.fr/alliance.php?Membres');await mount(true);
