@@ -50,6 +50,7 @@ const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Sel
   assert.equal((await page.$$('[data-prepare]')).length,2);
   assert.equal((await page.$$('[data-send]')).length,2);
   assert.equal((await page.$$('[data-send]:not(:disabled)')).length,0,'Manual preparation required before precise send');
+  assert.equal(await page.$eval('[data-target="3"] tr:nth-child(2) td:nth-child(2)',n=>n.textContent),'14\u202f249','Later player starts from the terrain after all earlier checked floods, before any send');
   await page.evaluate(()=>sessionStorage.setItem('uptep_s5_clock_cache_v1',JSON.stringify({version:1,globalAtReference:performance.timeOrigin+performance.now(),wallAtReference:Date.now(),serverAtReference:Date.now(),model:{consistent:true,uncertainty:100,rtt:120}})));
   await page.click('#uptep-multiflood button[aria-expanded]');
   assert.equal(await page.$eval('#joueur0max',n=>n.closest('tr').hidden),false);
@@ -115,8 +116,16 @@ const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Sel
   await page.evaluate(()=>{cleanupMF();sessionStorage.setItem('uptep:multiflood:Self:submission','null');});await mount();await page.waitForFunction(()=>!document.querySelector('#uptep-multiflood fieldset').disabled);await prepare('2');await launch('2');
   await page.waitForFunction(()=>document.querySelector('.uptep-mf-status').textContent.includes('Aucun renvoi automatique'));
   assert.equal(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('uptep:multiflood:Self:submission')).targets['2'].state),'uncertain');reject=false;
+  // Later arrivals can be sent first, while preserving the earlier reservations.
+  await page.evaluate(()=>{cleanupMF();sessionStorage.setItem('uptep:multiflood:Self:submission','null');const key='uptep:multiflood:Self:draft',draft=JSON.parse(sessionStorage.getItem(key));draft.excluded=[];for(const p of draft.targets){p.max=p.id==='2'?'100':'200';p.duration=p.id==='2'?'01:00:00':'02:00:00';}sessionStorage.setItem(key,JSON.stringify(draft));});
+  army='361';slots=2;await mount();await page.waitForFunction(()=>!document.querySelector('#uptep-multiflood fieldset').disabled);
+  assert.equal(await page.$eval('[data-target="3"] tr:nth-child(2) td:nth-child(2)',n=>n.textContent),'10\u202f821');
+  await prepare('3');await launch('3');await page.waitForFunction(()=>document.querySelector('.uptep-mf-status').textContent.includes('enregistrée'));
+  assert.equal(army,'161');assert.equal(await page.$eval('[data-target="2"] tr:last-child td:nth-last-child(2)',n=>n.textContent),'100');
+  await prepare('2');await launch('2');await page.waitForFunction(()=>document.querySelector('.uptep-mf-status').textContent.includes('enregistrée'));
+  assert.equal(army,'61');assert.equal(slots,0);
   // The remaining army is added to this player's last checked flood only.
-  await page.evaluate(()=>{cleanupMF();sessionStorage.setItem('uptep:multiflood:Self:submission','null');const key='uptep:multiflood:Self:draft',draft=JSON.parse(sessionStorage.getItem(key));draft.excluded=[];sessionStorage.setItem(key,JSON.stringify(draft));});
+  await page.evaluate(()=>{cleanupMF();sessionStorage.setItem('uptep:multiflood:Self:submission','null');const key='uptep:multiflood:Self:draft',draft=JSON.parse(sessionStorage.getItem(key));draft.excluded=[];for(const p of draft.targets){p.max='';p.duration='';}sessionStorage.setItem(key,JSON.stringify(draft));});
   army='50000';slots=10;await mount();await page.waitForFunction(()=>!document.querySelector('#uptep-multiflood fieldset').disabled);
   await prepare('2');await page.click('[data-remaining-army="2"]');
   assert.equal(await page.$eval('[data-send="2"]',n=>n.disabled),true,'Changing remainder option invalidates preparation');

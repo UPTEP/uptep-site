@@ -131,6 +131,18 @@ function multifloodTargetPlan(draft,native,target,records,arrivalAt){
  }
  result.forecast=forecast;return result;
 }
+function multifloodCampaignPlan(draft,native,records,arrivals){
+ const pending=draft.targets.filter(target=>!records[target.id]).map(target=>({target,arrivalAt:arrivals[target.id]??Infinity}));
+ pending.sort((a,b)=>(a.arrivalAt-b.arrivalAt)||((a.target.distance??Infinity)-(b.target.distance??Infinity)));
+ const projected={...records},remaining={...native},plans=[];
+ for(const {target,arrivalAt} of pending){
+  const result=multifloodTargetPlan(draft,remaining,target,projected,arrivalAt);
+  plans.push({target,arrivalAt,result});
+  remaining.army=String(result.armyLeft);remaining.slots=result.slotsLeft;
+  if(result.attacks.length)projected[target.id]={state:'done',gain:String(result.gain),arrivalAt};
+ }
+ return plans;
+}
 function mountMultiflood(context,data){
  const doc=context.document,win=context.window;
  if(!data||!Array.isArray(data.players)||win.location.pathname.toLowerCase()!=='/alliance.php')return ()=>{};
@@ -242,10 +254,17 @@ function mountMultiflood(context,data){
   for(const [suffix,property] of [['TDC','field'],['final','final'],['max','max']])draft.self[property]=form.querySelector('#joueur0'+suffix).value;
   draft.targets.forEach((p,i)=>{for(const [suffix,property] of [['TDC','field'],['final','final'],['max','max'],['arrondi','rounding']])p[property]=form.querySelector('#joueur'+(i+1)+suffix).value;const duration=form.querySelector('#joueur'+(i+1)+'duration').value;p.duration=duration===defaultDuration(p)?'':duration;});
  }
+ function campaignPlans(targetId,at){
+  const now=serverNow(),arrivals={};
+  for(const target of draft.targets){
+   if(ledger.targets[target.id])continue;
+   const seconds=travel(target).seconds;
+   arrivals[target.id]=target.id===targetId&&Number.isFinite(at)?at:seconds===null?Infinity:multifloodTiming(seconds,now).arrivalAt;
+  }
+  return multifloodCampaignPlan(draft,native,ledger.targets,arrivals);
+ }
  function targetPlan(target,at){
-  const seconds=travel(target).seconds;
-  const arrival=Number.isFinite(at)?at:seconds===null?Infinity:multifloodTiming(seconds,serverNow()).arrivalAt;
-  return multifloodTargetPlan(draft,native,target,ledger.targets,arrival);
+  return campaignPlans(target.id,at).find(plan=>plan.target.id===target.id).result;
  }
  function calculate(){
   results.replaceChildren();controls.clear();
@@ -253,15 +272,17 @@ function mountMultiflood(context,data){
    persist();
    if(!native){make('p','Lecture de l’armée et des attaques disponibles…',results);return;}
    availability.textContent=fmt(native.army)+' fourmis disponibles · '+native.slots+' attaques libres · VA '+native.speed;
-   for(const target of [...draft.targets].sort((a,b)=>(a.distance??Infinity)-(b.distance??Infinity))){
+   const plans=campaignPlans(),planned=new Map(plans.map(plan=>[plan.target.id,plan.result]));
+   const ordered=[...draft.targets.filter(target=>ledger.targets[target.id]),...plans.map(plan=>plan.target)];
+   for(const target of ordered){
     const section=make('section',null,results);section.dataset.target=target.id;make('h3',target.pseudo,section);
     const record=ledger.targets[target.id];
     if(record){make('p',record.state==='done'?'✓ '+record.count+' attaque(s) envoyée(s) · '+fmt(record.sent??record.gain)+' fourmis':'Envoi à vérifier dans Armée. Aucun renvoi automatique.',section).className='uptep-mf-summary';continue;}
     const remainderLabel=make('label',null,section),remainder=make('input',null,remainderLabel);remainder.type='checkbox';remainder.checked=!!target.useRemainingArmy;remainder.dataset.remainingArmy=target.id;
     remainderLabel.append(doc.createTextNode(' Ajouter le reste de mon armée au dernier flood'));
     remainder.addEventListener('change',()=>{prepared=null;target.useRemainingArmy=remainder.checked;calculate();});
-    if(target.useRemainingArmy)make('p','Toute l’armée disponible partira vers ce joueur. La prise du dernier flood reste limitée à 20 % et peut dépasser l’objectif saisi.',section).className='uptep-mf-note';
-    const result=prepared?.id===target.id?prepared.plan:targetPlan(target),group=result.groups[0];
+    if(target.useRemainingArmy)make('p','Toute l’armée restante après les floods précédents partira vers ce joueur. La prise du dernier flood reste limitée à 20 % et peut dépasser l’objectif saisi.',section).className='uptep-mf-note';
+    const result=prepared?.id===target.id?prepared.plan:planned.get(target.id),group=result.groups[0];
     if(group.reason)make('p',group.reason,section);
     else{
      const scroll=make('div',null,section);scroll.className='uptep-mf-scroll';const table=make('table',null,scroll),head=make('tr',null,table);for(const label of ['Attaque','Mon terrain','Terrain de '+target.pseudo,'Fourmis','Prise'])make('th',label,head);
@@ -276,9 +297,9 @@ function mountMultiflood(context,data){
     const send=button('2. Envoyer les floods à '+target.pseudo,actions,()=>sendTarget(target.id));send.dataset.send=target.id;
     const feedback=make('div',targetStatus.get(target.id)||'Clique sur Préparer pour activer l’envoi.',timing);feedback.className='uptep-mf-feedback';feedback.setAttribute('role','status');
     controls.set(target.id,{target,result,when,clockLine,countdown,timing,prepare,send,feedback});
-    if(result.forecast>0n)make('p','Terrain projeté avec les floods déjà envoyés : +'+fmt(result.forecast)+' cm² avant cette arrivée.',section).className='uptep-mf-note';
+    if(result.forecast>0n)make('p','Terrain projeté avec les floods précédents, prévus ou déjà envoyés : +'+fmt(result.forecast)+' cm² avant cette arrivée.',section).className='uptep-mf-note';
    }
-   make('p','Estimations par joueur : chaque envoi consomme l’armée et les attaques disponibles. Les autres cibles sont recalculées après chaque départ.',results).className='uptep-mf-note';
+   make('p','Calcul commun dans l’ordre d’arrivée prévu : les floods cochés réservent les fourmis et les attaques, et leurs prises augmentent ton terrain pour les cibles suivantes. Décoche des floods ou limite leur prise pour répartir l’armée.',results).className='uptep-mf-note';
    updateTiming();
   }catch(e){prepared=null;controls.clear();results.replaceChildren();make('p',e.message,results);}
  }
@@ -322,7 +343,7 @@ function mountMultiflood(context,data){
   try{await updateSnapshot();renderForm();calculate();showStatus('Terrains et disponibilités actualisés.');}
   catch(e){native=null;showStatus(e.message);calculate();}finally{if(!disposed)lock(false);}
  }
- function fingerprint(p){return JSON.stringify(p.attacks.map(r=>[r.id,String(r.amount)]));}
+ function fingerprint(p){return JSON.stringify(p.attacks.map(r=>[r.id,String(r.amount),String(r.capture),String(r.own),String(r.field)]));}
  async function prepareTarget(id){
   if(busy||unresolved()||ledger.targets[id])return;
   prepared=null;lock(true);showStatus('Vérification des floods pour '+draft.targets.find(p=>p.id===id).pseudo+'…',id);
