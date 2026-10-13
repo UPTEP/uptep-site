@@ -70,12 +70,15 @@ function mountLaboratory(context,snapshot){
  const doc=context.document,win=context.window;if(win.location.pathname.toLowerCase()!=='/laboratoire.php')return ()=>{};
  const added=[];const format=n=>n.toLocaleString('fr-FR');
  const element=(tag,text,parent)=>{const node=doc.createElement(tag);if(text!==null)node.textContent=text;if(parent)parent.append(node);return node;};
- const style=element('style',`.uptep-lab-analysis{padding:12px 15px;margin:6px 0 14px;background:#dfcf95;border:1px solid #82743d;border-left:4px solid #53633a;color:#292712;text-align:left;font:12px/1.6 Verdana}.uptep-lab-analysis h3{font-size:14px;margin:0 0 6px}.uptep-lab-analysis p{margin:5px 0}.uptep-lab-analysis table{width:100%;border-collapse:collapse;margin-top:8px}.uptep-lab-analysis th,.uptep-lab-analysis td{padding:5px 8px;text-align:right;border-bottom:1px solid #ad9b5a}.uptep-lab-analysis th:first-child,.uptep-lab-analysis td:first-child{text-align:left}.uptep-lab-analysis .uptep-lab-warning{color:#873b20}.uptep-lab-analysis summary{cursor:pointer;font-weight:bold}.uptep-lab-analysis small{display:block;color:#5c5330}`,doc.head);added.push(style);
+ const style=element('style',`.uptep-lab-row>td{padding:0!important}.uptep-lab-analysis{margin:2px 0 6px;border-left:2px solid #788052;background:rgba(255,255,255,.07);color:#454126;text-align:left;font:11px/1.5 Verdana}.uptep-lab-analysis>summary{padding:4px 8px;cursor:pointer}.uptep-lab-analysis>summary:hover{background:rgba(255,255,255,.12)}.uptep-lab-analysis>summary:focus-visible{outline:2px solid #53633a;outline-offset:1px}.uptep-lab-label{color:#67603b}.uptep-lab-hint{margin-left:8px;color:#67603b;font-size:10px}.uptep-lab-content{padding:2px 10px 8px}.uptep-lab-analysis p{margin:5px 0}.uptep-lab-analysis table{width:100%;border-collapse:collapse;margin-top:8px}.uptep-lab-analysis th,.uptep-lab-analysis td{padding:5px 8px;text-align:right;border-bottom:1px solid #ad9b5a}.uptep-lab-analysis th:first-child,.uptep-lab-analysis td:first-child{text-align:left}.uptep-lab-analysis .uptep-lab-warning{color:#873b20}.uptep-lab-content summary{cursor:pointer;font-weight:bold}.uptep-lab-analysis small{display:block;color:#5c5330}`,doc.head);added.push(style);
  const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  for(const row of doc.querySelectorAll('#centre tr.ligneAmelioration')){
   const title=normalize(row.querySelector('h2')?.textContent||'');const key=title==='armes'?'armes':title==='bouclier thoracique'?'bouclier':null;if(!key)continue;
   const tr=element('tr',null);tr.className='uptep-lab-row';const td=element('td',null,tr);td.colSpan=[...row.cells].reduce((n,c)=>n+c.colSpan,0)||1;
-  const panel=element('section',null,td);panel.className='uptep-lab-analysis';element('h3','UPTEP+ · Recherche ou ponte ?',panel);row.after(tr);added.push(tr);
+  const disclosure=element('details',null,td);disclosure.className='uptep-lab-analysis';
+  const summary=element('summary',null,disclosure);element('span','UPTEP+ · ',summary).className='uptep-lab-label';
+  const verdict=element('span','Comparaison indisponible',summary);element('span','Détails',summary).className='uptep-lab-hint';
+  const panel=element('div',null,disclosure);panel.className='uptep-lab-content';row.after(tr);added.push(tr);
   try{
    const offer=readLaboratoryOffer(row);const result=laboratoryCompare(snapshot?.data,key,offer.workers);
    if(result.level!==offer.level)throw Error('Niveau en BDD différent du jeu : actualise tes technologies dans UPTEP+ puis recharge cette page.');
@@ -83,23 +86,26 @@ function mountLaboratory(context,snapshot){
    element('p',`Niveau ${result.level} → ${result.level+1} : ${format(result.workers)} ouvrières, soit ${laboratoryDuration(result.seconds)} de ponte pour les remplacer (TDP ${result.tdp}).`,panel);
    element('p',`Gain sur ton armée actuelle : +${format(result.gain)} ${points}.`,panel);
    const best=result.alternatives[0];
-   if(result.unknown){element('p',`${result.unknown} unité(s) aux prérequis inconnus : complète tes bâtiments et technologies. Comparaison partielle, aucun verdict global.`,panel).className='uptep-lab-warning';}
+   if(result.unknown){verdict.textContent='Comparaison partielle';element('p',`${result.unknown} unité(s) aux prérequis inconnus : complète tes bâtiments et technologies. Comparaison partielle, aucun verdict global.`,panel).className='uptep-lab-warning';}
    if(best){
     element('p',`Pour le même temps : ${format(best.count)} × ${best.name}, soit +${format(best.gain)} ${points}.`,panel);
     if(!result.unknown){const minimum=result.gain<best.gain?result.gain:best.gain,maximum=result.gain>best.gain?result.gain:best.gain;const percent=minimum>0n?' (+'+format((maximum-minimum)*1000n/minimum/10n)+' %)':'';
+     verdict.textContent=result.gain===best.gain?'Gains équivalents':(result.gain>best.gain?'Recherche préférable':'Ponte préférable')+percent;
      element('strong',result.gain===best.gain?'Gains équivalents.':(result.gain>best.gain?'La recherche apporte le meilleur gain':'La ponte apporte le meilleur gain')+percent+'.',panel);
     }
     const details=element('details',null,panel);element('summary','Comparer les unités débloquées',details);const wrap=element('div',null,details);wrap.style.overflowX='auto';const table=element('table',null,wrap);const head=element('tr',null,element('thead',null,table));for(const label of ['Unité','Quantité','Gain de '+stat,'Nourriture'])element('th',label,head);const body=element('tbody',null,table);
     for(const unit of result.alternatives){const line=element('tr',null,body);for(const value of [unit.name,format(unit.count),'+'+format(unit.gain),format(unit.food)])element('td',value,line);}
-   }else if(!result.unknown)element('p','Aucune unité de combat débloquée selon les niveaux enregistrés.',panel);
+   }else if(!result.unknown){verdict.textContent='Aucune unité débloquée';element('p','Aucune unité de combat débloquée selon les niveaux enregistrés.',panel);}
    const costs=[];if(offer.food!==null)costs.push(format(offer.food)+' nourriture');if(offer.materials!==null)costs.push(format(offer.materials)+' matériaux');
    element('small','Coût de la recherche : '+(costs.join(' · ')||'ressources non reconnues')+'. Refaire les ouvrières coûte aussi '+format(result.workers*5n)+' nourriture.'+(offer.time?' Durée de recherche affichée : '+offer.time+'.':''),panel);
    element('small','Comparaison à temps de ponte égal, sans XP, sur les caractéristiques de base avec tes bonus Armes/Bouclier. Vie hors bonus de dôme/loge. Les ressources et la perte de production pendant le remplacement des ouvrières ne sont pas intégrées au verdict. Laboratoire et Reine travaillent en parallèle.',panel);
-  }catch(error){element('p',error.message,panel).className='uptep-lab-warning';}
+  }catch(error){verdict.className='uptep-lab-warning';element('p',error.message,panel).className='uptep-lab-warning';}
+  let stale=false;
   for(const [group,label] of [['buildings','Bâtiments'],['research','Technologies'],['army','Armée']]){
    const stamp=snapshot?.synced?.[group];const date=stamp?new Date(stamp):null;const valid=date&&!Number.isNaN(date.getTime());const old=valid&&Date.now()-date.getTime()>86400000;
-   const node=element('small',label+' : '+(valid?date.toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+' (Paris)'+(old?' — relevé de plus de 24 h':''):'date de synchronisation inconnue')+'.',panel);if(old||!valid)node.className='uptep-lab-warning';
+   const node=element('small',label+' : '+(valid?date.toLocaleString('fr-FR',{timeZone:'Europe/Paris'})+' (Paris)'+(old?' — relevé de plus de 24 h':''):'date de synchronisation inconnue')+'.',panel);if(old||!valid){node.className='uptep-lab-warning';stale=true;}
   }
+  if(stale)element('span','Données à actualiser',summary).className='uptep-lab-hint uptep-lab-warning';
  }
  return ()=>added.forEach(node=>node.remove());
 }

@@ -2,6 +2,8 @@
 
 Le panneau de `laboratoire.php` compare le prochain niveau d’Armes/Bouclier thoracique avec la ponte d’unités à temps de ponte égal. Aucun accès à Reine, aucune action de jeu, aucune nouvelle collecte. Désactivation dans UPTEP+ → Paramètres → Comparaison du laboratoire.
 
+L’affichage est replié par défaut sur une petite ligne : verdict et écart en pourcentage. Un clic (ou Entrée au clavier) ouvre les calculs, coûts, limites et dates de relevé. Les données anciennes ou manquantes restent signalées par une courte mention visible.
+
 ## Données et sources
 
 - Bâtiments, technologies, armée et dates de collecte : `user_stats` du **seul compte authentifié**. Aucune donnée d’armée d’un autre membre n’est envoyée. Une valeur absente n’est pas remplacée par zéro. Les dates absentes ou antérieures de plus de 24 h sont signalées.

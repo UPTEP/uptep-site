@@ -8,8 +8,15 @@ const row=(name,level,workers)=>`<tr class="ligneAmelioration"><td>Illustration<
  await page.evaluate(code+`;window.snapshot={data:{buildings:{couveuse:'10',solarium:'5',caserne:'0',salle_combat:'3'},research:{technique_ponte:'5',armes:'0',bouclier:'0',genetique:'0',acide:'0',poison:'0'},army:Object.fromEntries(laboratoryUnits.map(u=>[u[0],u[0]==='jsn'?'1000':'0']))},synced:{buildings:'2020-01-01T00:00:00Z',research:null,army:'2020-01-01T00:00:00Z'}};window.start=()=>mountLaboratory({document,window},snapshot);window.stop=start();`);
  assert.equal(await page.$eval('tr.uptep-lab-row td',n=>n.colSpan),4);assert.equal((await page.$$('.uptep-lab-analysis')).length,2);
  let text=await page.$eval('#centre',n=>n.textContent);assert.match(text,/\+800 points de vie/);assert.match(text,/\+300 points d’attaque/);assert.match(text,/relevé de plus de 24 h/);
- await page.click('summary');assert.equal((await page.$$('.uptep-lab-analysis table tbody tr')).length,4);
+ const compact=await page.$$eval('.uptep-lab-analysis',nodes=>nodes.map(n=>({open:n.open,height:n.getBoundingClientRect().height,text:n.innerText})));
+ assert.ok(compact.every(n=>!n.open&&n.height<40),'Comparisons are compact and collapsed by default');
+ assert.ok(compact.every(n=>!n.text.includes('Gain sur ton armée actuelle')),'Details stay hidden');
  await page.screenshot({path:'/tmp/uptep-laboratory-preview.png',fullPage:true});
+ await page.focus('.uptep-lab-analysis>summary');await page.keyboard.press('Enter');
+ assert.equal(await page.$eval('.uptep-lab-analysis',n=>n.open),true,'Keyboard opens details');
+ await page.click('.uptep-lab-content summary');assert.equal((await page.$$('.uptep-lab-analysis table tbody tr')).length,4);
+ await page.screenshot({path:'/tmp/uptep-laboratory-expanded.png',fullPage:true});
+ console.log('Collapsed panel heights:',compact.map(n=>n.height).join(', '));
  await page.evaluate(()=>{stop();document.querySelectorAll('.niveau_amelioration')[1].textContent='niveau 0 -> 1';window.stop=start();});text=await page.$eval('#centre',n=>n.textContent);assert.match(text,/comparaison suspendue/);
  await page.evaluate(()=>{stop();document.querySelectorAll('.niveau_amelioration')[1].textContent='niveau 1';window.stop=start();});text=await page.$eval('#centre',n=>n.textContent);assert.match(text,/Niveau en BDD différent/);
  await page.evaluate(()=>{stop();document.querySelectorAll('.niveau_amelioration')[1].textContent='niveau 0';document.querySelectorAll('.ouvriere')[1].textContent='?';window.stop=start();});text=await page.$eval('#centre',n=>n.textContent);assert.match(text,/Coût en ouvrières non reconnu/);
