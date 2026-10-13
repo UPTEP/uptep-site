@@ -1,0 +1,50 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const puppeteer=require(process.env.PUPPETEER_MODULE||'/root/maudits-lighthouse/node_modules/puppeteer-core');
+const root=path.resolve(__dirname,'..');
+const source=fs.readFileSync(path.join(root,fs.existsSync(path.join(root,'userscript/src/traffic.js'))?'userscript/src/traffic.js':'userscript/traffic.js'),'utf8');
+(async()=>{
+ const browser=await puppeteer.launch({executablePath:process.env.CHROMIUM||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const page=await browser.newPage();await page.setViewport({width:1440,height:900});
+  await page.setRequestInterception(true);let requests=0;
+  page.on('request',r=>{if(!r.url().endsWith('/favicon.ico'))requests++;r.respond({contentType:'text/html',body:'<html><head><style>body{margin:0;background:#454b39;font:14px Verdana}#centre{background:#d2bb77;min-height:850px;margin:0 260px;padding:50px 20px;box-sizing:border-box}@media(max-width:1343px){#centre{margin:0 10px}}h1{color:#4f492a}</style></head><body><main id="centre"><h1>Laboratoire</h1><p>Contenu du jeu</p></main></body></html>'});});
+  await page.goto('https://s5.fourmizzz.fr/laboratoire.php');
+  await page.evaluate(source+`;window.clockMs=0;Object.defineProperty(performance,'now',{value:()=>window.clockMs});window.timers=new Map();let timerId=0;window.setInterval=fn=>{timers.set(++timerId,fn);return timerId};window.clearInterval=id=>timers.delete(id);
+   window.startTime='2026-10-13T12:00:00Z';
+   window.data={outgoing:[{id:'1',kind:'convoy',pseudo:'Nythrakar',food:'9007199254740993',materials:'100000',arrival_at:'2026-10-13T14:57:57Z'},{id:'2',kind:'flood',pseudo:'Hardware',location:'Terrain de chasse',arrival_at:'2026-10-13T12:00:02Z'},{id:'3',kind:'flood',pseudo:'Expired',arrival_at:'2026-10-12T12:00:00Z'}],incoming:[{id:'4',kind:'flood',pseudo:'<img src=x onerror=alert(1)>',location:'Dôme',arrival_at:'2026-10-13T15:00:00Z'},{id:'5',kind:'convoy',pseudo:'Morel',food:'40000',materials:'0',arrival_at:'2026-10-13T13:00:00Z'}]};
+   window.mount=()=>mountTraffic({document,window,pseudo:'Self'},data,startTime);window.stop=mount();`);
+  assert.equal(await page.$eval('#uptep-traffic',n=>n.open),true);
+  assert.equal((await page.$$('#uptep-traffic li')).length,4);
+  assert.deepEqual(await page.$$eval('[data-direction="outgoing"] li',rows=>rows.map(n=>n.dataset.id)),['2','1']);
+  assert.match(await page.$eval('[data-kind="convoy"] .uptep-traffic-meta',n=>n.textContent),/9\D007\D199\D254\D740\D993/);
+  assert.equal((await page.$$('#uptep-traffic img')).length,0,'Names are text, never HTML');
+  assert.ok(await page.$eval('#uptep-traffic',n=>n.getBoundingClientRect().left>=document.getElementById('centre').getBoundingClientRect().right),'Sidebar does not cover the game');
+  assert.equal(await page.$eval('.uptep-traffic-total',n=>n.textContent),'4');
+  await page.screenshot({path:'/tmp/uptep-traffic-desktop.png',fullPage:true});
+  await page.evaluate(()=>{clockMs=3000;for(const tick of timers.values())tick();});
+  assert.equal((await page.$$('#uptep-traffic li')).length,3,'Arrived entries disappear without reload');
+  assert.equal(await page.$eval('.uptep-traffic-total',n=>n.textContent),'3');
+  await page.click('#uptep-traffic>summary');await page.waitForFunction(()=>sessionStorage.getItem('uptep:traffic:Self:sidebar')==='closed');
+  await page.evaluate(()=>{stop();window.stop=mount();});assert.equal(await page.$eval('#uptep-traffic',n=>n.open),false,'Collapsed choice survives refreshed data');
+  await page.setViewport({width:390,height:844});
+  assert.equal(await page.$eval('#uptep-traffic',n=>n.open),false,'Small screens default to collapsed');
+  await page.click('#uptep-traffic>summary');
+  assert.ok(await page.$eval('#uptep-traffic',n=>{const r=n.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&r.top>=0;}),'Mobile drawer stays on screen');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:'/tmp/uptep-traffic-mobile.png',fullPage:true});
+  await page.evaluate(()=>{stop();data={outgoing:Array.from({length:60},(_,i)=>({id:String(i),kind:'flood',pseudo:'Player '+i,location:'Terrain de chasse',arrival_at:'2026-10-14T12:00:00Z'})),incoming:[]};window.stop=mount();});
+  assert.equal((await page.$$('#uptep-traffic li')).length,60,'All active movements remain accessible');
+  assert.equal(await page.$eval('[data-direction="incoming"] .uptep-traffic-empty',n=>n.hidden),false);
+  await page.evaluate(()=>stop());assert.equal((await page.$$('#uptep-traffic')).length,0);assert.equal(await page.evaluate(()=>timers.size),0,'Cleanup stops countdowns');
+  const runtime=fs.readFileSync(path.join(root,'app/script-runtime.min.js'),'utf8');
+  await page.evaluate(runtime=>{
+   const data={outgoing:[],incoming:[]};
+   const run=new Function('context','const uptepPreferences={traffic:true,clock:false,chaine:false,laboratory:false};const uptepTrafficData='+JSON.stringify(data)+';const uptepTrafficServerTime="2026-10-13T12:00:00Z";'+runtime);
+   const stop=run({document,window,pseudo:'Self'});if(!document.querySelector('#uptep-traffic'))throw Error('Compiled widget missing');stop();if(document.querySelector('#uptep-traffic'))throw Error('Compiled cleanup failed');
+   const disabled=new Function('context','const uptepPreferences={traffic:false,clock:false,chaine:false,laboratory:false};const uptepTrafficData='+JSON.stringify(data)+';'+runtime);
+   const clean=disabled({document,window,pseudo:'Self'});if(document.querySelector('#uptep-traffic'))throw Error('Opt-out ignored');clean();
+  },runtime);
+  assert.equal(requests,1,'Widget makes no extra network requests');
+  console.log('OK: directions, ordering, exact quantities, safe names, countdown expiry, desktop/mobile layout, collapse persistence, full lists, runtime cleanup and opt-out.');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

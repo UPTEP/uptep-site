@@ -5,6 +5,7 @@ require '/home/uptep/private/app/bootstrap.php';
 require '/home/uptep/private/app/userscript.php';
 require '/home/uptep/private/app/chaine.php';
 require '/home/uptep/private/app/script-settings.php';
+require '/home/uptep/private/app/script-traffic.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, private');
 try{
@@ -20,11 +21,14 @@ try{
  $chainCode='const uptepChaineData='.json_encode(['self'=>(string)$actor['game_player_id'],'players'=>$players,'attack_speed'=>$speed,'research_synced_at'=>$research['research_synced_at']??null],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR).';';
  $code=file_get_contents('/home/uptep/private/app/script-runtime.min.js');if($code===false)throw new RuntimeException('Runtime missing');
  $prefs=scriptSettings((int)$actor['id'])['preferences'];
+ $traffic=$prefs['traffic']?scriptTraffic(db(),$actor):null;
+ $code='const uptepTrafficData='.json_encode($traffic,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR).';'.$code;
  $lab=loadStats((int)$actor['id']);
  $labData=$prefs['laboratory']?['data'=>array_intersect_key($lab['data'],array_flip(['buildings','research','army'])),'synced'=>array_intersect_key($lab['synced'],array_flip(['buildings','research','army']))]:null;
  $code='const uptepLaboratoryData='.json_encode($labData,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR).';'.$code;
  $code='const uptepHourlyDue='.json_encode($prefs['economy']&&hourlyCollectionDue((int)$actor['id'])).';const uptepPreferences='.json_encode($prefs,JSON_THROW_ON_ERROR).';'.$chainCode.$code;
- $revision=hash('sha256',$code);$out=['ok'=>true,'revision'=>$revision];if(($body['revision']??'')!==$revision)$out['code']='const uptepPortalAuth='.json_encode(['token'=>$token,'pseudo'=>$body['pseudo']],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR).';'.$code;
+ // The current time seeds local countdowns but must not change the revision every poll.
+ $revision=hash('sha256',$code);$out=['ok'=>true,'revision'=>$revision];if(($body['revision']??'')!==$revision)$out['code']='const uptepTrafficServerTime='.json_encode(gmdate('Y-m-d\TH:i:s\Z')).';const uptepPortalAuth='.json_encode(['token'=>$token,'pseudo'=>$body['pseudo']],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR).';'.$code;
  echo json_encode($out,JSON_THROW_ON_ERROR);
 }catch(DomainException $e){http_response_code($e->getCode());echo json_encode(['ok'=>false,'error'=>$e->getMessage()]);}
 catch(JsonException $e){http_response_code(400);echo '{"ok":false,"error":"Requête invalide."}';}

@@ -32,3 +32,15 @@ Une coordonnée ou une vitesse manquante donne `—` au lieu d’une estimation 
 ## Comparaison Armes / Bouclier et ponte
 
 Dans le Laboratoire, le script compare le gain du prochain niveau à celui des unités qui pourraient être pondues pendant le temps nécessaire au remplacement des ouvrières consommées. Il utilise tes bâtiments, technologies et ton armée en BDD ; les prérequis des unités sont intégrés au code, sans requête à Reine. Le panneau affiche les dates des relevés, les ressources à prévoir et le détail par unité. Option désactivable dans UPTEP+ → Paramètres. [Formules, prérequis, limites et tests](docs/laboratory.md).
+
+## Mes floods et convois en cours
+
+Un encart à droite du jeu affiche **Envois** et **Réceptions**, triés par arrivée : joueur, type de trajet, ressources des convois ou lieu des floods, heure de Paris et compte à rebours. Il montre uniquement les déclarations de la BDD liées à l’ID de jeu du compte authentifié. Les attaques identiques restent distinctes.
+
+Le chargeur existant actualise les données toutes les 30 secondes ; les lignes arrivées disparaissent aussi localement sans rechargement. Les convois annulés ou sans heure d’arrivée sont exclus. Une demande de ressources clôturée ou annulée ne masque pas un convoi encore en route et non annulé. Aucun trajet non déclaré ni trajet de retour n’est inventé.
+
+L’encart se replie au clic et conserve ce choix par joueur pour l’onglet. Quand la colonne droite manque, il démarre replié en bas à droite et s’ouvre à la demande. Désactivation dans UPTEP+ → Paramètres → Floods et convois en cours. Une révocation de l’accès ou un changement de joueur retire l’encart via le nettoyage du chargeur.
+
+Déploiement : ajouter `app/script-traffic.php`, appliquer `app/script-traffic.sql` (index uniquement, idempotent), puis mettre à jour `app/script-settings.php`, `public/script-api.php` et le runtime reconstruit. La préférence est activée par défaut sans réécrire les choix existants. Le chargeur personnel installé reste compatible : aucune réinstallation nécessaire. La date serveur des comptes à rebours est indépendante de la révision pour éviter un rechargement inutile du script à chaque vérification.
+
+Validation : `python3 tests/run-script-traffic.py` (tables temporaires PostgreSQL, droits et sélection personnelle) et `node tests/traffic-browser.cjs` (affichage, échéance, repli, mobile, runtime et nettoyage).
