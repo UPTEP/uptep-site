@@ -213,6 +213,10 @@ function mountMultiflood(context,data){
   const estimated=chaineTravel(origin,target,native?.speed??data.attack_speed);
   return {...estimated,seconds:multifloodDuration(target.duration,estimated.seconds),exact:!!String(target.duration??'').trim()};
  }
+ function defaultDuration(target){
+  const seconds=travel({...target,duration:''}).seconds;if(seconds===null)return '';
+  return [Math.floor(seconds/3600),Math.floor(seconds%3600/60),seconds%60].map(n=>String(n).padStart(2,'0')).join(':');
+ }
  function inputCell(row,id,value,label,readOnly=false){const td=make('td',null,row),input=make('input',null,td);input.id=id;input.value=value??'';input.setAttribute('aria-label',label);input.readOnly=readOnly;if(!readOnly)input.inputMode='numeric';return input;}
  function renderForm(){
   form.replaceChildren();const scroll=make('div',null,form);scroll.className='uptep-mf-scroll';const table=make('table',null,scroll),head=make('tr',null,table);
@@ -231,12 +235,12 @@ function mountMultiflood(context,data){
    }
   }
   const durations=make('tr',null,table);make('td','—',durations);make('th','Durée exacte du jeu',durations);
-  draft.targets.forEach((p,i)=>{const input=inputCell(durations,'joueur'+(i+1)+'duration',p.duration||'','Durée exacte HH:MM:SS · '+p.pseudo);input.inputMode='text';input.placeholder='HH:MM:SS';input.title='Facultatif : recopie la durée du jeu pour remplacer l’estimation.';input.disabled=!!ledger.targets[p.id];});
+  draft.targets.forEach((p,i)=>{const input=inputCell(durations,'joueur'+(i+1)+'duration',p.duration||defaultDuration(p),'Durée exacte HH:MM:SS · '+p.pseudo);input.inputMode='text';input.placeholder='HH:MM:SS';input.title='Durée du trajet préremplie, modifiable au format HH:MM:SS.';input.disabled=!!ledger.targets[p.id];});
   options.setAttribute('aria-expanded',String(!!draft.options));
  }
  function capture(){
   for(const [suffix,property] of [['TDC','field'],['final','final'],['max','max']])draft.self[property]=form.querySelector('#joueur0'+suffix).value;
-  draft.targets.forEach((p,i)=>{for(const [suffix,property] of [['TDC','field'],['final','final'],['max','max'],['arrondi','rounding'],['duration','duration']])p[property]=form.querySelector('#joueur'+(i+1)+suffix).value;});
+  draft.targets.forEach((p,i)=>{for(const [suffix,property] of [['TDC','field'],['final','final'],['max','max'],['arrondi','rounding']])p[property]=form.querySelector('#joueur'+(i+1)+suffix).value;const duration=form.querySelector('#joueur'+(i+1)+'duration').value;p.duration=duration===defaultDuration(p)?'':duration;});
  }
  function targetPlan(target,at){
   const seconds=travel(target).seconds;
@@ -287,7 +291,7 @@ function mountMultiflood(context,data){
   for(const [id,c] of controls){
    let t=null;try{t=travel(c.target);}catch{}
    const hint=multifloodTiming(t?.seconds,clock?.now??NaN),ready=prepared?.id===id;
-   c.when.textContent=hint?'Trajet '+(t.exact?'saisi':'estimé')+' '+chaineTravelDuration(t.seconds)+' · clic à :'+String(hint.clickSecond).padStart(2,'0')+' → arrivée visée à :59':'Trajet indisponible : renseigne la durée exacte du jeu.';
+   c.when.textContent=hint?'Trajet '+chaineTravelDuration(t.seconds)+' · clic à :'+String(hint.clickSecond).padStart(2,'0')+' → arrivée visée à :59':'Trajet indisponible : renseigne la durée exacte du jeu.';
    c.clockLine.textContent=clock?'Heure S5 '+timeFormat.format(now)+' · précision estimée ±'+clock.uncertainty+' ms':'Compte à rebours indisponible : synchronise l’horloge S5 dans le menu UPTEP+.';
    c.countdown.textContent=hint?.clickAt?(hint.inWindow?'C’est la seconde du clic !':'Prochain clic à '+timeFormat.format(hint.clickAt)+' · dans '+Math.ceil(hint.waitMs/1000)+' s')+' · arrivée estimée le '+arrivalFormat.format(hint.arrivalAt):'';
    c.timing.dataset.ready=String(!!ready&&!!hint?.inWindow);
@@ -383,13 +387,13 @@ function mountMultiflood(context,data){
   form=make('form',null,fieldset);form.id='formulaireFlood';form.addEventListener('submit',event=>{event.preventDefault();capture();prepared=null;calculate();});
   for(const type of ['input','change'])form.addEventListener(type,()=>{capture();prepared=null;draft.excluded=[];calculate();});
   results=make('div',null,fieldset);results.id='resultatFlood';
-  make('p','Durées calculées : estimations. Si le jeu affiche une autre durée, recopie-la dans « Durée exacte du jeu ». Prises estimées sans combat ni mouvements extérieurs à cette préparation.',page).className='uptep-mf-note';
+  make('p','La durée du trajet est préremplie dans « Durée exacte du jeu » et reste modifiable. Prises estimées sans combat ni mouvements extérieurs à cette préparation.',page).className='uptep-mf-note';
   draft=read('draft');
   if(!draft||draft.self?.id!==String(data.self)||!Array.isArray(draft.targets)||!draft.targets.length){refresh.disabled=true;reset.disabled=true;fieldset.hidden=true;showStatus('Sélectionne d’abord tes cibles depuis la page Membres.');}
   else{
    const seen=new Set();draft.targets=draft.targets.filter(p=>p&&typeof p.pseudo==='string'&&/^\d+$/.test(p.id)&&p.id!==String(data.self)&&!seen.has(p.id)&&seen.add(p.id));draft.excluded=Array.isArray(draft.excluded)?draft.excluded:[];
    renderForm();lock(true);
-   getNative().then(live=>{if(disposed)return;native=live;calculate();showStatus(unresolved()?'Un envoi précédent reste à vérifier dans Armée avant de continuer.':'Terrains relevés à '+new Date(draft.observed).toLocaleTimeString('fr-FR')+'.');}).catch(e=>showStatus(e.message)).finally(()=>{if(!disposed)lock(false);});
+   getNative().then(live=>{if(disposed)return;native=live;renderForm();calculate();showStatus(unresolved()?'Un envoi précédent reste à vérifier dans Armée avant de continuer.':'Terrains relevés à '+new Date(draft.observed).toLocaleTimeString('fr-FR')+'.');}).catch(e=>showStatus(e.message)).finally(()=>{if(!disposed)lock(false);});
    timingTimer=win.setInterval(updateTiming,100);
   }
  }
