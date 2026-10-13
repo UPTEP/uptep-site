@@ -181,7 +181,7 @@ function mountMultiflood(context,data){
  const previousSubmission=read('submission');
  let ledger=previousSubmission?.version===2?previousSubmission:{version:2,targets:{},legacy:previousSubmission||null};
  if(!ledger.targets||typeof ledger.targets!=='object'||Array.isArray(ledger.targets))ledger.targets={};
- const controls=new Map();
+ const controls=new Map(),targetStatus=new Map();
  const unresolved=()=>!!ledger.legacy||Object.values(ledger.targets).some(r=>r.state!=='done');
  const saveLedger=()=>write('submission',ledger);
  const serverNow=()=>multifloodClock(win)?.now??Date.now();
@@ -199,7 +199,7 @@ function mountMultiflood(context,data){
  async function getNative(){return readMultifloodNative(html(await request('/simulateurFlood.php')),context.pseudo,data.self);}
  function persist(){write('draft',draft);}
  function lock(value){busy=value;fieldset.disabled=value||unresolved();refresh.disabled=value||unresolved();reset.disabled=value;updateTiming();}
- function showStatus(text){if(!disposed)status.textContent=text;}
+ function showStatus(text,id){if(disposed)return;status.textContent=text;if(id){targetStatus.set(id,text);const feedback=controls.get(id)?.feedback;if(feedback)feedback.textContent=text;}}
  function travel(target){
   const origin=data.players.find(p=>String(p.player_id)===String(data.self));
   const estimated=chaineTravel(origin,target,native?.speed??data.attack_speed);
@@ -258,7 +258,8 @@ function mountMultiflood(context,data){
     const actions=make('div',null,timing);actions.className='uptep-mf-toolbar';
     const prepare=button('1. Préparer '+target.pseudo,actions,()=>prepareTarget(target.id));prepare.dataset.prepare=target.id;
     const send=button('2. Envoyer les floods à '+target.pseudo,actions,()=>sendTarget(target.id));send.dataset.send=target.id;
-    controls.set(target.id,{target,result,when,clockLine,countdown,timing,prepare,send});
+    const feedback=make('div',targetStatus.get(target.id)||'Clique sur Préparer pour activer l’envoi.',timing);feedback.className='uptep-mf-feedback';feedback.setAttribute('role','status');
+    controls.set(target.id,{target,result,when,clockLine,countdown,timing,prepare,send,feedback});
     if(result.forecast>0n)make('p','Terrain projeté avec les floods déjà envoyés : +'+fmt(result.forecast)+' cm² avant cette arrivée.',section).className='uptep-mf-note';
    }
    make('p','Estimations par joueur : chaque envoi consomme l’armée et les attaques disponibles. Les autres cibles sont recalculées après chaque départ.',results).className='uptep-mf-note';
@@ -282,13 +283,23 @@ function mountMultiflood(context,data){
    c.send.disabled=busy||unresolved()||!ready||!hint;
    c.prepare.textContent=ready?'✓ Prêt · '+Math.max(0,Math.ceil((90000-(win.performance.now()-prepared.checkedAt))/1000))+' s · revérifier':'1. Préparer '+c.target.pseudo;
    c.send.textContent='2. Envoyer à '+c.target.pseudo+(hint?' · clic :'+String(hint.clickSecond).padStart(2,'0'):'');
+   const feedback=targetStatus.get(id)||(ready?'Prêt : clique sur Envoyer à la seconde indiquée.':'Clique sur Préparer pour activer l’envoi.');if(c.feedback.textContent!==feedback)c.feedback.textContent=feedback;
   }
  }
  async function updateSnapshot(){
-  const members=readMultifloodMembers(html(await request('/alliance.php?Membres')),data,win.location.href),map=new Map(members.players.map(p=>[p.id,p]));
-  for(const p of draft.targets){if(ledger.targets[p.id])continue;const member=map.get(p.id);if(!member)throw Error(p.pseudo+' n’apparaît plus dans les membres. Retire cette cible.');Object.assign(p,cleanPlayer(member));}
-  Object.assign(draft.self,cleanPlayer(members.self));draft.observed=Date.now();draft.observedServer=serverNow();
-  native=await getNative();persist();
+  // The member table is read in the browser when selecting targets. For fresh
+  // values, use the same data endpoints as the game's native flood simulator.
+  const live=await getNative(),updates=[],allowed=new Map();
+  for(const p of draft.targets){
+   if(ledger.targets[p.id])continue;
+   const choices=JSON.parse(await request('/appelAjaxFlood.php?'+new URLSearchParams({term:p.pseudo})));
+   const player=Array.isArray(choices)?choices.find(choice=>String(choice.id)===p.id&&choice.value===p.pseudo):null;
+   if(!player)throw Error(p.pseudo+' n’a pas été trouvé dans le simulateur du jeu. Actualise ou retire cette cible.');
+   updates.push([p,{field:String(multifloodNumber(player.terrain))}]);allowed.set(p.id,['type1','type3'].includes(player.type));
+  }
+  for(const [target,values] of updates)Object.assign(target,values);
+  draft.self.field=live.field;draft.observed=Date.now();draft.observedServer=serverNow();
+  native=live;persist();return allowed;
  }
  async function refreshData(){
   if(busy||unresolved())return;prepared=null;lock(true);showStatus('Actualisation des terrains et des disponibilités…');
@@ -298,21 +309,19 @@ function mountMultiflood(context,data){
  function fingerprint(p){return JSON.stringify(p.attacks.map(r=>[r.id,String(r.amount)]));}
  async function prepareTarget(id){
   if(busy||unresolved()||ledger.targets[id])return;
-  prepared=null;lock(true);showStatus('Vérification des floods pour '+draft.targets.find(p=>p.id===id).pseudo+'…');
+  prepared=null;lock(true);showStatus('Vérification des floods pour '+draft.targets.find(p=>p.id===id).pseudo+'…',id);
   try{
-   capture();await updateSnapshot();const target=draft.targets.find(p=>p.id===id);
-   if(target.blocked)throw Error(target.pseudo+' n’est plus disponible.');
-   const choices=JSON.parse(await request('/appelAjaxFlood.php?'+new URLSearchParams({term:target.pseudo})));
-   if(!Array.isArray(choices)||!choices.some(p=>String(p.id)===id&&p.value===target.pseudo&&['type1','type3'].includes(p.type)))throw Error('Le jeu ne permet pas actuellement d’attaquer '+target.pseudo+'.');
+   capture();const allowed=await updateSnapshot(),target=draft.targets.find(p=>p.id===id);
+   if(!allowed.get(id))throw Error('Le jeu ne permet pas actuellement d’attaquer '+target.pseudo+'.');
    const seconds=travel(target).seconds;if(seconds===null)throw Error('Renseigne la durée du trajet pour '+target.pseudo+'.');
    // Read the token last, before waiting for the manual send click.
-   native=await getNative();const result=targetPlan(target);
+   native=await getNative();draft.self.field=native.field;draft.observed=Date.now();draft.observedServer=serverNow();const result=targetPlan(target);
    if(!result.attacks.length)throw Error('Aucune attaque sélectionnée et disponible pour '+target.pseudo+'.');
    const payload=new URLSearchParams({t:native.token,codeFlood:result.attacks.map(r=>r.id+'|'+r.amount+'|').join('')});
    if(payload.toString().length>7000)throw Error('Sélectionne moins d’attaques pour cette cible.');
    prepared={id,plan:result,payload,checkedAt:win.performance.now(),seconds,before:{...native}};
-   showStatus(target.pseudo+' : '+result.attacks.length+' attaque(s) prête(s). Vérifie les quantités puis clique sur Envoyer à la seconde indiquée.');
-  }catch(e){showStatus(e.message);}
+   targetStatus.delete(id);showStatus(target.pseudo+' : '+result.attacks.length+' attaque(s) prête(s). Vérifie les quantités puis clique sur Envoyer à la seconde indiquée.');
+  }catch(e){showStatus(e.message,id);}
   finally{if(!disposed){renderForm();calculate();lock(false);}}
  }
  async function sendTarget(id){

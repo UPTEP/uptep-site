@@ -5,7 +5,7 @@ const rows=[['1','Self','10721'],['2','Khan','8711'],['3','Morel','20000'],['4',
 const data={self:'1',attack_speed:5,players:rows.map(([id,pseudo],i)=>({player_id:id,pseudo,x:i*10,y:0,grade:'Passeur',sort_order:5-i,on_holiday:i===3}))};
 const members=()=>'<table id="members"><tr><th></th><th>Rang</th><th>Pseudo</th><th colspan="2">Terrain</th><th>Technologie</th><th>Fourmilière</th><th colspan="2">État</th></tr>'+rows.map(([id,pseudo,tdc],i)=>`<tr data-id="${id}"><td>${i+1}</td><td>Rang</td><td><a href="Membre.php?Pseudo=${pseudo}">${pseudo}</a></td><td>${tdc}</td><td></td><td>20</td><td>40</td><td><img alt="${pseudo==='Holiday'?'En vacances':'Actif'}"></td><td></td></tr>`).join('')+'</table>';
 const html=body=>`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>#formulaireFlood button{width:180px}body{margin:0;background:#3f4835;font:14px Verdana}#centre{box-sizing:border-box;background:#ccb36f;margin:0 240px;padding:45px 10px;min-height:900px}#menu{background:#4f5940;color:white;padding:10px;position:relative}#pseudo,#tag_alliance{display:none}@media(max-width:900px){#centre{margin:0;padding:10px}}</style></head><body><div id="pseudo">Self</div><div id="tag_alliance">UPTEP</div><main id="centre"><nav id="menu">Fourmilière　Alliance　Communauté　Compte +</nav>${body}</main></body></html>`;
-let army='50000',slots=10,sent=[],reject=false,partial=false,delay=false,termAllowed=true,trace=[];
+let army='50000',slots=10,sent=[],reject=false,partial=false,delay=false,termAllowed=true,trace=[],rawMembersMissing=false,termMissing=false,termMalformed=false;
 const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Self',joueur0ID:'1',joueur0TDC:rows[0][2],armee:army,joueur0attaquesDispo:slots,joueur0VA:5,t:'fixture-only-not-a-real-token'}).map(([id,value])=>`<input id="${id}" value="${value}">`).join('')+'</form>');
 (async()=>{
  const browser=await puppeteer.launch({executablePath:process.env.CHROMIUM||'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -21,8 +21,8 @@ const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Sel
     if(delay)await new Promise(resolve=>setTimeout(resolve,350));
     if(reject){status=503;body='error';}else if(!partial){for(let i=1;i<values.length;i+=2)army=String(BigInt(army)-BigInt(values[i]));slots-=values.length/2;}
    }else if(url.pathname==='/appelAjaxFlood.php'){
-    type='application/json';body=JSON.stringify(rows.filter(p=>p[1]===url.searchParams.get('term')).map(([id,value,terrain])=>({id,value,terrain,type:termAllowed?'type1':'type2'})));
-   }else body=html(members());
+    type='application/json';body=termMalformed?'invalid JSON':JSON.stringify(rows.filter(p=>!termMissing&&p[1]===url.searchParams.get('term')).map(([id,value,terrain])=>({id,value,terrain,type:termAllowed?'type1':'type2'})));
+   }else body=html(rawMembersMissing&&r.resourceType()==='fetch'?'':members());
    await r.respond({status,contentType:type+'; charset=utf-8',body});
   });
   const mount=async(chain=false)=>{await page.addScriptTag({content:source});await page.evaluate(({data,chain})=>{window.cleanupChain=chain?mountChaine({document,window,pseudo:'Self'},data):()=>{};window.cleanupMF=mountMultiflood({document,window,pseudo:'Self'},data);}, {data,chain});};
@@ -65,7 +65,13 @@ const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Sel
   assert.equal(await page.$eval('[data-attack="2:1"]',n=>n.closest('tr').cells[1].textContent),'10\u202f721','Unchecked attack no longer changes later terrain');
   const prepare=async id=>{await page.click('[data-prepare="'+id+'"]');await page.waitForFunction(()=>!document.querySelector('#uptep-multiflood fieldset').disabled);};
   const launch=id=>page.$eval('[data-send="'+id+'"]',n=>n.click());
+  rawMembersMissing=true;
+  rows[0][2]='10800';rows[1][2]='9000';
   await prepare('2');assert.equal(sent.length,0,'Preparation does not send');
+  assert.equal(await page.$eval('#joueur0TDC',n=>n.value),'10800','Preparation refreshes own terrain from native simulator');
+  assert.equal(await page.$eval('[aria-label="Terrain actuel · Khan"]',n=>n.value),'9000','Preparation refreshes target terrain from native autocomplete even without a readable fetched member table');
+  assert.match(await page.$eval('[data-target="2"] .uptep-mf-feedback',n=>n.textContent),/Prêt/);
+  rows[0][2]='10721';rows[1][2]='8711';await prepare('2');
   assert.equal(await page.$eval('[data-send="2"]',n=>n.disabled),false);
   assert.equal(await page.$eval('[data-send="3"]',n=>n.disabled),true);
   await page.screenshot({path:'/tmp/uptep-multiflood-timing-desktop.png',fullPage:true});
@@ -79,7 +85,9 @@ const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Sel
   assert.equal(await page.$eval('[data-attack="2:0"]',n=>n.checked),false);
   assert.equal(await page.$eval('[data-send="2"]',n=>n.disabled),true,'Remount preserves choices but requires fresh preparation');
   assert(!await page.evaluate(()=>sessionStorage.getItem('uptep:multiflood:Self:draft').includes('fixture-only')),'No native token saved');
-  termAllowed=false;await prepare('2');assert.match(await page.$eval('.uptep-mf-status',n=>n.textContent),/ne permet pas/);assert.equal(sent.length,0);termAllowed=true;
+  termMissing=true;await prepare('2');assert.match(await page.$eval('[data-target="2"] .uptep-mf-feedback',n=>n.textContent),/n’a pas été trouvé/);assert.equal(await page.$eval('[data-send="2"]',n=>n.disabled),true);termMissing=false;
+  termMalformed=true;await prepare('2');assert.equal(await page.$eval('[data-send="2"]',n=>n.disabled),true);assert.ok(await page.$eval('[data-target="2"] .uptep-mf-feedback',n=>n.textContent.length>0));termMalformed=false;
+  termAllowed=false;await prepare('2');assert.match(await page.$eval('.uptep-mf-status',n=>n.textContent),/ne permet pas/);assert.match(await page.$eval('[data-target="2"] .uptep-mf-feedback',n=>n.textContent),/ne permet pas/);assert.equal(sent.length,0);termAllowed=true;
   army='10000';await prepare('2');assert.match(await page.$eval('.uptep-mf-note',n=>n.textContent),/10\D000/);
   await page.evaluate(()=>{window.originalNow=performance.now.bind(performance);Object.defineProperty(performance,'now',{configurable:true,value:()=>originalNow()+91000});});
   await launch('2');assert.equal(sent.length,0,'Expired preparation never sends');assert.equal(await page.$eval('[data-send="2"]',n=>n.disabled),true);
