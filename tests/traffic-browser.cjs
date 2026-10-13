@@ -16,16 +16,35 @@ const source=fs.readFileSync(path.join(root,fs.existsSync(path.join(root,'usersc
   assert.equal(await page.$eval('#uptep-traffic',n=>n.open),true);
   assert.equal((await page.$$('#uptep-traffic li')).length,4);
   assert.deepEqual(await page.$$eval('[data-direction="outgoing"] li',rows=>rows.map(n=>n.dataset.id)),['2','1']);
-  assert.match(await page.$eval('[data-kind="convoy"] .uptep-traffic-meta',n=>n.textContent),/9\D007\D199\D254\D740\D993/);
+  assert.match(await page.$eval('[data-id="1"] .uptep-traffic-meta',n=>n.textContent),/9\D007\D199\D254\D740\D993/);
   assert.equal((await page.$$('#uptep-traffic img')).length,0,'Names are text, never HTML');
   assert.ok(await page.$eval('#uptep-traffic',n=>n.getBoundingClientRect().left>=document.getElementById('centre').getBoundingClientRect().right),'Sidebar does not cover the game');
   assert.equal(await page.$eval('.uptep-traffic-total',n=>n.textContent),'4');
+  assert.equal(await page.$eval('#uptep-traffic-panel-convoy',n=>n.hidden),true);
+  assert.equal(await page.$eval('#uptep-traffic-tab-flood',n=>n.textContent),'⚔ Attaques · 2');
+  assert.equal(await page.$eval('[data-id="2"] .uptep-traffic-route',n=>n.textContent),'Moi→Hardware');
+  assert.equal(await page.$eval('[data-id="5"] .uptep-traffic-route',n=>n.textContent),'Morel→Moi');
+  await page.click('#uptep-traffic-tab-convoy');
+  assert.equal(await page.$eval('#uptep-traffic-panel-flood',n=>n.hidden),true);
+  assert.equal(await page.$eval('#uptep-traffic-panel-convoy',n=>n.hidden),false);
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await page.$eval('#uptep-traffic-tab-flood',n=>n.getAttribute('aria-selected')),'true');
+  await page.keyboard.press('End');
+  assert.equal(await page.$eval('#uptep-traffic-tab-convoy',n=>document.activeElement===n),true);
+  await page.setViewport({width:1817,height:900});
+  await page.$eval('#centre',n=>n.style.marginRight='400px');
+  await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
+  assert.equal(await page.$eval('#uptep-traffic',n=>n.getBoundingClientRect().width),300,'Wide sidebar uses available space');
+  assert.ok(await page.$eval('#uptep-traffic',n=>n.getBoundingClientRect().left>=document.getElementById('centre').getBoundingClientRect().right));
   await page.screenshot({path:'/tmp/uptep-traffic-desktop.png',fullPage:true});
   await page.evaluate(()=>{clockMs=3000;for(const tick of timers.values())tick();});
   assert.equal((await page.$$('#uptep-traffic li')).length,3,'Arrived entries disappear without reload');
   assert.equal(await page.$eval('.uptep-traffic-total',n=>n.textContent),'3');
+  assert.equal(await page.$eval('#uptep-traffic-tab-flood',n=>n.textContent),'⚔ Attaques · 1','Hidden tabs also expire and update counts');
   await page.click('#uptep-traffic>summary');await page.waitForFunction(()=>sessionStorage.getItem('uptep:traffic:Self:sidebar')==='closed');
   await page.evaluate(()=>{stop();window.stop=mount();});assert.equal(await page.$eval('#uptep-traffic',n=>n.open),false,'Collapsed choice survives refreshed data');
+  assert.equal(await page.$eval('#uptep-traffic-tab-convoy',n=>n.getAttribute('aria-selected')),'true','Selected tab survives refreshed data');
+  await page.$eval('#centre',n=>n.style.marginRight='');
   await page.setViewport({width:390,height:844});
   assert.equal(await page.$eval('#uptep-traffic',n=>n.open),false,'Small screens default to collapsed');
   await page.click('#uptep-traffic>summary');
@@ -34,7 +53,9 @@ const source=fs.readFileSync(path.join(root,fs.existsSync(path.join(root,'usersc
   await page.screenshot({path:'/tmp/uptep-traffic-mobile.png',fullPage:true});
   await page.evaluate(()=>{stop();data={outgoing:Array.from({length:60},(_,i)=>({id:String(i),kind:'flood',pseudo:'Player '+i,location:'Terrain de chasse',arrival_at:'2026-10-14T12:00:00Z'})),incoming:[]};window.stop=mount();});
   assert.equal((await page.$$('#uptep-traffic li')).length,60,'All active movements remain accessible');
-  assert.equal(await page.$eval('[data-direction="incoming"] .uptep-traffic-empty',n=>n.hidden),false);
+  await page.click('#uptep-traffic-tab-flood');
+  assert.equal(await page.$eval('#uptep-traffic-panel-flood [data-direction="incoming"] .uptep-traffic-empty',n=>n.hidden),false);
+  assert.equal(await page.$eval('#uptep-traffic-tab-flood',n=>n.textContent),'⚔ Attaques · 60');
   await page.evaluate(()=>stop());assert.equal((await page.$$('#uptep-traffic')).length,0);assert.equal(await page.evaluate(()=>timers.size),0,'Cleanup stops countdowns');
   const runtime=fs.readFileSync(path.join(root,'app/script-runtime.min.js'),'utf8');
   await page.evaluate(runtime=>{
@@ -45,6 +66,6 @@ const source=fs.readFileSync(path.join(root,fs.existsSync(path.join(root,'usersc
    const clean=disabled({document,window,pseudo:'Self'});if(document.querySelector('#uptep-traffic'))throw Error('Opt-out ignored');clean();
   },runtime);
   assert.equal(requests,1,'Widget makes no extra network requests');
-  console.log('OK: directions, ordering, exact quantities, safe names, countdown expiry, desktop/mobile layout, collapse persistence, full lists, runtime cleanup and opt-out.');
+  console.log('OK: tabs, keyboard navigation, tab persistence, directional routes, adaptive width, ordering, exact quantities, safe names, countdown expiry, desktop/mobile layout, collapse persistence, full lists, runtime cleanup and opt-out.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

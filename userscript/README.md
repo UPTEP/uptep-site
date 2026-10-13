@@ -35,7 +35,7 @@ Dans le Laboratoire, le script compare le gain du prochain niveau à celui des u
 
 ## Mes floods et convois en cours
 
-Un encart à droite du jeu affiche **Envois** et **Réceptions**, triés par arrivée : joueur, type de trajet, ressources des convois ou lieu des floods, heure de Paris et compte à rebours. Il montre uniquement les déclarations de la BDD liées à l’ID de jeu du compte authentifié. Les attaques identiques restent distinctes.
+Un encart à droite du jeu, large de 300 px quand la place le permet, propose les onglets **Attaques** et **Convois** avec leurs compteurs. Chaque onglet sépare **Vers moi** (vert) et **Envoyés** (ocre), triés par arrivée : les flèches « Joueur → Moi » et « Moi → Joueur » explicitent le sens. Il affiche les ressources des convois ou le lieu des floods, l’heure de Paris et le compte à rebours. Le choix de l’onglet est conservé lors des actualisations ; les onglets sont également utilisables au clavier. Il montre uniquement les déclarations de la BDD liées à l’ID de jeu du compte authentifié. Les attaques identiques restent distinctes.
 
 Le chargeur existant actualise les données toutes les 30 secondes ; les lignes arrivées disparaissent aussi localement sans rechargement. Les convois annulés ou sans heure d’arrivée sont exclus. Une demande de ressources clôturée ou annulée ne masque pas un convoi encore en route et non annulé. Aucun trajet non déclaré ni trajet de retour n’est inventé.
 
