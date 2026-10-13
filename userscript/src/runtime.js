@@ -83,7 +83,7 @@ const cleanupClock=preferences.clock===false?()=>{}:mountClock(context,content);
 const cleanupChaine=preferences.chaine===false?()=>{}:mountChaine(context,typeof uptepChaineData==='undefined'?null:uptepChaineData);
 const cleanupLaboratory=preferences.laboratory===false?()=>{}:mountLaboratory(context,typeof uptepLaboratoryData==='undefined'?null:uptepLaboratoryData);
 const cleanupTraffic=preferences.traffic===false?()=>{}:mountTraffic(context,typeof uptepTrafficData==='undefined'?null:uptepTrafficData,typeof uptepTrafficServerTime==='undefined'?null:uptepTrafficServerTime);
-const cleanupMultiflood=mountMultiflood(context,typeof uptepChaineData==='undefined'?null:uptepChaineData);
+const cleanupMultiflood=preferences.multiflood===false?()=>{}:mountMultiflood(context,typeof uptepChaineData==='undefined'?null:uptepChaineData);
 position();
 const timer=win.setInterval(position,1000);
 win.addEventListener('resize',position);

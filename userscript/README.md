@@ -47,6 +47,8 @@ Validation : `python3 tests/run-script-traffic.py` (tables temporaires PostgreSQ
 
 ## Multiflood depuis les membres
 
+L’option **Multiflood** dans **UPTEP+ → Paramètres** contrôle l’affichage des colonnes de sélection, des boutons et du calculateur. Elle est activée par défaut et indépendante de l’option Chaîne. La désactivation prend effet au prochain rafraîchissement du runtime (sous 30 secondes ou au rechargement), y compris sur une page de préparation déjà ouverte.
+
 Les colonnes **Choix** et **Multiflood** ouvrent la même page intégrée `/alliance.php?uptepMultiflood=1`, avec une ou plusieurs cibles. Les terrains sont lus dans le tableau Membres, y compris après les tris de la chaîne ; le compte connecté, les joueurs en vacances et les joueurs hors de portée ne sont pas sélectionnables. La préparation est conservée dans `sessionStorage`, par joueur et par onglet, sans jeton de jeu.
 
 Le formulaire reprend l’organisation du simulateur natif : attaquant, cibles, terrains, objectifs de terrain final, prises maximales et arrondis. Les cibles sont dédupliquées et les résultats affichés dans l’ordre d’arrivée prévu. Les calculs utilisent des entiers exacts, la portée inclusive 50–300 %, le plafond de prise de 20 % et, si utile, une prise intermédiaire pour rester à portée avant la dernière attaque. Décocher une attaque retire ses effets du calcul sans ajouter une attaque de remplacement.

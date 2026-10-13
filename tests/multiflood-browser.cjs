@@ -168,6 +168,14 @@ const native=()=>html('<form id="formulaireFlood">'+Object.entries({joueur0:'Sel
   },{runtime,data});
   assert.equal((await page.$$('.uptep-mf-select')).length,5,'Compiled runtime mounts member controls');
   await page.evaluate(()=>runtimeStop());assert.equal((await page.$$('.uptep-mf-cell')).length,0,'Compiled cleanup removes controls');
+  const mountDisabled=()=>page.evaluate(({runtime,data})=>{
+   const run=new Function('context','const uptepPreferences={multiflood:false,traffic:false,clock:false,chaine:true,laboratory:false};const uptepChaineData='+JSON.stringify(data)+';'+runtime);
+   window.runtimeStop=run({document,window,pseudo:'Self'});
+  },{runtime,data});
+  await mountDisabled();assert.equal((await page.$$('.uptep-mf-cell,.uptep-mf-tools')).length,0,'Multiflood preference hides member selection and buttons');
+  assert.ok(await page.$('.uptep-chain-legend'),'Chain remains available independently');await page.evaluate(()=>runtimeStop());
+  await page.goto('https://s5.fourmizzz.fr/alliance.php?uptepMultiflood=1');await mountDisabled();
+  assert.equal(await page.$('#uptep-multiflood'),null,'Disabled calculator does not mount through a direct URL');await page.evaluate(()=>runtimeStop());
   assert.deepEqual(errors,[]);console.log('OK: member selection, chain sorting, direct/multi entry, live fields, :59 timing, exact duration, separate preparation, immediate per-player send, persisted sent state, remaining targets, projected terrain, mobile, native permissions, server verification, uncertain result lock and cleanup.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
