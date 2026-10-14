@@ -1,0 +1,29 @@
+UPTEP — Référence à réutiliser : calculateur RC Spyzzz
+Conservé le 14 octobre 2026 à la demande de l’utilisateur.
+
+Sources :
+https://spyzzz.fr/outils/rc
+https://spyzzz.fr/combat.js
+
+Fichiers :
+- page-source.html : copie du HTML téléchargé, avec le JavaScript intégré et ses dépendances locales de code.
+- combat.js : moteur de combat original téléchargé.
+- rc-calculator.excerpt.js : extrait parseRc() / rcCalc() pour retrouver rapidement le calculateur.
+- SHA256SUMS : empreintes des fichiers archivés.
+
+Fonctionnement constaté par lecture du code :
+Le bouton Analyser effectue les calculs dans le navigateur, sans API de calcul.
+parseRc() extrait les armées, dégâts, pertes, point de vue et lieu du rapport.
+Armes = Math.round(10 * bonus / dégâts de base), sur le premier tour.
+rcCalc() appelle window.Combat.combat() et teste les boucliers et niveaux de bâtiments de 0 à 40 inclus.
+Il filtre au premier tour puis conserve les combinaisons donnant exactement les mêmes pertes à chaque tour.
+Vie défenseur : multiplicateur 1 + 0,1 * Bouclier + bonus du lieu.
+Dôme : bonus 0,10 + 0,05 * niveau. Loge : bonus 0,30 + 0,15 * niveau.
+Plusieurs couples Bouclier / bâtiment peuvent correspondre au même rapport.
+
+Pour la reprise :
+L’extrait ne constitue pas un module autonome : il utilise loadCombat, armyKey, ARMY_NAMES, $, app, fmt et d’autres éléments de la page source.
+Le HTML reste une archive de référence, pas une application autonome hors ligne : il référence notamment Chart.js, des polices et des API du site d’origine.
+La précision du moteur n’a pas été testée ici : les validations mentionnées dans ses commentaires sont celles de son auteur.
+Code tiers conservé avec sa provenance ; aucune licence de réutilisation n’a été identifiée lors de cette inspection.
+Destination prévue : references/spyzzz-rc/ dans le dépôt du site UPTEP, hors public/.

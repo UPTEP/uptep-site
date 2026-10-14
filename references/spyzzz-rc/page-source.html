@@ -1,0 +1,1673 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculateur Dôme &amp; Loge | Spyzzz</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="description" content="Colle un rapport de combat : retrouve les Armes et le Bouclier des deux camps et les niveaux de Dôme ou de Loge du défenseur.">
+<meta property="og:site_name" content="Spyzzz"><meta property="og:type" content="website">
+<meta property="og:title" content="Calculateur Dôme & Loge | Spyzzz"><meta property="og:description" content="Colle un rapport de combat : retrouve les Armes et le Bouclier des deux camps et les niveaux de Dôme ou de Loge du défenseur.">
+<meta property="og:url" content="https://spyzzz.fr/outils/rc"><meta name="twitter:card" content="summary"><meta name="theme-color" content="#5f7d2e">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3e6cc;--bg2:#e6cfa3;--card:#fff8e8;--ink:#3a2414;--muted:#86684a;--line:#e5d1ab;--acc:#c0601c;--acc2:#5f7d2e;--up:#4a7f23;--down:#b5402a;
+--s1:#c0601c;--s2:#5f7d2e;--s3:#8a4f8f;--s4:#d9a21b;--soil1:#b88a55;--soil2:#8f6337;--soil3:#5e3d22;--shadow:rgba(94,61,34,.18);--field:#d9bd88;--onacc:#fff8e8}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1d140d;--bg2:#2a1d12;--card:#2e2016;--ink:#f3e3c6;--muted:#b89a76;--line:#45321f;--acc:#f0954a;--acc2:#a3c46a;--up:#9fd06a;--down:#f07a5e;
+--s1:#f0954a;--s2:#a3c46a;--s3:#d29ad6;--s4:#f2c94c;--soil1:#4a3220;--soil2:#362416;--soil3:#21160d;--shadow:rgba(0,0,0,.45);--field:#6b4f30;--onacc:#1d140d}}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;color:var(--ink);font:15px/1.55 Nunito,system-ui,sans-serif;min-height:100vh;overflow-x:hidden;
+ background:var(--bg) radial-gradient(circle at 12% 30%,var(--bg2) 0 2px,transparent 3px) 0 0/46px 46px,
+ radial-gradient(circle at 70% 80%,var(--bg2) 0 1.5px,transparent 2.5px) 0 0/31px 31px;background-color:var(--bg)}
+a{color:var(--acc);font-weight:700;text-decoration-thickness:2px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--acc) 35%,transparent)}
+a:hover{text-decoration-color:var(--acc)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+/* en-tête : surface herbeuse puis couches de sol */
+header{position:relative;background:linear-gradient(var(--acc2),color-mix(in srgb,var(--acc2) 80%,#000));color:#fff8e8;padding-bottom:58px}
+header .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px 24px;flex-wrap:wrap;padding-top:16px;padding-bottom:6px;position:relative;z-index:2}
+.soil{position:absolute;left:0;right:0;bottom:0;height:70px;display:block;width:100%}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.brand svg{flex-shrink:0;animation:wig 2.4s ease-in-out infinite}
+@keyframes wig{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+h1{font:800 26px/1 "Baloo 2",cursive;margin:0;letter-spacing:.01em}
+h1 span{display:inline-block;background:#f2c94c;color:#3a2414;border-radius:60% 40% 55% 45%/50% 60% 40% 50%;padding:2px 10px 0;margin-left:4px;font-size:20px;transform:rotate(-4deg)}
+h1 small{display:block;font:600 12px Nunito,sans-serif;opacity:.85;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav a{color:#fff8e8;text-decoration:none;font:700 16px "Baloo 2",cursive;padding:5px 14px 3px;border-radius:999px;transition:background .2s,transform .2s}
+nav a:hover{background:rgba(255,255,255,.15);transform:translateY(-2px)}
+nav a.on{background:#fff8e8;color:#3a2414;box-shadow:0 3px 0 rgba(0,0,0,.2)}
+main{padding:8px 16px 40px;animation:rise .5s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+h2{font:800 28px/1.15 "Baloo 2",cursive;margin:34px 0 14px;display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}
+h2::before{content:"";width:22px;height:22px;flex-shrink:0;align-self:center;background:var(--acc);border-radius:50% 40% 55% 45%/45% 55% 45% 55%;box-shadow:12px -8px 0 -6px var(--acc2)}
+h2 .muted{font:600 15px Nunito,sans-serif}
+h3{font:700 17px/1.2 "Baloo 2",cursive;margin:0 0 10px;color:var(--ink)}
+.note{color:var(--muted);font-size:13.5px}
+.note:first-child{display:inline-block;background:var(--card);border-radius:999px;padding:6px 16px;box-shadow:0 2px 0 var(--shadow)}
+/* cartes = chambres de fourmilière */
+.card{background:var(--card);border:2px solid var(--line);border-radius:28px 34px 26px 38px/34px 26px 38px 28px;padding:18px 20px;min-width:0;position:relative;
+ box-shadow:inset 0 -6px 0 color-mix(in srgb,var(--line) 55%,transparent),0 6px 18px var(--shadow)}
+.grid2 .card:nth-child(2n){border-radius:38px 26px 34px 28px/26px 38px 28px 34px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:14px;margin-top:14px}
+.kpi{padding:16px 18px 14px;overflow:hidden}
+.kpi::after{content:"";position:absolute;right:-18px;bottom:-18px;width:64px;height:64px;border-radius:50% 45% 55% 50%;background:var(--acc);opacity:.12}
+.kpi:nth-child(2n)::after{background:var(--acc2);opacity:.18}
+.kpi .v{font:800 30px/1.1 "Baloo 2",cursive;font-variant-numeric:tabular-nums;color:var(--ink);overflow-wrap:anywhere}
+.kpi .l{color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.kpis .card:nth-child(odd){transform:rotate(-.6deg)}.kpis .card:nth-child(even){transform:rotate(.5deg)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px;margin:16px 0 24px}
+.chart{position:relative;height:260px}.card .chart{margin-top:8px}
+.ch{display:flex;justify-content:space-between;align-items:center;gap:8px}.ch h3{margin:0}
+.hj{display:inline-flex;background:var(--bg);border-radius:999px;padding:3px;flex-shrink:0}
+.hj button{border:0;background:transparent;color:var(--muted);font:800 13px Nunito,sans-serif;padding:3px 11px;cursor:pointer;border-radius:999px}
+.hj button.on{background:var(--acc);color:var(--onacc)}
+/* tableaux : galeries */
+.tbl{overflow-x:auto;padding:8px 10px}
+table{width:100%;border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;text-align:left;white-space:nowrap}
+tbody tr:nth-child(odd) td{background:color-mix(in srgb,var(--bg) 55%,transparent)}
+tbody tr td:first-child{border-radius:14px 0 0 14px}tbody tr td:last-child{border-radius:0 14px 14px 0}
+tbody tr:hover td{background:color-mix(in srgb,var(--acc) 14%,transparent)}
+th{color:var(--muted);font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;user-select:none;border-bottom:2px dashed var(--line)}
+th:hover{color:var(--acc)}th[data-d="1"]::after{content:" ▲"}th[data-d="-1"]::after{content:" ▼"}
+td.n,th.n{text-align:right}
+.up{color:var(--up);font-weight:700}.down{color:var(--down);font-weight:700}.muted{color:var(--muted)}
+.tag{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--line);font-size:12px;font-weight:800;margin:1px}
+.tag.up{background:color-mix(in srgb,var(--up) 20%,transparent)}.tag.down{background:color-mix(in srgb,var(--down) 18%,transparent)}
+input[type=search],.row input{width:100%;max-width:380px;padding:11px 18px 11px 42px;border:2px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font:inherit;outline:none;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' stroke='%23a07a50' stroke-width='2.5'%3E%3Ccircle cx='8' cy='8' r='6'/%3E%3Cpath d='M12.5 12.5l4 4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:16px center}
+input:focus{border-color:var(--acc)}
+.row input{padding-left:18px;background-image:none;flex:1;min-width:140px}
+ul.ev{list-style:none;padding:0;margin:0}
+ul.ev li{padding:7px 0 7px 22px;border-bottom:2px dotted var(--line);position:relative}
+ul.ev li:last-child{border-bottom:0}
+/* cartes à liste : même hauteur, une ligne par élément, bouton calé en bas */
+.card:has(> ul.ev){display:flex;flex-direction:column}
+.card:has(> ul.ev) > ul.ev{flex:1}
+ul.ev li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ul.ev li::before{content:"";position:absolute;left:4px;top:15px;width:8px;height:6px;border-radius:50%;background:var(--acc);opacity:.6}
+[hidden]{display:none!important}
+.game{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start;margin-top:8px}
+@media (max-width:860px){.game{grid-template-columns:1fr}}
+.stage-wrap{display:flex;justify-content:center}
+.stage{position:relative;width:min(100%, calc((100vh - 150px) * 640 / 420));aspect-ratio:640/420;border-radius:24px;overflow:hidden;box-shadow:inset 0 0 0 3px var(--soil2),0 10px 30px rgba(0,0,0,.25);background:var(--field);user-select:none;-webkit-user-select:none}
+.stage:fullscreen{width:min(100vw, 100vh * 640 / 420);border-radius:0;margin:auto}
+.stage:fullscreen::backdrop{background:#120c07}
+canvas#g{width:100%;height:100%;display:block;touch-action:none}
+.stage.playing canvas#g{cursor:crosshair}
+.ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;text-align:center;background:rgba(20,12,6,.55);backdrop-filter:blur(2px);color:#fff8e8}
+.ov[hidden]{display:none!important}
+.ov h2{margin:0;font-size:clamp(28px,6vw,48px);color:#ffd84a;text-shadow:0 3px 0 rgba(0,0,0,.35)}
+.ov p{margin:0;max-width:420px}
+.ov .keys{font-size:12px;opacity:.8}
+.ov kbd{display:inline-block;padding:0 6px;border-radius:5px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);font:inherit;font-size:11px}
+.ov .pb{font-weight:700;color:#ffd84a}
+.ov .final{display:flex;flex-direction:column;align-items:center}
+.ov .final b{font:800 clamp(40px,9vw,72px)/1 "Baloo 2",cursive}
+.ov .final span{color:#ffd84a;font-weight:700}
+.ov .row{margin:0;width:min(100%,340px)}
+.ov .note{color:#fff8e8;opacity:.9;min-height:1.2em}
+.btn.big{font-size:18px;padding:10px 28px}
+.hud-btns{position:absolute;right:10px;bottom:10px;display:flex;gap:6px;z-index:2}
+.hud-btns button{width:36px;height:36px;border-radius:50%;border:0;background:rgba(0,0,0,.35);color:#fff;font-size:16px;cursor:pointer}
+.hud-btns button:hover{background:rgba(0,0,0,.55)}
+.lbcard ol.lb{max-height:calc(100vh - 230px);overflow:auto}
+.rules{margin-top:16px}.rules summary{cursor:pointer;font-weight:700}.rules p{margin:8px 0 0}
+.btn{background:var(--acc);color:var(--onacc);border:0;border-radius:999px;padding:10px 22px;font:800 17px "Baloo 2",cursive;cursor:pointer;box-shadow:0 4px 0 color-mix(in srgb,var(--acc) 60%,#000);transition:transform .1s}
+.btn:hover{transform:translateY(-1px)}.btn:active{transform:translateY(3px);box-shadow:0 1px 0 color-mix(in srgb,var(--acc) 60%,#000)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+ol.lb{margin:0;padding-left:30px}
+ol.lb li{padding:5px 0;border-bottom:2px dotted var(--line);font-variant-numeric:tabular-nums}
+ol.lb li::marker{font:800 15px "Baloo 2",cursive;color:var(--acc)}
+ol.lb b{float:right;font-family:"Baloo 2",cursive}
+footer{position:relative;margin-top:30px;color:var(--muted);text-align:center;font-size:13px;padding:70px 16px 24px;background:linear-gradient(transparent 0 40px,var(--soil3) 40px)}
+footer::before{content:"";position:absolute;left:0;right:0;top:0;height:60px;background:radial-gradient(60px 40px at 50% 100%,var(--soil3) 98%,transparent) 0 0/120px 60px repeat-x}
+footer p{color:#e6cfa3;margin:0}
+@media (max-width:560px){h1{font-size:22px}h2{font-size:23px}.card{padding:14px}.kpi .v{font-size:24px}header{padding-bottom:48px}nav a{padding:4px 10px 2px;font-size:15px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+button.more{display:block;margin:auto auto 0;margin-top:12px;align-self:center;padding:6px 16px;border-radius:999px;border:2px dashed var(--line);background:transparent;color:var(--acc);font:inherit;font-weight:700;font-size:13px;cursor:pointer}
+button.more:hover{border-style:solid}
+.map{position:relative;height:380px;border-radius:14px;overflow:hidden;background:var(--bg);touch-action:none}
+.map.big{height:min(70vh,640px)}
+.map canvas{display:block;cursor:grab}
+.maptip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:260px;z-index:2}
+.maptip div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.maptip i,.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.mapctl{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px;z-index:1}
+.mapctl button{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:18px;font-weight:700;cursor:pointer}
+.mapbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.mapbar input,.mapbar select{flex:1;min-width:160px;max-width:320px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font:inherit}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:12px;font-size:13px}
+.legend button{border:0;background:none;color:var(--ink);font:inherit;cursor:pointer;padding:2px 4px;border-radius:6px}
+.legend button:hover{background:var(--line)}
+.online{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:rgba(0,0,0,.18);color:#fff8e8;font-size:13px;font-weight:700;white-space:nowrap}
+.online i{width:8px;height:8px;border-radius:50%;background:#7CFC8A;box-shadow:0 0 0 0 rgba(124,252,138,.7);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 7px rgba(124,252,138,0)}100%{box-shadow:0 0 0 0 rgba(124,252,138,0)}}
+@media (prefers-reduced-motion:reduce){.online i{animation:none}}
+.modes{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:4px 0}
+.modes button{display:flex;flex-direction:column;align-items:center;gap:2px;width:120px;padding:10px 8px;border-radius:16px;border:2px solid rgba(255,248,232,.25);background:rgba(0,0,0,.25);color:#fff8e8;font:700 15px "Baloo 2",cursive;cursor:pointer;transition:.15s}
+.modes button span{font-size:24px}.modes button small{font:11px Nunito,system-ui;opacity:.75}
+.modes button:hover{border-color:rgba(255,216,74,.6)}
+.modes button.on{border-color:#ffd84a;background:rgba(255,216,74,.18);transform:translateY(-2px)}
+@media (max-width:520px){.modes button{width:92px;padding:8px 4px}.modes button small{display:none}}
+.keyhud{position:absolute;left:12px;bottom:12px;display:grid;grid-template-columns:repeat(3,32px);grid-template-rows:repeat(2,32px);gap:4px;z-index:2;pointer-events:none}
+.keyhud kbd{display:flex;align-items:center;justify-content:center;border-radius:8px;background:rgba(0,0,0,.3);border:2px solid rgba(255,248,232,.25);color:rgba(255,248,232,.6);font-size:13px;transition:background .06s,transform .06s}
+.keyhud [data-k=up]{grid-column:2;grid-row:1}.keyhud [data-k=left]{grid-column:1;grid-row:2}.keyhud [data-k=down]{grid-column:2;grid-row:2}.keyhud [data-k=right]{grid-column:3;grid-row:2}
+.keyhud kbd.on{background:#ffd84a;border-color:#ffd84a;color:#3a2414;transform:scale(.92)}
+.joy{position:absolute;left:10px;bottom:10px;width:clamp(64px,17%,104px);aspect-ratio:1;border-radius:50%;background:rgba(0,0,0,.28);border:2px solid rgba(255,248,232,.3);z-index:3;touch-action:none}
+.joy .knob{position:absolute;left:50%;top:50%;width:42%;height:42%;margin:-21% 0 0 -21%;border-radius:50%;background:rgba(255,248,232,.55);box-shadow:0 2px 6px rgba(0,0,0,.3);transition:transform .08s}
+.joy.on .knob{background:#ffd84a;transition:none}
+.ov ~ .joy{}
+.stage .ov{z-index:4}
+/* écran de jeu petit (mobile) : overlays compacts pour que rien ne dépasse */
+.stage{container-type:size}
+.ov{justify-content:safe center;overflow:auto}
+@container (max-height:380px){
+  .ov{gap:6px;padding:10px}
+  .ov h2{font-size:26px}
+  .ov > p:not(.keys):not(.pb):not(.note){display:none}
+  .modes{gap:6px;margin:0}
+  .modes button{width:auto;flex:1;max-width:110px;padding:6px 4px;font-size:13px;border-radius:12px}
+  .modes button span{font-size:18px}.modes button small{display:none}
+  .btn.big{font-size:15px;padding:7px 22px}
+  .ov .keys{display:none}
+  .ov .pb{font-size:12px}
+  .ov .final b{font-size:40px}
+}
+@container (max-height:260px){ .ov .pb{display:none} .ov h2{font-size:22px} }
+.stage[data-mode=joystick].playing canvas#g,.stage[data-mode=clavier].playing canvas#g{cursor:default}
+.ups{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.ups button{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:150px;padding:12px 10px;border-radius:16px;border:2px solid rgba(255,216,74,.45);background:rgba(0,0,0,.3);color:#fff8e8;cursor:pointer;font:inherit;transition:.12s}
+.ups button:hover{border-color:#ffd84a;background:rgba(255,216,74,.15);transform:translateY(-3px)}
+.ups button span{font-size:28px}.ups button b{font:800 15px "Baloo 2",cursive}.ups button small{font-size:12px;opacity:.85}
+.ups button kbd{position:absolute;top:6px;right:8px;font-size:10px}
+@container (max-height:380px){ .ups button{width:auto;flex:1;max-width:140px;padding:6px 4px} .ups button small{display:none} .ups button span{font-size:20px} }
+.filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:16px}
+.filters label{display:flex;flex-direction:column;gap:4px;font-weight:700;font-size:13px;flex:1;min-width:180px;max-width:320px}
+.filters select,.filters input{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font:inherit;font-weight:400}
+.chips{display:flex;flex-wrap:wrap;gap:6px;flex-basis:100%}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 4px 3px 12px;border-radius:999px;background:var(--line);font-size:13px;font-weight:700}
+.chip button{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:50%}
+.chip button:hover{color:var(--ink)}
+.pager{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px}
+.pager button.more{margin:0}.pager button:disabled{opacity:.35;cursor:default}
+.tdc2{margin-top:0;align-items:start}.tdc2 h3{margin:0 0 8px}.tdc2 h3.up{color:var(--up)}.tdc2 h3.down{color:var(--down)}
+.tdc2 td{padding:6px 6px}
+.ac{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:20;overflow:hidden;font-weight:400}
+.ac div{padding:7px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac div.on,.ac div:hover{background:var(--line)}
+.nextup{font-size:12px;font-weight:700;color:#fff8e8;opacity:.85;white-space:nowrap;margin-right:8px}
+@media (max-width:900px){.nextup{display:none}}
+#simout ul.ev li{white-space:normal;overflow:visible}
+.simgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.simunits{display:grid;gap:6px}
+.simunits.two{grid-template-columns:1fr 1fr;gap:6px 14px}
+.simunits.two input{width:84px}
+@media (max-width:420px){.simunits.two{grid-template-columns:1fr}}
+.simunits label{display:flex;align-items:center;gap:10px;font-size:14px}
+.simunits input{width:110px;padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;text-align:right;font-variant-numeric:tabular-nums}
+.simrow{margin-top:10px;position:relative}
+.simrow input,.simrow select{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font:inherit}
+button.mini{border:1px solid var(--line);background:transparent;color:var(--acc);border-radius:999px;padding:2px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px}
+.rc{background:#e9d9a6;color:#2b1d0e;border-radius:14px;padding:14px 16px;font:13px/1.55 Verdana,Tahoma,sans-serif;box-shadow:inset 0 0 0 2px #c9ad63}
+.rc p{margin:0 0 10px}.rc strong{color:#1a1006}
+.tools .tool{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:var(--ink);transition:transform .12s}
+.tools .tool:hover{transform:translateY(-3px)}
+.tools .tool span{font-size:34px}.tools .tool b{font:800 20px "Baloo 2",cursive}.tools .tool small{color:var(--muted);font-size:14px}
+.ctable{display:grid;grid-template-columns:118px 1fr 118px;gap:6px 10px;align-items:center}
+.ctable .chead{display:contents}.ctable .chead span{font-weight:800;font-size:13px;color:var(--muted);text-align:center}
+.ctable input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;text-align:right;font-variant-numeric:tabular-nums}
+.ctable .cname{text-align:center;font-size:13px}
+.ctable b.n{text-align:right;font-variant-numeric:tabular-nums;padding-right:8px}
+/* boutons radio en pastilles : rond natif masqué, pastille orange quand sélectionnée */
+.radios{display:flex;flex-direction:column;align-items:flex-start;gap:8px}.radios.row{flex-direction:row;flex-wrap:wrap}
+.radios label{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:2px solid var(--line);border-radius:999px;cursor:pointer;font-weight:700;font-size:14px;color:var(--muted);transition:.12s;user-select:none}
+.radios label:hover{border-color:var(--acc);color:var(--ink)}
+.radios input[type=radio]{position:absolute;opacity:0;width:0;height:0;margin:0;pointer-events:none}
+.radios label:has(input[type=radio]:checked){background:var(--acc);border-color:var(--acc);color:#fff}
+.radios label:has(input[type=radio]:focus-visible){box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 35%,transparent)}
+.radios label .num{background:rgba(0,0,0,.18);border-color:transparent}
+.radios label:has(input[type=radio]:checked) .num{background:rgba(0,0,0,.2)}
+.radios label:has(input[type=radio]:checked) .num .st,.radios label:has(input[type=radio]:checked) .num input{color:#fff}
+.radios label:not(:has(input[type=radio]:checked)) .num{opacity:.5}
+.radios label{display:flex;align-items:center;gap:8px}
+.radios input[type=number]{width:70px;padding:4px 8px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;text-align:right}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.num{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:10px;background:var(--bg);overflow:hidden;transition:border-color .12s,box-shadow .12s}
+.num:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 30%,transparent)}
+.num input[type=number]{border:0!important;background:transparent!important;border-radius:0!important;outline:none;box-shadow:none;min-width:0;padding-left:4px!important;padding-right:4px!important}
+.num .st{display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--muted);font:800 15px "Baloo 2",system-ui;width:24px;flex:none;cursor:pointer;padding:0;user-select:none;touch-action:manipulation}
+.num .st:hover{color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.num .st:active{color:#fff;background:var(--acc)}
+.ctable .num,.simunits .num{width:100%}
+.simunits .num{width:auto}.simunits .num input{width:70px!important}
+.simunits.two .num input{width:56px!important}
+.ctable .num input{width:100%!important}
+.radios .num input{width:44px!important}
+.tdcfl{margin-top:16px}.tdcfl h3{margin:0 0 8px;color:var(--acc)}
+.tdc2 h3.acc{color:var(--acc)}
+.paste{margin:4px 0 12px}.paste summary{cursor:pointer;font-weight:700;color:var(--acc);font-size:14px}
+.paste textarea{width:100%;min-height:90px;margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:13px/1.4 inherit;resize:vertical}
+.paste .simrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.paste .pmsg{font-size:13px;font-weight:700}
+.bigta{width:100%;min-height:180px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--bg);color:var(--ink);font:13px/1.45 inherit;resize:vertical}
+.pairs{display:flex;flex-wrap:wrap;gap:4px}
+.extbtn{margin-left:auto;margin-right:10px;padding:6px 14px;border-radius:999px;background:#fff8e8;color:#3a2414;font:700 14px Nunito,system-ui;text-decoration:none;white-space:nowrap}.extbtn:hover{background:#fff}
+#srvsel{margin-right:10px;padding:6px 12px;border-radius:999px;border:2px solid rgba(255,248,232,.5);background:rgba(0,0,0,.2);color:#fff8e8;font:700 14px Nunito,system-ui;cursor:pointer}
+#srvsel option{color:#3a2414}
+.lothero{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:linear-gradient(135deg,var(--card),color-mix(in srgb,var(--acc) 14%,var(--card)))}
+.lothero .l{color:var(--muted);font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+.lothero .cd{font:800 clamp(26px,5vw,40px)/1.1 "Baloo 2",cursive;font-variant-numeric:tabular-nums}
+.lotpot{text-align:right}.lotpot .v{font:800 clamp(24px,4.5vw,36px)/1.1 "Baloo 2",cursive;color:var(--acc)}
+.steps{margin:0;padding-left:20px}.steps li{margin:6px 0}
+.tag.flood{background:color-mix(in srgb,var(--acc) 18%,transparent);color:var(--acc);font-weight:700}
+.tag.flood.sure{background:var(--acc);color:#fff}.tag.flood a{color:inherit}
+/* page affichée dans une fenêtre du script Spyzzz (dans le jeu) : seulement le contenu */
+html.embed header,html.embed footer,html.embed #lotban{display:none!important}
+#lotban{display:flex;align-items:center;justify-content:center;gap:14px 22px;flex-wrap:wrap;padding:16px 16px;background:linear-gradient(90deg,#c0601c,#f0954a 50%,#c0601c);color:#1d140d;text-decoration:none;text-align:center;font-family:Nunito,system-ui,sans-serif}
+#lotban[hidden]{display:none}
+#lotban .lb-t{font-weight:900;font-size:22px;letter-spacing:.2px}
+#lotban .lb-s{font-weight:700;font-size:15px}
+#lotban .lb-c{display:inline-block;padding:9px 20px;border-radius:999px;background:#1d140d;color:#ffd9a8;font-weight:900;font-size:15px;white-space:nowrap}
+#lotban:hover .lb-c{background:#2e2016}
+@media (max-width:600px){#lotban .lb-t{font-size:18px}#lotban{padding:12px}}
+html.embed main{padding-top:10px!important;padding-bottom:20px!important}
+html.embed body{background:var(--bg)}
+html.embed h2:first-child{margin-top:4px}
+</style>
+</head>
+<body>
+<a id="lotban" href="/s5/loterie" hidden></a>
+<header><div class="wrap">
+<a class="brand" href="#/"><svg width="46" height="46" viewBox="0 0 48 48" aria-hidden="true"><g fill="#3a2414" stroke="#3a2414" stroke-linecap="round" stroke-width="2"><path d="M18 20l-8-6M18 24h-10M18 28l-8 6M28 20l2-8M28 28l2 8M24 24l2 0" fill="none"/><ellipse cx="13" cy="24" rx="7" ry="5.5" stroke="none"/><ellipse cx="24" cy="24" rx="4.5" ry="3.5" stroke="none"/><circle cx="34" cy="24" r="5" stroke="none"/><path d="M38 21l4-6M38 27l4 6" fill="none"/></g><circle cx="36" cy="22.5" r="1.3" fill="#fff8e8"/></svg>
+<h1>Spyzzz <span id="srvtag">S5</span><small id="srvsub">Fourmizzz · serveur 5</small></h1></a>
+<a class="extbtn" href="https://chromewebstore.google.com/detail/spyzzz-pour-fourmizzz/hhldnlehmclmifcibmpfeimbiejfmleh" target="_blank" rel="noopener" title="Spyzzz directement dans Fourmizzz : installer l'extension Chrome">🧩 Extension Chrome</a>
+<select id="srvsel" aria-label="Serveur" title="Changer de serveur"></select>
+<nav><a href="#/" data-r="">Accueil</a><a href="#/alliances" data-r="alliances">Alliances</a><a href="#/joueurs" data-r="joueurs">Joueurs</a><a href="#/tdc" data-r="tdc">TDC</a><a href="#/carte" data-r="carte">Carte</a><a href="#/loterie" data-r="loterie" id="nav-lot" hidden>Loterie</a><a href="#/outils" data-r="outils">Outils</a><a href="#/jeu" data-r="jeu">Jeu</a></nav><span class="nextup" id="nextup" title="Les exports du jeu sont publiés chaque heure et récupérés à hh:05"></span><span class="online" id="online" hidden title="Visiteurs actifs ces 5 dernières minutes"><i></i><b>–</b> en ligne</span></div>
+<svg class="soil" viewBox="0 0 1200 70" preserveAspectRatio="none" aria-hidden="true">
+<path d="M0 18 Q150 0 300 16 T600 14 T900 18 T1200 10 V70 H0Z" style="fill:var(--soil1)"/>
+<path d="M0 38 Q200 22 400 38 T800 34 T1200 36 V70 H0Z" style="fill:var(--soil2)"/>
+<path d="M0 56 Q180 44 360 56 T720 52 T1200 54 V70 H0Z" style="fill:var(--bg)"/>
+<g style="fill:var(--soil3)" opacity=".5"><circle cx="120" cy="26" r="3"/><circle cx="480" cy="30" r="2"/><circle cx="760" cy="24" r="3.5"/><circle cx="1050" cy="40" r="2.5"/><circle cx="300" cy="44" r="2"/></g></svg>
+</header>
+<main class="wrap" id="app"><p class="muted">Chargement…</p></main>
+<footer><p>Spyzzz · creusé avec amour par les fourmis de Fourmizzz · relevés horaires · <a href="/confidentialite" target="_blank" rel="noopener">Confidentialité</a></p></footer>
+<script>
+if (window.self !== window.top) document.documentElement.classList.add("embed");
+// bandeau de la loterie (S5 seulement) : cagnotte et temps restant avant le tirage
+(async () => { try {
+  const s = +(location.pathname.match(/^\/s([1-5])(\/|$)/) || [])[1] || +new URLSearchParams(location.search).get("srv") || +localStorage.getItem("srv") || 5;
+  if (s !== 5 || window.self !== window.top) return;
+  const c = (await (await fetch("/api/lottery")).json()).current; if (!c || c.status !== "open") return;
+  const b = document.getElementById("lotban"), n = x => Number(x).toLocaleString("fr-FR");
+  const left = () => { const ms = Date.parse(c.ends_at) - Date.now(); if (ms <= 0) return "tirage imminent";
+    const d = Math.floor(ms / 864e5), hh = Math.floor(ms / 36e5) % 24, mm = Math.floor(ms / 6e4) % 60;
+    return "tirage dans " + (d ? d + " j " : "") + hh + " h " + String(mm).padStart(2, "0"); };
+  const paint = () => b.innerHTML = `<span class="lb-t">🎟️ Loterie du S5 : ${n(c.prize)} de ${c.resource} à gagner</span>
+    <span class="lb-s">${n(c.price)} de ${c.resource} le ticket · ${n(c.tickets)} ticket${c.tickets > 1 ? "s" : ""} vendu${c.tickets > 1 ? "s" : ""} · ${left()}</span>
+    <span class="lb-c">Je participe →</span>`;
+  paint(); b.hidden = false; setInterval(paint, 30e3);
+} catch {} })();
+const $ = s => document.querySelector(s), app = $("#app");
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => n == null ? "–" : Number(n).toLocaleString("fr-FR");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// version AAAAMMJJHHmm en UTC -> date du jour (heure de Paris) correspondant au relevé de minuit
+const vd = v => new Date(Date.UTC(+v.slice(0,4), +v.slice(4,6)-1, +v.slice(6,8), +v.slice(8,10), +v.slice(10,12)));
+const vdate = v => vd(v).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+const delta = (a, b) => b == null || a == null ? "" : a === b ? `<span class="muted">=</span>` :
+  `<span class="${a > b ? "up" : "down"}">${a > b ? "+" : ""}${fmt(a - b)}</span>`;
+const aLink = t => t ? `<a href="#/a/${encodeURIComponent(t)}">${esc(t)}</a>` : `<span class="muted">—</span>`;
+const pLink = (id, n) => `<a href="#/j/${id}">${esc(n)}</a>`;
+// serveur affiché : ?srv= dans l'adresse, sinon le dernier choisi, sinon le S5
+const SERVERS_LIST = [1, 2, 3, 4, 5];
+const SRV = (() => { let s = +(location.pathname.match(/^\/s([1-5])(\/|$)/) || [])[1] || +new URLSearchParams(location.search).get("srv");
+  if (!SERVERS_LIST.includes(s)) { try { s = +localStorage.getItem("srv"); } catch {} }
+  if (!SERVERS_LIST.includes(s)) s = 5;
+  try { localStorage.setItem("srv", s); } catch {} return s; })();
+const withSrv = p => /^\/api\/(online|scores)/.test(p) || !p.startsWith("/api/") ? p : p + (p.includes("?") ? "&" : "?") + "srv=" + SRV;
+const get = async p => { const r = await fetch(withSrv(p)); const j = await r.json(); if (!r.ok) throw new Error(j.error); return j; };
+// recherche de pseudos côté serveur (index par début de nom) : marche aussi sur les serveurs à 200 000 joueurs
+const searchPlayers = async q => (await get("/api/search?q=" + encodeURIComponent(q))).players.map(p => ({ id: p.id, label: p.pseudo, sub: (p.alliance ? p.alliance + " · " : "") + fmt(p.field) + " cm²", f: p.field, alliance: p.alliance }));
+let charts = [];
+function chart(id, labels, datasets, opts = {}) {
+  Chart.defaults.font.family = "Nunito, system-ui, sans-serif";
+  // 4 couleurs du thème, puis des couleurs supplémentaires pour les graphiques à 10 séries
+  const pal = [...["--s1","--s2","--s3","--s4"].map(css), "#d64f6b", "#2fa3a3", "#c9a227", "#8a6d3b", "#6b8e23", "#e58fb0"];
+  const c = new Chart(document.getElementById(id), { type: opts.type || "line",
+    data: { labels, datasets: datasets.map((d, i) => ({ borderColor: d.color || pal[i % pal.length], backgroundColor: d.color || pal[i % pal.length],
+      borderWidth: 3, borderRadius: 8, pointRadius: labels.length > 30 ? 0 : 3, tension: .35, ...d })) },
+    options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: datasets.length > 1, labels: { color: css("--muted"), boxWidth: 12 } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt(c.parsed.y)}` } } },
+      scales: { x: { ticks: { color: css("--muted") }, grid: { display: false } },
+        y: { ticks: { color: css("--muted"), callback: v => fmt(v) }, grid: { color: css("--line") }, beginAtZero: !!opts.zero } } } });
+  charts.push(c);
+}
+function sortable(tbl) {
+  tbl.querySelectorAll("th").forEach((th, i) => th.onclick = () => {
+    const rows = [...tbl.tBodies[0].rows], dir = th.dataset.d = th.dataset.d === "1" ? "-1" : "1";
+    const val = r => { const t = r.cells[i].dataset.v ?? r.cells[i].textContent; const n = parseFloat(t); return isNaN(n) ? t.toLowerCase() : n; };
+    rows.sort((a, b) => (val(a) > val(b) ? 1 : val(a) < val(b) ? -1 : 0) * dir).forEach(r => tbl.tBodies[0].append(r));
+  });
+}
+const td = (v, cls = "n") => `<td class="${cls}" data-v="${v ?? ""}">${fmt(v)}</td>`;
+
+// listes longues : 5 lignes max + bouton « Charger plus »
+function limitLists(root) {
+  root.querySelectorAll("ul.ev").forEach(ul => {
+    const items = [...ul.children]; if (items.length <= 5) return;
+    let shown = 5; items.forEach((li, i) => li.hidden = i >= shown);
+    const btn = document.createElement("button"); btn.className = "more";
+    const label = () => btn.textContent = `Charger plus (${items.length - shown} restants)`; label();
+    btn.onclick = () => { shown += 5; items.forEach((li, i) => li.hidden = i >= shown); if (shown >= items.length) btn.remove(); else label(); };
+    ul.after(btn);
+  });
+}
+
+async function home() {
+  const [s, e, al] = await Promise.all([get("/api/summary"), get("/api/events"), get("/api/alliances")]);
+  const t = s.timeline, L = t.map(x => vdate(x.version)), last = t.at(-1), pr = t.at(-2) || {};
+  app.innerHTML = `
+  <p class="note" id="homenote">Serveur ${SRV} · dernier relevé : ${vdate(s.latest)} · <b id="nextup-home"></b> · ${t.length} relevés</p>
+  <div class="kpis">
+    ${[["Joueurs", last.players, pr.players], ["Joueurs actifs", last.active, pr.active], ["En alliance", last.allied, pr.allied],
+       ["Alliances", last.alliances, pr.alliances], ["TDC total (cm²)", last.field, pr.field]]
+      .map(([l, v, p]) => `<div class="card kpi"><div class="l">${l}</div><div class="v">${fmt(v)}</div><div>${delta(v, p)}</div></div>`).join("")}
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="ch"><h3>Joueurs</h3><span class="hj" data-c="c1"><button data-m="H">H</button><button data-m="J" class="on">J</button></span></div><div class="chart"><canvas id="c1"></canvas></div></div>
+    <div class="card"><div class="ch"><h3>Terrain de chasse total</h3><span class="hj" data-c="c2"><button data-m="H">H</button><button data-m="J" class="on">J</button></span></div><div class="chart"><canvas id="c2"></canvas></div></div>
+    <div class="card"><div class="ch"><h3>TDC des 5 premières alliances</h3><span class="hj" data-c="c3"><button data-m="H">H</button><button data-m="J" class="on">J</button></span></div><div class="chart"><canvas id="c3"></canvas></div></div>
+    <div class="card"><div class="ch"><h3>Top 5 des alliances en TDC / membre</h3></div><div class="chart"><canvas id="c5"></canvas></div></div>
+    <div class="card"><div class="ch"><h3>Nombre d'alliances</h3><span class="hj" data-c="c4"><button data-m="H">H</button><button data-m="J" class="on">J</button></span></div><div class="chart"><canvas id="c4"></canvas></div></div>
+  </div>
+  <h2>Sur les dernières 24 h <span class="muted">· depuis ${e.previous ? vdate(e.previous) : "–"}</span></h2>
+  ${!e.previous ? `<p class="muted">Il faut au moins deux relevés pour comparer.</p>` : `
+  <div class="grid2">
+    <div class="card"><h3>Changements d'alliance (${e.moves.length})</h3><ul class="ev">${e.moves.map(m =>
+      `<li>${pLink(m.id, m.pseudo)} : ${aLink(m.before)} → ${aLink(m.after)}</li>`).join("") || "<li class=muted>Aucun</li>"}</ul></div>
+    <div class="card"><h3>Alliances créées / disparues</h3><ul class="ev">
+      ${al.alliances.filter(a => a.isnew).map(a => `<li><span class="up">Nouvelle</span> ${aLink(a.tag)} ${esc(a.name)} · ${a.players} membres</li>`).join("")}
+      ${al.gone.map(a => `<li><span class="down">Disparue</span> ${esc(a.tag)} ${esc(a.name)} · avait ${a.players} membres</li>`).join("")}
+      ${!al.gone.length && !al.alliances.some(a => a.isnew) ? "<li class=muted>Aucune</li>" : ""}</ul></div>
+    <div class="card"><h3>Plus fortes hausses de TDC</h3><ul class="ev">${e.topGain.map(p =>
+      `<li>${pLink(p.id, p.pseudo)} ${p.alliance ? `<span class="tag">${esc(p.alliance)}</span>` : ""} <span class="up">+${fmt(p.delta)}</span></li>`).join("") || "<li class=muted>Aucune</li>"}</ul></div>
+    <div class="card"><h3>Plus fortes baisses de TDC</h3><ul class="ev">${e.topLoss.map(p =>
+      `<li>${pLink(p.id, p.pseudo)} ${p.alliance ? `<span class="tag">${esc(p.alliance)}</span>` : ""} <span class="down">${fmt(p.delta)}</span></li>`).join("") || "<li class=muted>Aucune</li>"}</ul></div>
+    <div class="card"><h3>Nouveaux joueurs (${e.newPlayers.length})</h3><ul class="ev">${e.newPlayers.map(p => `<li>${pLink(p.id, p.pseudo)} ${p.alliance ? `<span class="tag">${esc(p.alliance)}</span>` : ""}</li>`).join("") || "<li class=muted>Aucun</li>"}</ul></div>
+    <div class="card"><h3>Joueurs disparus (${e.gonePlayers.length})</h3><ul class="ev">${e.gonePlayers.map(p => `<li>${esc(p.pseudo)} ${p.alliance ? `<span class="tag">${esc(p.alliance)}</span>` : ""} <span class="muted">· ${fmt(p.field)} cm²</span></li>`).join("") || "<li class=muted>Aucun</li>"}</ul></div>
+  </div>`}`;
+  limitLists(app); nextupTick();
+  // H = tous les relevés horaires ; J = dernier relevé de chaque jour (heure de Paris)
+  const day = v => vd(v).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+  const daily = vs => vs.filter((v, i) => i === vs.length - 1 || day(v) !== day(vs[i + 1]));
+  const dlabel = v => vd(v).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", timeZone: "Europe/Paris" });
+  const top = al.alliances.slice(0, 5).map(a => a.tag), avs = [...new Set(al.timeline.map(r => r.version))];
+  const draws = {
+    c1: (tt, lab) => chart("c1", tt.map(x => lab(x.version)), [{ label: "Inscrits", data: tt.map(x => x.players) }, { label: "Actifs", data: tt.map(x => x.active) }, { label: "En alliance", data: tt.map(x => x.allied) }]),
+    c2: (tt, lab) => chart("c2", tt.map(x => lab(x.version)), [{ label: "TDC", data: tt.map(x => x.field) }]),
+    c3: (_, lab, m) => { const vs = m === "J" ? daily(avs) : avs;
+      chart("c3", vs.map(lab), top.map(tag => ({ label: tag, data: vs.map(v => al.timeline.find(r => r.version === v && r.tag === tag)?.field ?? null) }))); },
+    // valeur actuelle seulement (dernier relevé), pas d'évolution
+    // les 5 meilleures moyennes actuelles de TDC par membre
+    c5: () => { const best = al.alliances.filter(a => a.players).map(a => ({ tag: a.tag, v: Math.round(a.field / a.players) })).sort((x, y) => y.v - x.v).slice(0, 5);
+      chart("c5", best.map(b => b.tag), [{ label: "TDC / membre", data: best.map(b => b.v), type: "bar" }], { zero: true }); },
+    c4: (tt, lab) => chart("c4", tt.map(x => lab(x.version)), [{ label: "Alliances", data: tt.map(x => x.alliances), type: "bar" }], { zero: true }),
+  };
+  const render = (id, m) => { Chart.getChart(id)?.destroy();
+    const keep = new Set(daily(t.map(x => x.version)));
+    draws[id](m === "J" ? t.filter(x => keep.has(x.version)) : t, m === "J" ? dlabel : vdate, m); };
+  Object.keys(draws).forEach(id => render(id, "J"));
+  document.querySelectorAll(".hj").forEach(g => g.onclick = e => { const m = e.target.dataset.m; if (!m) return;
+    g.querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); render(g.dataset.c, m); });
+}
+
+async function alliances() {
+  const d = await get("/api/alliances");
+  app.innerHTML = `<h2>Alliances <span class="muted">· ${vdate(d.latest)}</span></h2>
+  <div class="card tbl"><table id="t"><thead><tr><th>#</th><th>Tag</th><th>Nom</th><th class="n">Membres</th><th class="n">± 24 h</th><th class="n">TDC</th><th class="n">± 24 h</th><th class="n">TDC/membre</th><th class="n">Fourmilière</th><th class="n">Techno</th><th class="n">Trophées</th><th>Pactes</th><th>Guerres</th></tr></thead><tbody>
+  ${d.alliances.map((a, i) => `<tr><td>${i + 1}</td><td>${aLink(a.tag)}${a.isnew ? ' <span class="tag up">new</span>' : ""}</td><td>${esc(a.name)}</td>
+    ${td(a.players)}<td class="n" data-v="${a.players - (a.pplayers ?? a.players)}">${delta(a.players, a.pplayers)}</td>${td(a.field)}<td class="n" data-v="${a.field - (a.pfield ?? a.field)}">${delta(a.field, a.pfield)}</td>
+    ${td(a.players ? Math.round(a.field / a.players) : null)}${td(a.building)}${td(a.tech)}${td(a.trophy)}<td>${a.pacts.map(p => `<span class="tag" title="${esc(p.name)}">${esc(p.tag)}</span>`).join("")}</td><td>${a.wars.map(w => `<span class="tag down">${esc(w)}</span>`).join("")}</td></tr>`).join("")}
+  </tbody></table></div>
+  ${d.gone.length ? `<h2>Disparues sur les dernières 24 h</h2><p>${d.gone.map(a => esc(a.tag)).join(", ")}</p>` : ""}`;
+  sortable($("#t"));
+}
+
+async function alliance(tag) {
+  const d = await get("/api/alliance/" + encodeURIComponent(tag)), t = d.timeline, L = t.map(x => vdate(x.version)), c = t.at(-1);
+  const alive = c.version === d.latest;
+  app.innerHTML = `<h2>${esc(tag)} <span class="muted">· ${esc(c.name)}</span> ${alive ? "" : '<span class="tag down">disparue</span>'}</h2>
+  <div class="kpis">${[["Membres", c.players], ["TDC", c.field], ["TDC/membre", c.players ? Math.round(c.field / c.players) : null], ["Fourmilière", c.building], ["Techno", c.tech], ["Trophées", c.trophy]]
+    .map(([l, v]) => `<div class="card kpi"><div class="l">${l}</div><div class="v">${fmt(v)}</div></div>`).join("")}</div>
+  <p>Pactes : ${c.pacts.map(p => `${aLink(p.tag)} <span class="muted">(${esc(p.name)})</span>`).join(", ") || "<span class=muted>aucun</span>"} ·
+     Guerres : ${c.wars.map(aLink).join(", ") || "<span class=muted>aucune</span>"}</p>
+  <div class="grid2">
+    <div class="card"><h3>Terrain de chasse</h3><div class="chart"><canvas id="c1"></canvas></div></div>
+    <div class="card"><h3>Membres</h3><div class="chart"><canvas id="c2"></canvas></div></div>
+    <div class="card"><div class="ch"><h3>TDC / membre</h3><span class="hj" id="hjpm"><button data-m="H">H</button><button data-m="J" class="on">J</button></span></div>
+      <table><thead><tr><th>Relevé</th><th class="n">TDC / membre</th><th class="n">Écart</th></tr></thead><tbody id="tb-pm"></tbody></table><button class="more" id="pm-more">Charger plus</button></div>
+  </div>
+  <h2>Sur la carte</h2><div class="card"><div class="map" id="amap"></div><p class="note">Les membres de ${esc(tag)} sont en couleur, les autres joueurs en gris. <a href="#/carte/${encodeURIComponent(tag)}">Ouvrir la grande carte</a></p></div>
+  <h2>Membres actuels (${d.members.length})</h2>
+  <div class="card tbl"><table id="t"><thead><tr><th>Pseudo</th><th>Grade</th><th class="n">TDC</th><th class="n">± 24 h</th><th class="n">Fourmilière</th><th class="n">Techno</th><th class="n">Trophées</th><th>Coord.</th></tr></thead><tbody>
+  ${d.members.map(p => `<tr><td>${pLink(p.id, p.pseudo)}${p.holiday ? ' <span class="tag">vacances</span>' : ""}</td><td>${esc(p.grade ?? "")}</td>${td(p.field)}<td class="n" data-v="${p.field - (p.pfield ?? p.field)}">${delta(p.field, p.pfield)}</td>${td(p.building)}${td(p.tech)}${td(p.trophy)}<td>${p.x}, ${p.y}</td></tr>`).join("")}
+  </tbody></table></div>
+  <h2>Arrivées et départs</h2>
+  <div class="card"><ul class="ev">${d.moves.map(m => `<li><span class="muted">${vdate(m.version)}</span> ${pLink(m.id, m.pseudo)} ${m.after === tag
+    ? `<span class="up">arrive</span>${m.before ? " de " + aLink(m.before) : ""}` : `<span class="down">part</span>${m.after ? " vers " + aLink(m.after) : ""}`}</li>`).join("") || "<li class=muted>Aucun mouvement enregistré</li>"}</ul></div>`;
+  chart("c1", L, [{ label: "TDC", data: t.map(x => x.field) }]);
+  chart("c2", L, [{ label: "Membres", data: t.map(x => x.players) }], { zero: true });
+  // TDC / membre : H = tous les relevés horaires ; J = dernier relevé de chaque jour (heure de Paris)
+  const day = v => vd(v).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+  let pmRows = [], pmN = 0;
+  const pmMore = () => { // 5 lignes de plus, du plus récent au plus ancien ; l'écart est pris sur la ligne précédente (heure ou jour)
+    $("#tb-pm").insertAdjacentHTML("beforeend", pmRows.slice(pmN, pmN + 5).map((r, k) => { const p = pmRows[pmN + k + 1];
+      return `<tr><td class="muted">${r.l}</td><td class="n">${fmt(r.v)}</td><td class="n">${p ? delta(r.v, p.v) : ""}</td></tr>`; }).join(""));
+    pmN += 5; $("#pm-more").hidden = pmN >= pmRows.length; };
+  const perMember = m => {
+    const tt = m === "J" ? t.filter((x, i) => i === t.length - 1 || day(x.version) !== day(t[i + 1].version)) : t;
+    pmRows = tt.filter(x => x.players).map(x => ({ v: Math.round(x.field / x.players),
+      l: m === "J" ? vd(x.version).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", timeZone: "Europe/Paris" }) : vdate(x.version) })).reverse();
+    pmN = 0; $("#tb-pm").innerHTML = ""; pmMore(); };
+  perMember("J"); $("#pm-more").onclick = pmMore;
+  $("#hjpm").onclick = e => { const m = e.target.dataset.m; if (!m) return;
+    $("#hjpm").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); perMember(m); };
+  sortable($("#t"));
+  get("/api/map").then(m => worldMap($("#amap"), m.players, { focus: tag })).catch(() => {});
+}
+
+async function joueurs(q = "") {
+  app.innerHTML = `<h2>Joueurs</h2><p><input type="search" id="q" placeholder="Rechercher un pseudo…" value="${esc(q)}"></p><div id="res" class="card tbl"></div>`;
+  const load = async () => {
+    const d = await get("/api/players?q=" + encodeURIComponent($("#q").value));
+    $("#res").innerHTML = `<table id="t"><thead><tr><th>Pseudo</th><th>Alliance</th><th class="n">TDC</th><th class="n">± 24 h</th><th class="n">Fourmilière</th><th class="n">Techno</th><th class="n">Trophées</th></tr></thead><tbody>
+    ${d.players.map(p => `<tr><td>${pLink(p.id, p.pseudo)}${p.banned ? ' <span class="tag down">banni</span>' : ""}${p.holiday ? ' <span class="tag">vacances</span>' : ""}</td><td>${aLink(p.alliance)}</td>${td(p.field)}<td class="n" data-v="${p.field - (p.pfield ?? p.field)}">${delta(p.field, p.pfield)}</td>${td(p.building)}${td(p.tech)}${td(p.trophy)}</tr>`).join("")}
+    </tbody></table><p class="note">200 premiers résultats, classés par TDC.</p>`;
+    sortable($("#t"));
+  };
+  let tm; $("#q").oninput = () => { clearTimeout(tm); tm = setTimeout(load, 250); };
+  await load();
+}
+
+async function joueur(id) {
+  const d = await get("/api/player/" + id), t = d.timeline, L = t.map(x => vdate(x.version)), c = t.at(-1);
+  const hist = []; t.forEach((x, i) => { const p = t[i - 1];
+    if (!p) return;
+    if (p.alliance !== x.alliance) hist.push(`${vdate(x.version)} : ${aLink(p.alliance)} → ${aLink(x.alliance)}`);
+    if (p.pseudo !== x.pseudo) hist.push(`${vdate(x.version)} : renommé ${esc(p.pseudo)} → ${esc(x.pseudo)}`);
+    if (p.grade !== x.grade && p.alliance === x.alliance) hist.push(`${vdate(x.version)} : grade ${esc(p.grade ?? "—")} → ${esc(x.grade ?? "—")}`);
+    if (p.master !== x.master) hist.push(`${vdate(x.version)} : ${x.master ? `colonisé par ${pLink(x.master, "#" + x.master)}` : "libéré"}`); });
+  // mouvements de TDC entre deux relevés consécutifs
+  const tdcMoves = []; t.forEach((x, i) => { const p = t[i - 1];
+    if (p && p.field !== x.field) { const f = (d.floods || []).find(f => f.version === x.version && f.sens === Math.sign(x.field - p.field) && f.amount === Math.abs(x.field - p.field));
+      tdcMoves.push(`<span class="muted">${vdate(x.version)}</span> ${delta(x.field, p.field)}${f ? floodTag(f.cands, f.opseudo, f.other) : ""} <span class="muted">(${fmt(p.field)} → ${fmt(x.field)})</span>`); } });
+  app.innerHTML = `<h2>${esc(c.pseudo)} <span class="muted">· ${aLink(c.alliance)} ${esc(c.grade ?? "")}</span></h2>
+  <div class="kpis">${[["TDC", c.field], ["Fourmilière", c.building], ["Techno", c.tech], ["Trophées", c.trophy]]
+    .map(([l, v]) => `<div class="card kpi"><div class="l">${l}</div><div class="v">${fmt(v)}</div></div>`).join("")}
+    <div class="card kpi"><div class="l">Coordonnées</div><div class="v">${c.x}, ${c.y}</div></div></div>
+  ${c.master ? `<p>Colonisé par ${pLink(c.master, "#" + c.master)}</p>` : ""}
+  <div class="grid2">
+    <div class="card"><h3>Terrain de chasse</h3><div class="chart"><canvas id="c1"></canvas></div></div>
+    <div class="card"><h3>Scores</h3><div class="chart"><canvas id="c2"></canvas></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Mouvements de TDC (${tdcMoves.length})</h3><ul class="ev">${tdcMoves.reverse().map(m => `<li>${m}</li>`).join("") || "<li class=muted>Aucun mouvement enregistré</li>"}</ul></div>
+    <div class="card"><h3>Historique</h3><ul class="ev">${hist.reverse().map(h => `<li>${h}</li>`).join("") || "<li class=muted>Aucun changement enregistré</li>"}</ul></div>
+  </div>`;
+  limitLists(app);
+  chart("c1", L, [{ label: "TDC", data: t.map(x => x.field) }]);
+  chart("c2", L, [{ label: "Fourmilière", data: t.map(x => x.building) }, { label: "Techno", data: t.map(x => x.tech) }]);
+}
+
+
+let stopGame = null;
+async function jeu() {
+  app.innerHTML = `<div class="game">
+    <div class="stage-wrap"><div class="stage" id="stage">
+      <canvas id="g"></canvas>
+      <div class="keyhud" id="keyhud" hidden><kbd data-k="up">▲</kbd><kbd data-k="left">◀</kbd><kbd data-k="down">▼</kbd><kbd data-k="right">▶</kbd></div>
+      <div class="joy" id="joy" hidden><div class="knob"></div></div>
+      <div class="hud-btns"><button id="pz" title="Pause (P)" hidden>⏸</button><button id="fs" title="Plein écran (F)">⛶</button></div>
+      <div class="ov" id="ov-start"><h2>Récolte</h2>
+        <p>Ramasse les miettes, enchaîne les combos, évite les araignées.</p>
+        <div class="modes" id="modes">
+          <button data-mode="clavier"><span>⌨️</span>Clavier<small>Flèches ou ZQSD</small></button>
+          <button data-mode="joystick"><span>🕹️</span>Joystick<small>Tactile ou manette</small></button>
+          <button data-mode="souris"><span>🖱️</span>Souris<small>La fourmi suit le curseur</small></button>
+        </div>
+        <button class="btn big" id="go">Jouer</button>
+        <p class="keys"><kbd>Espace</kbd> pour jouer · <kbd>P</kbd> pause · <kbd>F</kbd> plein écran</p>
+        <p class="pb" id="pb"></p></div>
+      <div class="ov" id="ov-up" hidden><h2>Amélioration !</h2><p>Choisis un bonus pour la suite de la partie</p><div class="ups" id="ups"></div><p class="keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> pour choisir</p></div>
+      <div class="ov" id="ov-pause" hidden><h2>Pause</h2><button class="btn big" id="resume">Reprendre</button><p class="keys"><kbd>P</kbd> ou <kbd>Espace</kbd></p></div>
+      <div class="ov" id="ov-over" hidden><h2>Croquée !</h2>
+        <div class="final"><b id="fscore">0</b><span id="frec"></span></div>
+        <div class="row" id="send"><input id="ps" maxlength="20" placeholder="Ton pseudo" autocomplete="nickname"><button class="btn" id="ok">Enregistrer</button></div>
+        <p id="msg" class="note"></p>
+        <button class="btn big" id="again">Rejouer</button><p class="keys"><kbd>Espace</kbd> pour rejouer</p></div>
+    </div></div>
+    <aside class="card lbcard"><div class="ch"><h3>Classement</h3><span class="hj" id="lbtab"><button data-m="w" class="on">Semaine</button><button data-m="a">Tous</button></span></div>
+      <ol class="lb" id="lbw"><li class="muted">Chargement…</li></ol><ol class="lb" id="lb" hidden></ol></aside>
+  </div>
+  <details class="card rules"><summary>Règles et astuces</summary>
+    <p>Guide ta fourmi pour ramasser les miettes. Enchaîne-les sans t'arrêter pour monter le combo (x2, x3…). Les miettes dorées valent 10 points, et des tas de miettes tombent régulièrement.</p>
+    <p>Araignées : <b>chasseuses</b> (noires, zigzaguent vers toi), <b>rôdeuses</b> (grises, foncent quand tu passes près), <b>sprinteuses</b> (rouges, chargent quand leurs yeux clignotent) et <b>sauteuses</b> (vertes, bondissent là où tu vas).</p>
+    <p>Événements surprises : frénésie, gel, nuit noire, aimant, invasion, pluie dorée, bouclier, séisme.</p>
+    <p>Ta fourmi crache automatiquement de l'acide sur les araignées proches. Chaque araignée a des points de vie : vaincue, elle rapporte des points et lâche des miettes. À chaque palier de score, le jeu se met en pause et tu choisis une amélioration parmi trois (dégâts, cadence, portée, vitesse, vies…).</p></details>`;
+  const cv = $("#g"), g = cv.getContext("2d"), W = 640, H = 420, stage = $("#stage");
+  // canvas net sur écrans haute densité : coordonnées logiques 640x420, résolution réelle × dpr
+  const dpr = Math.min(3, devicePixelRatio || 1); cv.width = W * dpr; cv.height = H * dpr;
+  const show = id => ["ov-start", "ov-pause", "ov-over", "ov-up"].forEach(o => $("#" + o).hidden = o !== id);
+  let best = 0; try { best = +localStorage.getItem("best") || 0; } catch {}
+  const pbText = () => $("#pb").textContent = best ? `Ton record : ${fmt(best)}` : "";
+  pbText();
+  const lb = async (r) => { const d = r || await get("/api/scores");
+    const li = l => l.map(s => `<li>${esc(s.pseudo)} <b>${fmt(s.score)}</b></li>`).join("") || "<li class=muted>Aucun score, sois le premier !</li>";
+    $("#lb").innerHTML = li(d.top); $("#lbw").innerHTML = li(d.week || []); };
+  $("#lbtab").onclick = e => { const m = e.target.dataset.m; if (!m) return;
+    $("#lbtab").querySelectorAll("button").forEach(b => b.classList.toggle("on", b === e.target)); $("#lbw").hidden = m !== "w"; $("#lb").hidden = m !== "a"; };
+  lb();
+  try { $("#ps").value = localStorage.getItem("pseudo") || ""; } catch {}
+  let st, raf, keys = {}, target = null, last = 0, result = null, paused = false, state = "intro";
+  // mode de contrôle choisi (mémorisé) : clavier, joystick (virtuel ou manette) ou souris
+  const touchDev = matchMedia("(pointer: coarse)").matches;
+  let mode; try { mode = localStorage.getItem("mode"); } catch {} if (!["clavier", "joystick", "souris"].includes(mode)) mode = touchDev ? "joystick" : "souris";
+  let joyVec = { x: 0, y: 0 };
+  function setMode(m) { mode = m; try { localStorage.setItem("mode", m); } catch {}
+    $("#modes").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+    $("#keyhud").hidden = m !== "clavier"; $("#joy").hidden = m !== "joystick"; stage.dataset.mode = m; }
+  $("#modes").onclick = e => { const b = e.target.closest("button"); if (b) setMode(b.dataset.mode); };
+  setMode(mode);
+  const rnd = (a, b) => a + Math.random() * (b - a), dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const crumb = (gold) => ({ x: rnd(30, W - 30), y: rnd(30, H - 30), gold, t: gold ? 6000 : Infinity });
+  // 4 types d'araignées au comportement différent
+  const TYPES = { chasseur: "#2a201a", sprinteur: "#7a1414", rodeur: "#55504a", sauteur: "#2f5a22" };
+  function spider(type, tmp) { let p; do { const e = Math.floor(rnd(0, 4)); p = { x: e == 0 ? 0 : e == 1 ? W : rnd(0, W), y: e == 2 ? 0 : e == 3 ? H : rnd(0, H) }; }
+    while (st && dist(p, st.ant) < 280);
+    if (!type) { const lvl = st ? st.t / 1000 : 0, pool = ["chasseur", "rodeur"];
+      if (lvl > 8) pool.push("sprinteur"); if (lvl > 16) pool.push("sauteur"); type = pool[Math.floor(rnd(0, pool.length))]; }
+    // difficulté : PV qui grimpent avec le temps et avec chaque amélioration prise (+18 % par amélioration)
+    const tier = st?.t ? Math.pow(1 + st.t / 45000, 1.35) * Math.pow(1.18, st.upLvl || 0) : 1;
+    const hp = tmp ? Math.ceil(tier) : Math.round({ chasseur: 3, rodeur: 2, sprinteur: 2, sauteur: 4 }[type] * tier);
+    return { ...p, type, a: rnd(0, 6.28), sp: rnd(0.9, 1.5), phase: "move", pt: rnd(800, 2500), wob: rnd(0, 99), goal: null, tmp: tmp ? 7000 : 0, hp, maxhp: hp, flash: 0 }; }
+  // améliorations proposées tous les X points (3 au hasard, on en choisit 1)
+  const UPGRADES = [
+    { id: "dmg", ico: "🧪", name: "Acide concentré", desc: "+1 dégât par jet", ok: u => u.dmg < 6, apply: u => u.dmg++ },
+    { id: "rate", ico: "⚡", name: "Tir rapide", desc: "Crache 25 % plus souvent", ok: u => u.rate > 350, apply: u => u.rate = Math.round(u.rate * .75) },
+    { id: "shots", ico: "🔱", name: "Jet multiple", desc: "+1 cible à chaque tir", ok: u => u.shots < 4, apply: u => u.shots++ },
+    { id: "range", ico: "🎯", name: "Longue portée", desc: "Portée de tir +35 %", ok: u => u.range < 320, apply: u => u.range = Math.round(u.range * 1.35) },
+    { id: "pierce", ico: "🗡️", name: "Acide perforant", desc: "Les jets traversent les araignées", ok: u => !u.pierce, apply: u => u.pierce = true },
+    { id: "speed", ico: "🦵", name: "Pattes agiles", desc: "Vitesse +12 %", ok: u => u.speed < 1.6, apply: u => u.speed += .12 },
+    { id: "pick", ico: "🦷", name: "Grandes mandibules", desc: "Ramasse les miettes de plus loin", ok: u => u.pick < 40, apply: u => u.pick += 7 },
+    { id: "magnet", ico: "🧲", name: "Phéromones", desc: "Attire les miettes proches en permanence", ok: u => u.magnet < 160, apply: u => u.magnet += 60 },
+    { id: "combo", ico: "🔥", name: "Combo tenace", desc: "Le combo dure 0,5 s de plus", ok: u => u.comboT < 3000, apply: u => u.comboT += 500 },
+    { id: "life", ico: "❤️", name: "Carapace", desc: "+1 vie", ok: () => true, apply: (u, s) => s.lives++ },
+    { id: "heal", ico: "🛡️", name: "Bulle", desc: "Bouclier immédiat (absorbe 1 morsure)", ok: (u, s) => !s.shield, apply: (u, s) => s.shield = true },
+  ];
+  function offerUpgrade() {
+    st.choosing = true; paused = true; cancelAnimationFrame(raf); draw();
+    const pool = UPGRADES.filter(x => x.ok(st.up, st)).sort(() => Math.random() - .5).slice(0, 3);
+    st.offer = pool;
+    $("#ups").innerHTML = pool.map((x, i) => `<button data-i="${i}"><span>${x.ico}</span><b>${x.name}</b><small>${x.desc}</small><kbd>${i + 1}</kbd></button>`).join("");
+    show("ov-up");
+  }
+  function chooseUpgrade(i) { const x = st.offer?.[i]; if (!x) return;
+    x.apply(st.up, st); st.taken.push(x.ico); st.upLvl++;
+    st.nextUp = st.score + 40 + st.upLvl * 30; st.prevUp = st.score;
+    st.choosing = false; st.offer = null; st.inv = Math.max(st.inv, 800);
+    st.fx.push({ x: st.ant.x, y: st.ant.y - 20, txt: x.name, t: 1200, col: "#ffd84a", big: true });
+    show(null); paused = false; last = performance.now(); raf = requestAnimationFrame(loop); }
+  const EVENTS = [
+    ["Frénésie !", "Ta fourmi court plus vite", 5000],
+    ["Gel !", "Les araignées sont figées", 3500],
+    ["Nuit noire", "On n'y voit plus rien…", 6000],
+    ["Aimant", "Les miettes viennent à toi", 6000],
+    ["Invasion !", "Des araignées débarquent", 7000],
+    ["Pluie dorée", "Miettes en or partout !", 0],
+    ["Bouclier", "Attrape la bulle bleue", 0],
+    ["Séisme", "Les araignées s'affolent", 4000],
+  ];
+  function event() { const [name, sub, dur] = EVENTS[Math.floor(rnd(0, EVENTS.length))];
+    st.ev = { name, sub, t: dur, banner: 2200 };
+    if (name === "Invasion !") for (let i = 0; i < 3; i++) st.spiders.push(spider(null, true));
+    if (name === "Pluie dorée") for (let i = 0; i < 6; i++) st.crumbs.push({ ...crumb(true), t: 5000 });
+    if (name === "Bouclier") st.crumbs.push({ ...crumb(), shield: true, t: 7000 });
+    if (name === "Séisme") st.shake = 14;
+  }
+  const evOn = n => st.ev && st.ev.name === n && st.ev.t > 0;
+  function start() {
+    st = { ant: { x: W / 2, y: H / 2, a: 0 }, crumbs: Array.from({ length: 12 }, () => crumb()), spiders: [], score: 0, t: 0, combo: 0, comboT: 0, fx: [], shake: 0, nextBurst: 4000, nextSpider: 1500, nextGold: 9000, nextEv: rnd(6000, 10000), ev: null, shield: false, alive: true,
+      up: { dmg: 1, rate: 1100, shots: 1, range: 150, pierce: false, speed: 1, pick: 20, magnet: 0, comboT: 1400 },
+      lives: 1, inv: 0, shots: [], shootT: 800, nextUp: 40, prevUp: 0, upLvl: 0, taken: [], kills: 0, choosing: false };
+    target = null; result = null; paused = false; state = "play"; keys = {};
+    show(null); $("#pz").hidden = false; stage.classList.add("playing");
+    last = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
+  }
+  function pause(on) { if (state !== "play" || paused === on || st.choosing) return; paused = on; show(on ? "ov-pause" : null);
+    if (!on) { last = performance.now(); raf = requestAnimationFrame(loop); } else cancelAnimationFrame(raf); }
+  function loop(now) {
+    if (paused) return;
+    const dt = Math.min(50, now - last), k = dt / 16.67; last = now; st.t += dt;
+    const a = st.ant, sp = 3.4 * k * st.up.speed * (evOn("Frénésie !") ? 1.6 : 1); let dx = 0, dy = 0;
+    if (mode === "clavier") {
+      if (keys.ArrowLeft || keys.a || keys.q) dx--; if (keys.ArrowRight || keys.d) dx++;
+      if (keys.ArrowUp || keys.w || keys.z) dy--; if (keys.ArrowDown || keys.s) dy++;
+      if (dx || dy) { const n = Math.hypot(dx, dy); dx /= n; dy /= n; }
+    } else if (mode === "joystick") {
+      // manette physique prioritaire si elle est inclinée, sinon joystick tactile ; vitesse proportionnelle
+      let v = joyVec; const gp = [...(navigator.getGamepads?.() || [])].find(Boolean);
+      if (gp) { const gx = gp.axes[0] || 0, gy = gp.axes[1] || 0; if (Math.hypot(gx, gy) > .2) v = { x: gx, y: gy };
+        if (gp.buttons[14]?.pressed) v = { x: -1, y: v.y }; if (gp.buttons[15]?.pressed) v = { x: 1, y: v.y };
+        if (gp.buttons[12]?.pressed) v = { x: v.x, y: -1 }; if (gp.buttons[13]?.pressed) v = { x: v.x, y: 1 }; }
+      const n = Math.hypot(v.x, v.y); if (n > .15) { const m = Math.min(1, n); dx = v.x / n * m; dy = v.y / n * m; }
+    } else if (target) { const d = dist(a, target); if (d > 4) { dx = (target.x - a.x) / d; dy = (target.y - a.y) / d; } }
+    if (dx || dy) { a.x = Math.max(8, Math.min(W - 8, a.x + dx * sp)); a.y = Math.max(8, Math.min(H - 8, a.y + dy * sp)); a.a = Math.atan2(dy, dx); }
+    // miettes
+    st.comboT -= dt; if (st.comboT <= 0) st.combo = 0; st.inv -= dt;
+    st.crumbs = st.crumbs.filter(c => { c.t -= dt;
+      if (evOn("Aimant") && !c.shield) { const d = dist(c, a); if (d < 170 && d > 1) { c.x += (a.x - c.x) / d * 4 * k; c.y += (a.y - c.y) / d * 4 * k; } }
+      else if (st.up.magnet && !c.shield) { const d = dist(c, a); if (d < st.up.magnet && d > 1) { c.x += (a.x - c.x) / d * 2.2 * k; c.y += (a.y - c.y) / d * 2.2 * k; } }
+      if (c.shield && dist(c, a) < 22) { st.shield = true; st.fx.push({ x: c.x, y: c.y - 6, txt: "Bouclier !", t: 900, col: "#7fd0ff", big: true }); return false; }
+      if (c.shield) return c.t > 0;
+      if (dist(c, a) < st.up.pick) {
+        st.combo = Math.min(st.combo + 1, 50); st.comboT = st.up.comboT;
+        const mult = 1 + Math.floor(st.combo / 5), pts = (c.gold ? 10 : 1) * mult; st.score += pts;
+        st.fx.push({ x: c.x, y: c.y - 6, txt: "+" + pts, t: 700, col: c.gold ? "#ffd84a" : mult > 1 ? "#ff9b3d" : "#fff", big: c.gold || mult > 2 });
+        for (let i = 0; i < (c.gold ? 18 : 6); i++) st.fx.push({ x: c.x, y: c.y, vx: rnd(-3, 3), vy: rnd(-3, 3), t: 400, p: 1, col: c.gold ? "#ffd84a" : "#f7efd9" });
+        if (c.gold) st.shake = 8;
+        if (!c.gold && !c.burst) st.crumbs.push(crumb()); return false; } return c.t > 0; });
+    // pluie de miettes : un tas de 8 à 14 miettes regroupées, qui disparaît après 5 s
+    if (st.t > st.nextBurst) { const cx = rnd(70, W - 70), cy = rnd(70, H - 70);
+      for (let i = 0, n = rnd(8, 14); i < n; i++) st.crumbs.push({ x: cx + rnd(-45, 45), y: cy + rnd(-45, 45), gold: false, burst: true, t: 5000 });
+      st.nextBurst = st.t + rnd(5000, 8000); }
+    st.fx = st.fx.filter(f => { f.t -= dt; if (f.p) { f.x += f.vx * k; f.y += f.vy * k; } else f.y -= 0.6 * k; return f.t > 0; });
+    st.shake *= 0.85;
+    if (st.t > st.nextGold) { st.crumbs.push(crumb(true)); st.nextGold = st.t + rnd(4000, 7000); }
+    // araignées : une de plus toutes les 4,5 s au début, puis toutes les 2 s (max 18)
+    const lvl = st.t / 1000;
+    const cap = Math.min(45, 18 + Math.floor(lvl / 20) + st.upLvl * 2);
+    if (st.t > st.nextSpider) { if (st.spiders.length < cap) st.spiders.push(spider()); st.nextSpider = st.t + Math.max(700, 4500 - lvl * 40 - st.upLvl * 150); }
+    // vague toutes les 25 s : un groupe d'araignées qui arrive d'un même côté
+    if (st.t > (st.nextWave ??= 25000)) { const n = 3 + Math.floor(lvl / 30) + st.upLvl;
+      for (let i = 0; i < n && st.spiders.length < cap + 10; i++) st.spiders.push(spider());
+      if (!st.ev) st.ev = { name: "Vague !", sub: `${n} araignées arrivent`, t: 0, banner: 1800 }; st.nextWave = st.t + 25000; }
+    // événements aléatoires
+    if (st.t > st.nextEv) { event(); st.nextEv = st.t + rnd(8000, 14000); }
+    if (st.ev) { st.ev.t -= dt; st.ev.banner -= dt; if (st.ev.t <= 0 && st.ev.banner <= 0) st.ev = null; }
+    const frozen = evOn("Gel !"), quake = evOn("Séisme"), boost = Math.min(3, lvl / 60 + st.upLvl * .08);
+    const turn = (s, want, rate) => { const diff = ((want - s.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI; s.a += diff * rate * k; };
+    for (const s of st.spiders) {
+      if (s.tmp) s.tmp -= dt;
+      if (frozen) continue;
+      const toAnt = Math.atan2(a.y - s.y, a.x - s.x), d = dist(s, a); let v = s.sp + boost;
+      s.pt -= dt;
+      if (quake) { s.a += rnd(-0.5, 0.5); v *= 1.8; }
+      else if (s.type === "chasseur") {
+        // poursuite avec zigzags irréguliers et changements de cap soudains
+        if (s.pt <= 0) { s.wob = rnd(0, 99); s.pt = rnd(600, 2000); }
+        turn(s, toAnt + Math.sin(st.t / 300 + s.wob) * 1.1 + Math.sin(st.t / 170 + s.wob * 2) * 0.5, 0.07);
+      } else if (s.type === "rodeur") {
+        // erre au hasard, fonce si la fourmi passe près
+        if (!s.goal || dist(s, s.goal) < 20 || s.pt <= 0) { s.goal = { x: rnd(30, W - 30), y: rnd(30, H - 30) }; s.pt = rnd(1500, 4000); }
+        if (d < 150) { turn(s, toAnt, 0.12); v *= 1.7; } else turn(s, Math.atan2(s.goal.y - s.y, s.goal.x - s.x), 0.05);
+      } else if (s.type === "sprinteur") {
+        // lent, puis se fige (yeux qui clignotent) et fait une charge en ligne droite
+        if (s.phase === "move") { turn(s, toAnt, 0.05); v *= 0.6; if (s.pt <= 0) { s.phase = "aim"; s.pt = 450; } }
+        else if (s.phase === "aim") { turn(s, toAnt, 0.25); v = 0; if (s.pt <= 0) { s.phase = "dash"; s.pt = rnd(450, 700); } }
+        else { v = 6.5 + boost; if (s.pt <= 0) { s.phase = "move"; s.pt = rnd(1500, 3000); } }
+      } else if (s.type === "sauteur") {
+        // s'arrête, vise là où la fourmi va être, puis bondit
+        if (s.phase === "move") { turn(s, toAnt, 0.06); v *= 0.8; if (s.pt <= 0 && d < 260) { s.phase = "aim"; s.pt = 500; } }
+        else if (s.phase === "aim") { v = 0; if (s.pt <= 0) { const lead = 18;
+            s.goal = { x: a.x + Math.cos(a.a) * sp * lead, y: a.y + Math.sin(a.a) * sp * lead }; s.a = Math.atan2(s.goal.y - s.y, s.goal.x - s.x); s.phase = "jump"; s.pt = 380; } }
+        else { v = 8; if (s.pt <= 0 || dist(s, s.goal) < 10) { s.phase = "move"; s.pt = rnd(1200, 2600); } }
+      }
+      s.x += Math.cos(s.a) * v * k; s.y += Math.sin(s.a) * v * k;
+      s.x = Math.max(-20, Math.min(W + 20, s.x)); s.y = Math.max(-20, Math.min(H + 20, s.y));
+    }
+    // tir automatique d'acide sur les araignées les plus proches à portée
+    st.shootT -= dt;
+    if (st.shootT <= 0) {
+      const tg = st.spiders.filter(s => dist(s, a) < st.up.range).sort((p, q) => dist(p, a) - dist(q, a)).slice(0, st.up.shots);
+      for (const s of tg) { const d = dist(s, a) || 1;
+        st.shots.push({ x: a.x, y: a.y, vx: (s.x - a.x) / d * 7, vy: (s.y - a.y) / d * 7, t: 700, hit: new Set() }); }
+      st.shootT = tg.length ? st.up.rate : 150; }
+    st.shots = st.shots.filter(p => { p.x += p.vx * k; p.y += p.vy * k; p.t -= dt;
+      for (const s of st.spiders) { if (s.hp <= 0 || p.hit.has(s) || dist(p, s) > 13) continue;
+        p.hit.add(s); s.hp -= st.up.dmg; s.flash = 120; s.x += p.vx * .6; s.y += p.vy * .6;
+        for (let i = 0; i < 4; i++) st.fx.push({ x: p.x, y: p.y, vx: rnd(-2, 2), vy: rnd(-2, 2), t: 250, p: 1, col: "#9be15d" });
+        if (!st.up.pierce) return false; }
+      return p.t > 0 && p.x > -10 && p.y > -10 && p.x < W + 10 && p.y < H + 10; });
+    st.spiders = st.spiders.filter(s => {
+      if (s.tmp < 0) return false;
+      s.flash -= dt;
+      if (s.hp <= 0) { // araignée vaincue : points + miettes
+        const pts = Math.min(25, 3 + s.maxhp); st.score += pts; st.kills++;
+        st.fx.push({ x: s.x, y: s.y - 10, txt: "+" + pts, t: 800, col: "#9be15d", big: true });
+        for (let i = 0; i < 14; i++) st.fx.push({ x: s.x, y: s.y, vx: rnd(-3.5, 3.5), vy: rnd(-3.5, 3.5), t: 450, p: 1, col: "#2a201a" });
+        for (let i = 0; i < 3; i++) st.crumbs.push({ x: s.x + rnd(-18, 18), y: s.y + rnd(-18, 18), gold: false, burst: true, t: 4000 });
+        return false; }
+      if (dist(s, a) < 17 && st.inv <= 0) {
+        if (st.lives > 1 && !st.shield) { st.lives--; st.inv = 1600; st.shake = 12;
+          st.fx.push({ x: a.x, y: a.y - 14, txt: "-1 vie", t: 900, col: "#ff6b5b", big: true });
+          const d = dist(s, a) || 1; s.x += (s.x - a.x) / d * 60; s.y += (s.y - a.y) / d * 60; return true; }
+        if (st.shield) { st.shield = false; st.shake = 10; st.fx.push({ x: s.x, y: s.y, txt: "Paf !", t: 800, col: "#7fd0ff", big: true });
+          for (let i = 0; i < 20; i++) st.fx.push({ x: s.x, y: s.y, vx: rnd(-4, 4), vy: rnd(-4, 4), t: 500, p: 1, col: "#7fd0ff" }); return false; }
+        st.alive = false; }
+      return true; });
+    draw();
+    if (!st.alive) over();
+    else if (st.score >= st.nextUp) offerUpgrade();
+    else raf = requestAnimationFrame(loop);
+  }
+  function draw() {
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.save(); if (st.shake > .5) g.translate(rnd(-st.shake, st.shake), rnd(-st.shake, st.shake));
+    g.fillStyle = css("--field") || "#d9bd88"; g.fillRect(-10, -10, W + 20, H + 20);
+    g.fillStyle = "rgba(94,61,34,.13)"; for (let i = 0; i < 40; i++) { g.beginPath(); g.ellipse((i * 137) % W, (i * 89) % H, 10 + i % 9, 7 + i % 5, i, 0, 7); g.fill(); }
+    g.fillStyle = "rgba(95,125,46,.35)"; for (let i = 0; i < 24; i++) { const x = (i * 211) % W, y = (i * 53) % H; g.beginPath(); g.ellipse(x, y, 2, 6, .4, 0, 7); g.ellipse(x + 4, y + 1, 2, 5, -.4, 0, 7); g.fill(); }
+    for (const c of st.crumbs.filter(c => c.shield)) { g.strokeStyle = "#7fd0ff"; g.lineWidth = 3; g.fillStyle = "rgba(127,208,255,.35)";
+      g.beginPath(); g.arc(c.x, c.y, 11 + Math.sin(st.t / 150) * 2, 0, 7); g.fill(); g.stroke(); g.lineWidth = 1; }
+    for (const c of st.crumbs.filter(c => !c.shield)) { g.fillStyle = c.gold ? "#f2c230" : "#f7efd9"; g.strokeStyle = "rgba(0,0,0,.25)";
+      g.globalAlpha = c.t < 1200 ? (Math.sin(c.t / 60) > 0 ? 1 : .35) : 1;
+      g.beginPath(); g.arc(c.x, c.y, c.gold ? 9 + Math.sin(st.t / 120) * 2 : 6, 0, 7); g.fill(); g.stroke(); g.globalAlpha = 1; }
+    for (const s of st.spiders) { g.save(); g.translate(s.x, s.y); g.rotate(s.a); g.strokeStyle = "#1d1712"; g.lineWidth = 2;
+      const w = Math.sin(st.t / 60) * 3;
+      for (let i = 0; i < 4; i++) for (const sd of [-1, 1]) { g.beginPath(); g.moveTo(0, 0); g.lineTo(-6 + i * 5, sd * 10); g.lineTo(-10 + i * 7 + (i % 2 ? w : -w), sd * 17); g.stroke(); }
+      if (s.tmp) g.globalAlpha = s.tmp < 1500 ? (Math.sin(st.t / 50) > 0 ? .9 : .3) : .9;
+      g.fillStyle = TYPES[s.type]; g.beginPath(); g.arc(-4, 0, 8, 0, 7); g.fill(); g.beginPath(); g.arc(6, 0, 5, 0, 7); g.fill();
+      if (s.type === "sprinteur") { g.fillStyle = "#ff5a3c"; g.fillRect(-7, -1, 7, 2); }
+      if (s.type === "sauteur") { g.fillStyle = "#9fe06a"; g.beginPath(); g.arc(-4, 0, 3, 0, 7); g.fill(); }
+      if (evOn("Gel !")) { g.fillStyle = "rgba(150,210,255,.55)"; g.beginPath(); g.arc(0, 0, 14, 0, 7); g.fill(); }
+      if (s.flash > 0) { g.globalAlpha = .7; g.fillStyle = "#fff"; g.beginPath(); g.arc(-4, 0, 8, 0, 7); g.fill(); g.beginPath(); g.arc(6, 0, 5, 0, 7); g.fill(); }
+      g.globalAlpha = 1; g.fillStyle = s.phase === "aim" && Math.sin(st.t / 40) > 0 ? "#fff" : "#e33"; g.fillRect(8, -3, 2, 2); g.fillRect(8, 1, 2, 2); g.restore();
+      if (s.maxhp > 1 || s.hp < s.maxhp) { const bw = 22, f = Math.max(0, s.hp) / s.maxhp;
+        g.fillStyle = "rgba(0,0,0,.45)"; g.fillRect(s.x - bw / 2 - 1, s.y - 21, bw + 2, 5);
+        g.fillStyle = f > .5 ? "#7ed957" : f > .25 ? "#f2c230" : "#ff5a3c"; g.fillRect(s.x - bw / 2, s.y - 20, bw * f, 3); } }
+    for (const p of st.shots || []) { g.fillStyle = "#9be15d"; g.strokeStyle = "rgba(40,80,10,.6)"; g.lineWidth = 1.5;
+      g.beginPath(); g.arc(p.x, p.y, 4, 0, 7); g.fill(); g.stroke(); }
+    const a = st.ant; if (st.inv > 0 && Math.sin(st.t / 45) > 0) g.globalAlpha = .35; g.save(); g.translate(a.x, a.y); g.rotate(a.a); g.strokeStyle = "#5a1d0e"; g.lineWidth = 1.5;
+    for (const sd of [-1, 1]) for (const ox of [-4, 0, 4]) { g.beginPath(); g.moveTo(ox, 0); g.lineTo(ox + Math.sin(st.t / 50 + ox) * 2, sd * 9); g.stroke(); }
+    g.fillStyle = "#7a2a12"; for (const [x, r] of [[-8, 5], [0, 3.5], [7, 4]]) { g.beginPath(); g.arc(x, 0, r, 0, 7); g.fill(); }
+    g.beginPath(); g.moveTo(10, -2); g.lineTo(15, -6); g.moveTo(10, 2); g.lineTo(15, 6); g.stroke(); g.restore(); g.globalAlpha = 1;
+    if (mode === "souris" && target && state === "play") { g.strokeStyle = "rgba(255,248,232,.7)"; g.lineWidth = 2;
+      g.beginPath(); g.arc(target.x, target.y, 7, 0, 7); g.moveTo(target.x - 11, target.y); g.lineTo(target.x - 4, target.y);
+      g.moveTo(target.x + 4, target.y); g.lineTo(target.x + 11, target.y); g.moveTo(target.x, target.y - 11); g.lineTo(target.x, target.y - 4);
+      g.moveTo(target.x, target.y + 4); g.lineTo(target.x, target.y + 11); g.stroke(); g.lineWidth = 1; }
+    if (st.shield) { g.strokeStyle = "rgba(127,208,255,.9)"; g.lineWidth = 3; g.beginPath(); g.arc(a.x, a.y, 20 + Math.sin(st.t / 120) * 2, 0, 7); g.stroke(); g.lineWidth = 1; }
+    if (st.ev && evOn("Nuit noire")) { const gr = g.createRadialGradient(a.x, a.y, 40, a.x, a.y, 130);
+      gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(1, "rgba(0,0,0,.94)"); g.fillStyle = gr; g.fillRect(-10, -10, W + 20, H + 20); }
+    if (st.ev && evOn("Frénésie !")) { g.strokeStyle = "rgba(255,155,61,.6)"; g.lineWidth = 6; g.strokeRect(3, 3, W - 6, H - 6); g.lineWidth = 1; }
+    for (const f of st.fx || []) { g.globalAlpha = Math.min(1, f.t / 300); g.fillStyle = f.col;
+      if (f.p) { g.fillRect(f.x - 1.5, f.y - 1.5, 3, 3); }
+      else { g.font = `bold ${f.big ? 22 : 15}px 'Baloo 2', system-ui`; g.textAlign = "center"; g.strokeStyle = "rgba(0,0,0,.5)"; g.lineWidth = 3; g.strokeText(f.txt, f.x, f.y); g.fillText(f.txt, f.x, f.y); } }
+    g.globalAlpha = 1;
+    if (st.combo >= 5) { const m = 1 + Math.floor(st.combo / 5); g.textAlign = "right"; g.font = `bold ${22 + m * 2}px 'Baloo 2', system-ui`;
+      g.fillStyle = "#ff9b3d"; g.strokeStyle = "rgba(0,0,0,.5)"; g.lineWidth = 4; g.strokeText(`COMBO x${m}`, W - 14, 34); g.fillText(`COMBO x${m}`, W - 14, 34);
+      g.fillStyle = "rgba(0,0,0,.25)"; g.fillRect(W - 140, 42, 126, 5); g.fillStyle = "#ff9b3d"; g.fillRect(W - 140, 42, 126 * Math.max(0, st.comboT) / (st.up?.comboT || 1400), 5); }
+    g.textAlign = "left"; g.font = "bold 24px 'Baloo 2', system-ui"; g.fillStyle = "#fff"; g.strokeStyle = "rgba(0,0,0,.5)"; g.lineWidth = 4;
+    g.strokeText(st.score, 14, 34); g.fillText(st.score, 14, 34);
+    if (st.up) { // vies, barre de progression vers la prochaine amélioration, bonus pris
+      g.font = "16px system-ui"; g.textAlign = "left"; g.fillText("❤️".repeat(Math.min(st.lives, 8)), 14, 58);
+      const f = Math.min(1, (st.score - st.prevUp) / (st.nextUp - st.prevUp));
+      g.fillStyle = "rgba(0,0,0,.3)"; g.fillRect(W / 2 - 90, 10, 180, 7); g.fillStyle = "#ffd84a"; g.fillRect(W / 2 - 90, 10, 180 * f, 7);
+      g.font = "bold 11px 'Baloo 2', system-ui"; g.textAlign = "center"; g.fillStyle = "#fff"; g.fillText(`Amélioration ${st.upLvl + 1}`, W / 2, 30);
+      if (st.taken.length) { g.font = "13px system-ui"; g.textAlign = "left"; g.fillText(st.taken.join(""), 14, H - 14 - (mode !== "souris" ? 0 : 0)); } }
+    if (st.ev && st.ev.banner > 0) { const al = Math.min(1, st.ev.banner / 400, (2200 - st.ev.banner) / 200); g.globalAlpha = al; g.textAlign = "center";
+      g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, H / 2 - 48, W, 76); g.fillStyle = "#ffd84a"; g.font = "bold 34px 'Baloo 2', system-ui"; g.fillText(st.ev.name, W / 2, H / 2 - 8);
+      g.fillStyle = "#fff"; g.font = "16px 'Baloo 2', system-ui"; g.fillText(st.ev.sub, W / 2, H / 2 + 18); g.globalAlpha = 1; }
+    g.restore();
+  }
+  function over() {
+    draw(); state = "over"; $("#pz").hidden = true; stage.classList.remove("playing");
+    result = { score: st.score, duration: Math.round(st.t) };
+    const rec = st.score > best; if (rec) { best = st.score; try { localStorage.setItem("best", best); } catch {} pbText(); }
+    $("#fscore").textContent = fmt(st.score);
+    $("#frec").textContent = (rec && st.score > 0 ? "Nouveau record !" : best ? `Record : ${fmt(best)}` : "") + ` · ${st.kills} araignée${st.kills > 1 ? "s" : ""} vaincue${st.kills > 1 ? "s" : ""}`;
+    $("#send").hidden = st.score <= 0; $("#msg").textContent = ""; show("ov-over");
+    if (st.score > 0 && !$("#ps").value) $("#ps").focus();
+  }
+  function intro() { st = { ant: { x: W / 2, y: H / 2, a: 0 }, crumbs: [crumb(), crumb(true), crumb()], spiders: [], score: 0, t: 0 };
+    st.spiders = [spider()]; draw(); }
+  intro();
+  const pos = e => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
+  cv.onpointermove = cv.onpointerdown = e => { if (mode !== "souris") return; if (e.pointerType !== "mouse" || e.type === "pointermove") target = pos(e); };
+  // joystick tactile : on pose le doigt n'importe où dans le cercle et on glisse
+  const joy = $("#joy"), knob = joy.querySelector(".knob");
+  const joyMove = e => { const r = joy.getBoundingClientRect(), R = r.width / 2;
+    let x = e.clientX - r.left - R, y = e.clientY - r.top - R; const n = Math.hypot(x, y); if (n > R) { x *= R / n; y *= R / n; }
+    joyVec = { x: x / R, y: y / R }; knob.style.transform = `translate(${x}px, ${y}px)`; };
+  joy.onpointerdown = e => { joy.setPointerCapture(e.pointerId); joy.classList.add("on"); joyMove(e); if (state !== "play") start(); };
+  joy.onpointermove = e => { if (joy.hasPointerCapture(e.pointerId)) joyMove(e); };
+  joy.onpointerup = joy.onpointercancel = () => { joyVec = { x: 0, y: 0 }; knob.style.transform = ""; joy.classList.remove("on"); };
+  // affichage des flèches pressées (mode clavier)
+  const KMAP = { ArrowUp: "up", z: "up", w: "up", ArrowDown: "down", s: "down", ArrowLeft: "left", q: "left", a: "left", ArrowRight: "right", d: "right" };
+  const keyHud = () => ["up", "down", "left", "right"].forEach(k => $("#keyhud").querySelector(`[data-k=${k}]`)
+    .classList.toggle("on", Object.entries(KMAP).some(([key, v]) => v === k && keys[key])));
+  const typing = () => document.activeElement?.tagName === "INPUT";
+  const kd = e => {
+    if (typing()) { if (e.key === "Enter" && e.type === "keydown") $("#ok").click(); return; }
+    const down = e.type === "keydown";
+    if (/^Arrow| /.test(e.key) && (state !== "intro" || e.key === " ")) e.preventDefault();
+    if (down && st?.choosing) { if (/^[123]$/.test(e.key)) chooseUpgrade(+e.key - 1); if (e.key === " ") e.preventDefault(); return; }
+    if (down && !e.repeat) {
+      if (e.key === " " || e.key === "Enter") { if (state === "play") pause(!paused); else start(); }
+      if (e.key === "p" || e.key === "P" || e.key === "Escape") pause(!paused);
+      if (e.key === "f" || e.key === "F") toggleFs();
+    }
+    keys[e.key] = down; keyHud(); };
+  const toggleFs = () => document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen?.().catch(() => {});
+  $("#fs").onclick = toggleFs; $("#pz").onclick = () => pause(true); $("#resume").onclick = () => pause(false);
+  $("#again").onclick = start;
+  $("#ups").onclick = e => { const b = e.target.closest("button"); if (b) chooseUpgrade(+b.dataset.i); };
+  const vis = () => { if (document.hidden) pause(true); }; document.addEventListener("visibilitychange", vis);
+  const blur = () => pause(true); addEventListener("blur", blur);
+  addEventListener("keydown", kd); addEventListener("keyup", kd);
+  $("#go").onclick = start;
+  $("#ok").onclick = async () => {
+    const pseudo = $("#ps").value.trim(); if (pseudo.length < 2) { $("#msg").textContent = "Pseudo trop court."; return; }
+    try { localStorage.setItem("pseudo", pseudo); } catch {}
+    $("#ok").disabled = true;
+    try { const r = await fetch("/api/scores", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pseudo, ...result }) });
+      const d = await r.json(); if (!r.ok) throw new Error(d.error); lb(d); $("#send").hidden = true;
+      const rank = (d.week || []).findIndex(s => s.pseudo === pseudo) + 1;
+      $("#msg").textContent = rank ? `Score enregistré : ${rank}ᵉ cette semaine !` : "Score enregistré !"; }
+    catch (e) { $("#msg").textContent = "Erreur : " + e.message; } finally { $("#ok").disabled = false; }
+  };
+  stopGame = () => { cancelAnimationFrame(raf); removeEventListener("keydown", kd); removeEventListener("keyup", kd);
+    document.removeEventListener("visibilitychange", vis); removeEventListener("blur", blur); if (document.fullscreenElement) document.exitFullscreen(); };
+}
+
+// ---------- Carte interactive ----------
+let stopMap = null;
+const MAP_COLORS = ["#e0703a", "#4f9d69", "#3f7fbf", "#c9a227", "#a35bb5", "#d64f6b", "#2fa3a3", "#8a6d3b", "#6b8e23", "#e58fb0"];
+function worldMap(box, players, opts = {}) {
+  box.innerHTML = `<canvas></canvas><div class="maptip" hidden></div>
+    <div class="mapctl"><button data-z="1" title="Zoomer">+</button><button data-z="-1" title="Dézoomer">−</button><button data-z="0" title="Recentrer">⟲</button></div>`;
+  const cv = box.querySelector("canvas"), g = cv.getContext("2d"), tip = box.querySelector(".maptip");
+  // regroupe les joueurs par case
+  const cells = new Map(); for (const p of players) { const k = p.x + "," + p.y; (cells.get(k) || cells.set(k, []).get(k)).push(p); }
+  const xs = players.map(p => p.x), ys = players.map(p => p.y);
+  const minX = Math.min(...xs) - 1, maxX = Math.max(...xs) + 1, minY = Math.min(...ys) - 1, maxY = Math.max(...ys) + 1;
+  // couleurs : top 10 alliances par TDC (ou l'alliance ciblée)
+  const tdc = {}; for (const p of players) if (p.alliance) tdc[p.alliance] = (tdc[p.alliance] || 0) + p.field;
+  const top = Object.entries(tdc).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+  const color = {}; top.forEach((t, i) => color[t] = MAP_COLORS[i]);
+  let hl = opts.focus || opts.highlight || null;
+  // une alliance hors du top 10 n'a pas de couleur : on lui en donne une vive quand elle est mise en avant
+  const ensureColor = t => { if (t && !color[t]) color[t] = "#ff7a2e"; };
+  ensureColor(hl);
+  const maxF = Math.max(1, ...players.map(p => p.field));
+  let view = null, W = 0, H = 0, dpr = 1, hover = null, mark = opts.mark || null, picks = new Set(opts.picks || []);
+  // mis en avant : membres de l'alliance choisie et joueurs ajoutés un par un (couleur à part, pseudo affiché)
+  const sel = p => (hl && p.alliance === hl) || picks.has(p.id), on = () => hl || picks.size;
+  function fit() { const r = box.getBoundingClientRect(); W = r.width; H = r.height; dpr = devicePixelRatio || 1;
+    cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + "px"; cv.style.height = H + "px";
+    if (!view) reset(); draw(); }
+  function reset() { let x0 = minX, x1 = maxX, y0 = minY, y1 = maxY;
+    // sur une alliance : cadrer sur ses membres (avec une marge)
+    const fp = opts.focus ? players.filter(p => p.alliance === opts.focus) : [];
+    if (fp.length) { x0 = Math.min(...fp.map(p => p.x)) - 3; x1 = Math.max(...fp.map(p => p.x)) + 3; y0 = Math.min(...fp.map(p => p.y)) - 3; y1 = Math.max(...fp.map(p => p.y)) + 3; }
+    const s = Math.min(W / Math.max(6, x1 - x0), H / Math.max(6, y1 - y0));
+    view = { s, ox: W / 2 - (x0 + x1) / 2 * s, oy: H / 2 - (y0 + y1) / 2 * s }; }
+  const sx = x => x * view.s + view.ox, sy = y => y * view.s + view.oy;
+  const col = p => !p.alliance ? css("--muted") : (color[p.alliance] || css("--muted"));
+  function draw() {
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    // quadrillage
+    const step = view.s < 6 ? 10 : view.s < 25 ? 5 : 1;
+    g.strokeStyle = css("--line"); g.lineWidth = 1; g.fillStyle = css("--muted"); g.font = "11px system-ui";
+    for (let x = Math.ceil(minX / step) * step; x <= maxX; x += step) { g.globalAlpha = x % 10 ? .35 : .8; g.beginPath(); g.moveTo(sx(x), sy(minY)); g.lineTo(sx(x), sy(maxY)); g.stroke(); }
+    for (let y = Math.ceil(minY / step) * step; y <= maxY; y += step) { g.globalAlpha = y % 10 ? .35 : .8; g.beginPath(); g.moveTo(sx(minX), sy(y)); g.lineTo(sx(maxX), sy(y)); g.stroke(); }
+    g.globalAlpha = 1;
+    for (let x = Math.ceil(minX / 10) * 10; x <= maxX; x += 10) g.fillText(x, sx(x) + 3, Math.max(12, sy(minY) + 12));
+    for (let y = Math.ceil(minY / 10) * 10; y <= maxY; y += 10) if (y) g.fillText(y, Math.max(3, sx(minX) + 3), sy(y) - 3);
+    // joueurs : un rond par case, taille selon le TDC total de la case ; découpé en parts par alliance
+    const rmax = Math.max(3, Math.min(view.s * .48, 22));
+    const order = [...cells.entries()].sort((a, b) => (on() ? a[1].some(sel) - b[1].some(sel) : 0));
+    for (const [k, ps] of order) {
+      const [x, y] = k.split(",").map(Number), cx = sx(x), cy = sy(y);
+      if (cx < -30 || cy < -30 || cx > W + 30 || cy > H + 30) continue;
+      const f = ps.reduce((s, p) => s + p.field, 0), r = Math.max(2.5, rmax * Math.sqrt(f / maxF) ** .8 + 1.5);
+      const dim = on() && !ps.some(sel);
+      g.globalAlpha = dim ? .18 : .92;
+      let a0 = -Math.PI / 2;
+      for (const p of ps) { const a1 = a0 + Math.PI * 2 / ps.length;
+        g.fillStyle = on() ? (picks.has(p.id) ? "#3ec7e8" : p.alliance === hl && hl ? "#ff7a2e" : css("--muted")) : col(p); g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, r, a0, a1); g.fill(); a0 = a1; }
+      if (on() && !dim) { g.globalAlpha = 1; g.strokeStyle = "#fff8e8"; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, r + 1.5, 0, 7); g.stroke(); }
+      if (ps.length > 1 && view.s > 14 && !dim) { g.globalAlpha = 1; g.fillStyle = "#fff"; g.font = "bold 10px system-ui"; g.textAlign = "center"; g.fillText(ps.length, cx, cy + 3.5); g.textAlign = "left"; }
+      if (hover === k) { g.globalAlpha = 1; g.strokeStyle = css("--ink"); g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, r + 3, 0, 7); g.stroke(); }
+    }
+    g.globalAlpha = 1;
+    // alliance sélectionnée : pseudos de ses membres, placés sans chevauchement.
+    // Pour chaque point (du plus gros TDC au plus petit), on essaie des positions autour de lui ;
+    // si l'étiquette doit s'éloigner, un trait la relie à son point. Faute de place, elle est masquée (zoomer).
+    if (on()) { g.font = "700 12px Nunito, system-ui"; g.textBaseline = "middle"; g.lineJoin = "round";
+      const rr = Math.max(6, Math.min(view.s * .48, 22) * .6), placed = [], todo = [];
+      for (const [k, ps] of cells) { const mem = ps.filter(sel); if (!mem.length) continue;
+        const [x, y] = k.split(",").map(Number), cx = sx(x), cy = sy(y);
+        if (cx < -60 || cy < -20 || cx > W + 60 || cy > H + 20) continue;
+        mem.sort((a, b) => b.field - a.field);
+        todo.push({ cx, cy, f: mem.reduce((s, p) => s + p.field, 0), txt: mem.length > 2 ? `${mem[0].pseudo} +${mem.length - 1}` : mem.map(p => p.pseudo).join(", ") }); }
+      todo.sort((a, b) => b.f - a.f);
+      // les points eux-mêmes sont des obstacles pour les étiquettes
+      const dots = todo.map(t => ({ x: t.cx - rr, y: t.cy - rr, w: rr * 2, h: rr * 2 }));
+      const hit = (b, list) => list.some(o => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y);
+      const DIRS = [[1, 0], [-1, 0], [0, -1], [0, 1], [1, -1], [1, 1], [-1, -1], [-1, 1]];
+      let hidden = 0;
+      for (const t of todo) {
+        const w = g.measureText(t.txt).width + 4, hgt = 14; let spot = null;
+        for (const d of [0, 16, 32, 50]) { for (const [dx, dy] of DIRS) {
+          const ax = t.cx + dx * (rr + 3 + d), ay = t.cy + dy * (rr + 2 + d * .7);
+          const bx = dx > 0 ? ax : dx < 0 ? ax - w : ax - w / 2, by = dy > 0 ? ay : dy < 0 ? ay - hgt : ay - hgt / 2;
+          const box = { x: bx, y: by, w, h: hgt };
+          if (bx < 0 || by < 0 || bx + w > W || by + hgt > H) continue;
+          if (!hit(box, placed) && !hit(box, dots.filter(o => Math.abs(o.x + rr - t.cx) > .5 || Math.abs(o.y + rr - t.cy) > .5))) { spot = { box, far: d > 0 }; break; } }
+          if (spot) break; }
+        if (!spot) { hidden++; continue; }
+        placed.push(spot.box); const b = spot.box;
+        if (spot.far) { // trait de rappel vers le point
+          const lx = Math.max(b.x, Math.min(t.cx, b.x + b.w)), ly = Math.max(b.y, Math.min(t.cy, b.y + b.h));
+          g.strokeStyle = "rgba(255,248,232,.55)"; g.lineWidth = 1; g.beginPath(); g.moveTo(t.cx, t.cy); g.lineTo(lx, ly); g.stroke(); }
+        g.strokeStyle = "rgba(20,12,6,.85)"; g.lineWidth = 3; g.textAlign = "left";
+        g.strokeText(t.txt, b.x + 2, b.y + hgt / 2); g.fillStyle = "#fff8e8"; g.fillText(t.txt, b.x + 2, b.y + hgt / 2); }
+      g.textBaseline = "alphabetic";
+      if (hidden) { g.font = "600 11px Nunito, system-ui"; g.fillStyle = css("--muted"); g.textAlign = "left";
+        g.fillText(`${hidden} pseudo${hidden > 1 ? "s" : ""} masqué${hidden > 1 ? "s" : ""} faute de place — zoomer pour les voir`, 10, H - 10); } }
+    if (mark) { const cx = sx(mark.x), cy = sy(mark.y); g.strokeStyle = css("--acc"); g.lineWidth = 3;
+      g.beginPath(); g.arc(cx, cy, Math.max(10, rmax + 6), 0, 7); g.stroke(); }
+  }
+  const at = (mx, my) => { const x = Math.round((mx - view.ox) / view.s), y = Math.round((my - view.oy) / view.s), k = x + "," + y;
+    if (!cells.has(k)) return null; const d = Math.hypot(sx(x) - mx, sy(y) - my); return d < Math.max(8, view.s * .55) ? k : null; };
+  function zoomAt(f, mx = W / 2, my = H / 2) { const ns = Math.max(2, Math.min(120, view.s * f)); const k = ns / view.s;
+    view.ox = mx - (mx - view.ox) * k; view.oy = my - (my - view.oy) * k; view.s = ns; draw(); }
+  // interactions : molette, glisser, pincer, survol, clic
+  const ptrs = new Map(); let drag = null, moved = false, pinch = null;
+  const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener("wheel", e => { e.preventDefault(); const [mx, my] = pos(e); zoomAt(Math.exp(-e.deltaY * .0015), mx, my); }, { passive: false });
+  cv.onpointerdown = e => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, pos(e)); moved = false;
+    if (ptrs.size === 1) drag = { p: pos(e), ox: view.ox, oy: view.oy };
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), s: view.s }; drag = null; } };
+  cv.onpointermove = e => { const p = pos(e);
+    if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, p);
+    if (pinch && ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      zoomAt(pinch.s * d / pinch.d / view.s, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); moved = true; return; }
+    if (drag) { const dx = p[0] - drag.p[0], dy = p[1] - drag.p[1]; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+      if (moved) { view.ox = drag.ox + dx; view.oy = drag.oy + dy; tip.hidden = true; draw(); return; } }
+    const k = at(...p); if (k !== hover) { hover = k; draw(); }
+    if (k) { const ps = cells.get(k).slice().sort((a, b) => b.field - a.field);
+      tip.innerHTML = `<b>${k.replace(",", " , ")}</b>` + ps.slice(0, 8).map(q => `<div><i style="background:${col(q)}"></i>${esc(q.pseudo)} ${q.alliance ? `<span class="tag">${esc(q.alliance)}</span>` : ""} <span class="muted">${fmt(q.field)}</span></div>`).join("") + (ps.length > 8 ? `<div class="muted">+ ${ps.length - 8} autres</div>` : "");
+      tip.hidden = false; const r = box.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+      tip.style.left = Math.min(r.width - tw - 6, p[0] + 14) + "px"; tip.style.top = (p[1] + th + 20 > r.height ? p[1] - th - 10 : p[1] + 14) + "px";
+    } else tip.hidden = true; cv.style.cursor = k ? "pointer" : drag ? "grabbing" : "grab"; };
+  const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null;
+    if (drag && !moved && e.type === "pointerup") { const k = at(...pos(e)); if (k) { const ps = cells.get(k);
+      if (ps.length === 1) go("/j/" + ps[0].id); else if (e.pointerType !== "mouse") { hover = k; draw(); } else go("/j/" + ps.sort((a, b) => b.field - a.field)[0].id); } }
+    if (!ptrs.size) drag = null; };
+  cv.onpointerup = cv.onpointercancel = up; cv.onpointerleave = () => { if (!drag) { hover = null; tip.hidden = true; draw(); } };
+  box.querySelector(".mapctl").onclick = e => { const z = e.target.dataset.z; if (z == null) return; if (z === "0") { reset(); draw(); } else zoomAt(z > 0 ? 1.5 : 1 / 1.5); };
+  const ro = new ResizeObserver(() => fit()); ro.observe(box);
+  return { colors: color, top, setHighlight: t => { hl = t; ensureColor(t); draw(); }, setPicks: ids => { picks = new Set(ids); draw(); },
+    goTo: p => { mark = p; view.s = Math.max(view.s, 30); view.ox = W / 2 - p.x * view.s; view.oy = H / 2 - p.y * view.s; draw(); },
+    destroy: () => ro.disconnect() };
+}
+
+async function carte(focus, avant) {
+  const d = avant ? await fetch("/map-avant.json").then(r => r.json()) : await get("/api/map");
+  app.innerHTML = `<h2>${avant ? "Carte d'avant la relocalisation" : "Carte du serveur " + SRV} <span class="muted">· ${fmt(d.total || d.players.length)} joueurs · ${vdate(d.latest)}</span></h2>
+  ${!avant && d.total > d.players.length ? `<p class="note">Serveur très peuplé : la carte montre les ${fmt(d.players.length)} plus gros terrains de chasse sur ${fmt(d.total)} joueurs (plus tous les membres de l'alliance filtrée).</p>` : ""}
+  ${avant ? `<p class="note">Positions du relevé du ${vdate(d.latest)}, le dernier avant la relocalisation des joueurs. <a href="/s5/carte">Voir la carte actuelle</a></p>` : ""}
+  <div class="mapbar"><input type="search" id="mq" placeholder="Ajouter un joueur…">
+    <select id="ma"><option value="">Toutes les alliances</option></select><div class="chips" id="mchips"></div></div>
+  <div class="card"><div class="map big" id="wmap"></div><div class="legend" id="leg"></div>
+  <p class="note">Molette ou pincement pour zoomer, glisser pour se déplacer, clic sur un point pour ouvrir la fiche du joueur. La taille d'un point dépend du terrain de chasse.</p></div>`;
+  const m = worldMap($("#wmap"), d.players, { highlight: focus || null });
+  stopMap = () => m.destroy();
+  const tags = [...new Set(d.players.map(p => p.alliance).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  $("#ma").innerHTML += tags.map(t => `<option ${t === focus ? "selected" : ""}>${esc(t)}</option>`).join("");
+  $("#leg").innerHTML = m.top.map(t => `<button data-t="${esc(t)}"><i style="background:${m.colors[t]}"></i>${esc(t)}</button>`).join("") +
+    `<span><i style="background:var(--muted)"></i>autres / sans alliance</span>`;
+  const setA = t => { $("#ma").value = t || ""; m.setHighlight(t || null); history.replaceState(null, "", avant ? "/map-avant" + (t ? "#/carte/" + encodeURIComponent(t) : "") : toPath(t ? "/carte/" + encodeURIComponent(t) : "/carte")); };
+  $("#ma").onchange = e => setA(e.target.value);
+  $("#leg").onclick = e => { const b = e.target.closest("button"); if (b) setA($("#ma").value === b.dataset.t ? "" : b.dataset.t); };
+  // joueurs ajoutés : autant qu'on veut, chacun en couleur avec son pseudo sur la carte
+  const picked = [], byPid = new Map(d.players.map(p => [p.id, p]));
+  const chips = () => { $("#mchips").innerHTML = picked.map(p => `<span class="chip">${esc(p.pseudo)}<button data-id="${p.id}" title="Retirer">✕</button></span>`).join(""); m.setPicks(picked.map(p => p.id)); };
+  autocomplete($("#mq"), d.players.map(p => ({ id: p.id, label: p.pseudo, sub: p.alliance || "" })), it => {
+    const p = byPid.get(it.id); if (!p) return; if (!picked.includes(p)) picked.push(p); chips(); m.goTo(p); });
+  $("#mchips").onclick = e => { const b = e.target.closest("button"); if (!b) return; const i = picked.findIndex(p => p.id === +b.dataset.id); if (i >= 0) picked.splice(i, 1); chips(); };
+}
+
+// ---------- Autocomplétion ----------
+// Filtre une liste déjà chargée côté navigateur : aucune requête pendant la frappe.
+function autocomplete(input, items, onPick) {
+  const box = document.createElement("div"); box.className = "ac"; box.hidden = true; input.after(box);
+  input.parentElement.style.position = "relative"; input.setAttribute("autocomplete", "off");
+  let list = [], sel = 0;
+  const norm = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const render = () => { box.innerHTML = list.map((it, i) => `<div class="${i === sel ? "on" : ""}" data-i="${i}">${esc(it.label)}${it.sub ? ` <span class="muted">${esc(it.sub)}</span>` : ""}</div>`).join(""); box.hidden = !list.length; };
+  let timer, seq = 0;
+  input.addEventListener("input", () => { const raw = input.value.trim(), q = norm(raw); sel = 0;
+    if (!q) { list = []; return render(); }
+    if (typeof items === "function") { // recherche distante, 250 ms après la dernière frappe, à partir de 2 lettres
+      clearTimeout(timer); if (raw.length < 2) { list = []; return render(); }
+      const my = ++seq; timer = setTimeout(async () => { try { const r = await items(raw); if (my === seq) { list = r.slice(0, 8); render(); } } catch {} }, 250); return; }
+    const starts = [], has = [];
+    for (const it of items) { const n = it.n ??= norm(it.label); if (n.startsWith(q)) starts.push(it); else if (n.includes(q)) has.push(it); if (starts.length >= 8) break; }
+    list = [...starts, ...has].slice(0, 8); render(); });
+  const pick = i => { const it = list[i]; if (!it) return; input.value = ""; list = []; render(); onPick(it); };
+  input.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown") { sel = Math.min(list.length - 1, sel + 1); render(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { sel = Math.max(0, sel - 1); render(); e.preventDefault(); }
+    else if (e.key === "Enter") { pick(sel); e.preventDefault(); }
+    else if (e.key === "Escape") { list = []; render(); } });
+  box.addEventListener("mousedown", e => { const d = e.target.closest("[data-i]"); if (d) { e.preventDefault(); pick(+d.dataset.i); } });
+  input.addEventListener("blur", () => setTimeout(() => { list = []; render(); }, 100));
+}
+
+// étiquette « flood » d'un mouvement de TDC : cands = 1 -> probable (appariement unique), sinon possible
+const floodTag = (cands, who, id) => cands == null ? "" :
+  ` <span class="tag flood ${cands === 1 ? "sure" : ""}" title="Flood ${cands === 1 ? "probable" : "possible"} : un autre joueur a ${cands === 1 ? "" : "peut-être "}fait exactement le mouvement inverse dans le même relevé">⇄ flood${cands === 1 ? "" : " ?"}${who ? " · " + (id ? pLink(id, who) : esc(who)) : ""}</span>`;
+
+// ---------- Mouvements de TDC ----------
+async function tdc(qs) {
+  let tag = qs.get("a") || "", ids = (qs.get("p") || "").split(",").map(Number).filter(n => n > 0).slice(0, 10);
+  const [al, nm] = await Promise.all([get("/api/alliances"), ids.length ? get("/api/names?p=" + ids.join(",")) : { players: [] }]);
+  const byId = new Map(nm.players.map(p => [p.id, [p.id, p.pseudo, p.alliance]]));
+  ids = ids.filter(i => byId.has(i));
+  const tags = al.alliances.map(a => a.tag).sort((a, b) => a.localeCompare(b));
+  app.innerHTML = `<h2>Mouvements de TDC</h2>
+  <div class="card filters">
+    <label>Alliance <select id="fa"><option value="">Toutes</option>${tags.map(t => `<option ${t === tag ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+    <label>Joueurs <input type="search" id="fp" placeholder="Ajouter un joueur…"></label>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div class="grid2 tdc2">
+    <div class="card tbl"><h3 class="up">▲ Hausses de TDC</h3><table><thead><tr><th>Relevé</th><th>Joueur</th><th class="n">Avant → après</th><th class="n">Écart</th></tr></thead><tbody id="tb-pos"></tbody></table><button class="more" data-k="pos">Charger plus</button></div>
+    <div class="card tbl"><h3 class="down">▼ Baisses de TDC</h3><table><thead><tr><th>Relevé</th><th>Joueur</th><th class="n">Avant → après</th><th class="n">Écart</th></tr></thead><tbody id="tb-neg"></tbody></table><button class="more" data-k="neg">Charger plus</button></div>
+  </div>
+  <div class="card tbl tdcfl"><h3 class="acc">⇄ Floods possibles</h3><p class="note" style="margin:0 0 6px">Un joueur gagne exactement ce qu'un autre perd dans le même relevé. <b>Probable</b> : appariement unique ; <b>possible</b> : 2 ou 3 candidats.</p>
+    <table><thead><tr><th>Relevé</th><th>Gagnant ⇄ perdant</th><th class="n">Montant</th></tr></thead><tbody id="tb-fl"></tbody></table><button class="more" data-k="fl">Charger plus</button></div>`;
+  const STEP = 5; // lignes par tranche : rien n'est préchargé, chaque « Charger plus » demande la tranche suivante au serveur
+  const filt = () => { const p = new URLSearchParams(); if (tag) p.set("a", tag); if (ids.length) p.set("p", ids.join(",")); return p; };
+  const sync = () => { const p = filt(); history.replaceState(null, "", toPath("/tdc" + (p.size ? "?" + p : ""))); };
+  const chips = () => $("#chips").innerHTML = ids.map(id => `<span class="chip">${esc(byId.get(id)[1])}<button data-id="${id}" title="Retirer">✕</button></span>`).join("");
+  const rowMove = m => `<tr><td class="muted">${vdate(m.version)}</td>
+    <td>${pLink(m.id, m.pseudo ?? byId.get(m.id)?.[1] ?? "#" + m.id)}${m.alliance ? ` <span class="tag">${esc(m.alliance)}</span>` : ""}</td>
+    <td class="n muted">${fmt(m.before)} → ${fmt(m.after)}</td><td class="n">${delta(m.after, m.before)}</td></tr>`;
+  const rowFlood = f => `<tr><td class="muted">${vdate(f.version)}</td>
+    <td>${pLink(f.gid, f.gpseudo ?? "#" + f.gid)}${f.galliance ? ` <span class="tag">${esc(f.galliance)}</span>` : ""} ⇄ ${pLink(f.lid, f.lpseudo ?? "#" + f.lid)}${f.lalliance ? ` <span class="tag">${esc(f.lalliance)}</span>` : ""}
+      <span class="tag ${f.cands === 1 ? "down" : ""}">${f.cands === 1 ? "probable" : "possible"}</span></td>
+    <td class="n">${fmt(f.amount)}</td></tr>`;
+  const lists = { pos: { n: 0, cols: 4, empty: "Aucun mouvement" }, neg: { n: 0, cols: 4, empty: "Aucun mouvement" }, fl: { n: 0, cols: 3, empty: "Aucun flood détecté" } };
+  let gen = 0; // un changement de filtre annule les chargements en cours
+  async function more(k) {
+    const L = lists[k], tb = $("#tb-" + k), btn = app.querySelector(`button.more[data-k=${k}]`), my = gen;
+    btn.disabled = true; btn.textContent = "Chargement…";
+    const p = filt(); p.set("n", STEP); p.set("o", L.n); if (k !== "fl") p.set("s", k);
+    try {
+      const d = await get((k === "fl" ? "/api/floods?" : "/api/tdc?") + p); if (my !== gen) return;
+      const rows = k === "fl" ? d.floods : d.moves;
+      if (!L.n && !rows.length) tb.innerHTML = `<tr><td colspan="${L.cols}" class="muted">${L.empty}</td></tr>`;
+      else tb.insertAdjacentHTML("beforeend", rows.map(k === "fl" ? rowFlood : rowMove).join(""));
+      L.n += rows.length; btn.hidden = !d.more; linkify(tb);
+    } catch (e) { if (my === gen) tb.insertAdjacentHTML("beforeend", `<tr><td colspan="${L.cols}" class="down">Erreur : ${esc(e.message)}</td></tr>`); }
+    btn.disabled = false; btn.textContent = "Charger plus";
+  }
+  const reset = () => { gen++; sync(); chips(); for (const k of Object.keys(lists)) { lists[k].n = 0; $("#tb-" + k).innerHTML = ""; app.querySelector(`button.more[data-k=${k}]`).hidden = false; }
+    return Promise.all(Object.keys(lists).map(more)); };
+  $("#fa").onchange = e => { tag = e.target.value; reset(); };
+  autocomplete($("#fp"), searchPlayers, it => {
+    if (!ids.includes(it.id) && ids.length < 10) { byId.set(it.id, [it.id, it.label, it.alliance]); ids.push(it.id); reset(); } });
+  $("#chips").onclick = e => { const b = e.target.closest("button"); if (b) { ids = ids.filter(i => i !== +b.dataset.id); reset(); } };
+  app.querySelectorAll("button.more[data-k]").forEach(b => b.onclick = () => more(b.dataset.k));
+  await reset();
+}
+
+// ---------- Simulateur de chasse (moteur : public/chasse.js) ----------
+let chasseP = null;
+const loadChasse = () => chasseP ??= new Promise((ok, ko) => { const s = document.createElement("script"); s.src = "/chasse.js"; s.onload = ok; s.onerror = ko; document.head.append(s); });
+const dur = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + "h " : "") + (h || m ? m + "m " : "") + x + "s"; };
+// ---- RC au format du jeu (relevé sur le simulateur officiel) ----
+const UNIT_PL = ["Jeunes Soldates Naines", "Soldates Naines", "Naines d’Elites", "Jeunes Soldates", "Soldates", "Concierges", "Concierges d’élites",
+  "Artilleuses", "Artilleuses d’élites", "Soldates d’élites", "Tanks", "Tanks d’élites", "Tueuses", "Tueuses d’élites"];
+const UNIT_SG = ["Jeune Soldate Naine", "Soldate Naine", "Naine d’Elite", "Jeune Soldate", "Soldate", "Concierge", "Concierge d’élite",
+  "Artilleuse", "Artilleuse d’élite", "Soldate d’élite", "Tank", "Tank d’élite", "Tueuse", "Tueuse d’élite"];
+const PREY_PL = ["Petites araignées", "Araignées", "Chenilles", "Criquets", "Guèpes", "Cigales", "Abeilles", "Dionées", "Hannetons", "Scarabées",
+  "Mantes religieuses", "Lezards", "Souris", "Mulots", "Alouettes", "Rats", "Tamanoirs"];
+const PREY_SG = ["Petite araignée", "Araignée", "Chenille", "Criquet", "Guèpe", "Cigale", "Abeille", "Dionée", "Hanneton", "Scarabée",
+  "Mante religieuse", "Lezard", "Souris", "Mulot", "Alouette", "Rat", "Tamanoir"];
+const up = x => Math.ceil(x - 1e-6), nb = n => fmt(n).replace(/\u202f/g, " ");
+const rcList = (arr, sg, pl) => arr.map((n, i) => n ? `${nb(n)} ${n > 1 ? pl[i] : sg[i]}` : "").filter(Boolean).join(", ");
+// durée comme le jeu : heures et minutes tronquées, secondes arrondies (d'où parfois « 60s »)
+const rcDur = t => `${Math.floor(t / 3600)}H ${Math.floor(t % 3600 / 60)}m ${Math.round(t % 60)}s`;
+function rcHtml(C, s, prey, log, r) {
+  const L = [];
+  L.push(`Troupes en attaque : ${rcList(s.army, UNIT_SG, UNIT_PL)}. <br>Troupes en défense : ${rcList(prey, PREY_SG, PREY_PL)}. <br><br>`);
+  for (const l of log) {
+    L.push(`Vous infligez <strong>${nb(up(l.base))} (+ ${nb(up(l.bonus))})</strong> dégâts et tuez <strong>${nb(l.killedPrey)}</strong> ennemie${l.killedPrey > 1 ? "s" : ""}.<br>`);
+    L.push(`L’ennemie inflige <strong>${nb(up(l.dPrShown))} (+ 0)</strong> dégâts à vos fourmis et en tue <strong>${nb(l.killedUnits)}</strong>.<br>`);
+  }
+  L.push("<br>");
+  if (r.win) {
+    L.push(log.length === 1 ? "Belle victoire ! L’ennemi n’a même pas eu le temps d’organiser ses défenses efficacement !<br>"
+      : "L’adversaire y a cru, mais vous sortez victorieux de ce combat acharné.<br>");
+    L.push("<strong>Vous avez gagné cette bataille !</strong><br><br>");
+    const pr = r.promo.map((n, i) => n ? `- ${nb(n)} ${n > 1 ? UNIT_PL[i] : UNIT_SG[i]} ${n > 1 ? "sont devenues des" : "est devenue une"} <strong>${n > 1 ? UNIT_PL[C.PROMO_TO[i]] : UNIT_SG[C.PROMO_TO[i]]}</strong><br>` : "").join("");
+    if (pr) L.push("Les unités survivantes ont appris de cette bataille :<br>" + pr + "<br>");
+    L.push(`Vos chasseuses ont conquis <strong>${nb(s.amt)} cm²</strong>, les carcasses des prédateurs vous rapportent <strong>${nb(up(0.8 * C.difficulty(s.tdc, s.amt)))}</strong> 🍎<br>`);
+  } else {
+    const done = log.reduce((a, l) => a + l.dUs, 0) / Math.max(1, prey.reduce((a, n, i) => a + n * C.PREY[i].hp, 0));
+    L.push(done < .5 ? "Votre armée n’a fait qu’une égratignure à l’ennemi. Vous n’aviez aucune chance.<br>"
+      : "Vos troupes se sont battues avec courage, mais l’ennemi était trop nombreux.<br>");
+    L.push("<strong>Vos troupes ont échoué</strong><br><br> Vos chasseuses sont mortes, l'expédition a échoué.<br>");
+  }
+  return `<p><strong>Message que recevrait le chasseur:</strong></p><p>${L.join("")}</p><p>Temps nécessaire: ${rcDur((s.amt + Math.max(s.tdc, 50)) * Math.pow(0.9, s.vit))}</p>`;
+}
+
+async function simulateur() {
+  await loadChasse(); const C = window.Chasse;
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem("sim") || "{}"); } catch {}
+  const v = (k, d = 0) => saved[k] ?? d;
+  app.innerHTML = `<h2>Simulateur de chasse</h2>
+  <p class="note">Le même calcul que le simulateur de chasse du Compte +, ouvert à tous. Le moteur reprend les règles relevées sur le simulateur officiel (tirage des proies, combat, réplique, pertes, promotions) et tourne entièrement dans ton navigateur.</p>
+  <div class="simgrid">
+    <div class="card"><h3>Chasseurs <button class="mini" id="clr" title="Tout vider">vider</button></h3><div id="paste"></div>
+      <div class="simunits two">${C.UNITS.map((u, i) => `<label><input type="number" min="0" step="1" data-u="${i}" value="${v("u" + i)}"><span>${u.name}</span></label>`).join("")}</div></div>
+    <div class="card"><h3>Technologies</h3>
+      <div class="simunits">${[["bou", "Bouclier thoracique"], ["arm", "Armes"], ["vit", "Vitesse de chasse"], ["coch", "Étable à cochenilles"]].map(([k, l]) => `<label><input type="number" min="0" step="1" id="s-${k}" value="${v(k)}"><span>${l}</span></label>`).join("")}</div>
+      <h3 style="margin-top:16px">Terrain de chasse</h3>
+      <div class="simunits">
+        <label><input type="number" min="0" step="1" id="s-tdc" value="${v("tdc", 0)}"><span>TDC actuel (cm²)</span></label>
+        <label><input type="number" min="1" step="1" id="s-amt" value="${v("amt", 0)}"><span>Terrain à conquérir (cm²)</span></label>
+      </div>
+      <div class="simrow"><input type="search" id="s-ps" placeholder="Remplir le TDC actuel depuis un pseudo…"></div>
+      <div class="simrow"><select id="s-rule"><option value="real">Pertes : unité blessée à la moitié de ses PV ou plus = perdue</option><option value="sim">Pertes : comme le simulateur officiel (arrondi bas)</option></select></div>
+      <button class="btn big" id="fight" style="margin-top:14px;width:100%">Fight !</button>
+    </div>
+  </div>
+  <div id="simout"></div>
+  <p class="note" style="margin-top:20px">Règles reconstituées à partir d'environ 36 000 relevés du simulateur officiel (serveur de test). La règle des pertes « réelle » vient de joueurs et ne peut pas être vérifiée sur le simulateur. Comme le dit le jeu : les prédateurs restent imprévisibles, prévois une armée un peu plus grosse que celle simulée.</p>`;
+  $("#s-rule").value = v("rule", "real"); steppers(app);
+  pasteBox($("#paste"), [["Remplir les chasseurs", r => { r.army.forEach((x, i) => app.querySelector(`[data-u="${i}"]`).value = x);
+    save(); }]]);
+  autocomplete($("#s-ps"), searchPlayers, it => { $("#s-tdc").value = it.f; save(); });
+  const read = () => {
+    const army = C.UNITS.map((u, i) => Math.max(0, Math.floor(+app.querySelector(`[data-u="${i}"]`).value || 0)));
+    const n = id => Math.max(0, Math.floor(+$("#s-" + id).value || 0));
+    return { army, tech: { bou: n("bou"), arm: n("arm"), coch: n("coch") }, vit: n("vit"), tdc: n("tdc"), amt: n("amt"), rule: $("#s-rule").value };
+  };
+  const save = () => { const s = read(), o = { bou: s.tech.bou, arm: s.tech.arm, coch: s.tech.coch, vit: s.vit, tdc: s.tdc, amt: s.amt, rule: s.rule };
+    s.army.forEach((x, i) => o["u" + i] = x); try { localStorage.setItem("sim", JSON.stringify(o)); } catch {} };
+  app.querySelectorAll(".simgrid input, .simgrid select").forEach(e => e.addEventListener("change", save));
+  $("#clr").onclick = () => { app.querySelectorAll("[data-u]").forEach(e => e.value = 0); save(); };
+  let seed = Date.now() % 1e9;
+  function run(reroll) {
+    const s = read(); save(); C.setLossRule(s.rule);
+    const out = $("#simout");
+    if (!s.army.some(Boolean)) { out.innerHTML = `<div class="card"><p class="down">Ajoute au moins une unité.</p></div>`; return; }
+    if (s.amt < 1) { out.innerHTML = `<div class="card"><p class="down">Indique le terrain à conquérir.</p></div>`; return; }
+    if (reroll) seed++;
+    const att = C.armyAttack(s.army, s.tech), life = C.armyLife(s.army, s.tech), diff = C.difficulty(s.tdc, s.amt), d = C.huntDuration(s.tdc, s.amt, s.vit);
+    // une chasse tirée au hasard, avec le détail des tours
+    // le RC suit la règle du simulateur officiel (comme le C+) ; les statistiques suivent la règle choisie
+    C.setLossRule("sim"); const prey = C.genPrey(s.tdc, s.amt, C.mulberry32(seed)), log = [], r = C.fight(s.army, prey, s.tech, log); C.setLossRule(s.rule);
+    const preyLife = prey.reduce((a, n, i) => a + n * C.PREY[i].hp, 0), preyDmg = prey.reduce((a, n, i) => a + n * C.PREY[i].dmg, 0);
+    const st = C.stats(s.army, s.tdc, s.amt, s.tech, 1000, 777 + s.amt);
+    const sent = s.army.map((n, i) => [n, i]).filter(([n]) => n > 0);
+    const lostTot = r.lost.reduce((a, b) => a + b, 0), promoTot = r.promo.reduce((a, b) => a + b, 0);
+    const repTxt = x => x === 1 ? "100 %" : Math.round(x * 100) + " %";
+    out.innerHTML = `
+    <div class="kpis" style="margin-top:16px">
+      <div class="card kpi"><div class="l">Attaque / difficulté</div><div class="v">${(att / diff).toFixed(2)}</div><div class="muted">${fmt(Math.round(att))} / ${fmt(Math.round(diff))}</div></div>
+      <div class="card kpi"><div class="l">Victoire (1 000 chasses)</div><div class="v ${st.win >= .99 ? "up" : st.win < .9 ? "down" : ""}">${(st.win * 100).toFixed(1)} %</div><div class="muted">zéro perte : ${(st.zero * 100).toFixed(0)} %</div></div>
+      <div class="card kpi"><div class="l">Pertes moyennes</div><div class="v">${st.mean.toFixed(1)}</div><div class="muted">9 fois sur 10 ≤ ${st.p90} · max ${st.max}</div></div>
+      <div class="card kpi"><div class="l">Durée</div><div class="v">${dur(d)}</div><div class="muted">TDC après : ${fmt(s.tdc + s.amt)} cm²</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="ch"><h3>Rapport de combat</h3><span><button class="mini" id="reroll">Relancer le tirage</button><button class="mini" id="apply" ${r.win ? "" : "hidden"}>Reporter les survivantes</button></span></div>
+        <div class="rc">${rcHtml(C, s, prey, log, r)}</div></div>
+      <div class="card"><h3>Moyenne sur 1 000 chasses</h3>
+        <div class="tbl"><table><thead><tr><th>Unité</th><th class="n">Envoyées</th><th class="n">Pertes moy.</th><th class="n">Promotions moy.</th></tr></thead><tbody>
+        ${sent.map(([n, i]) => `<tr><td>${C.UNITS[i].name}</td><td class="n">${fmt(n)}</td><td class="n ${st.lost[i] ? "down" : ""}">${st.lost[i].toFixed(1)}</td><td class="n ${st.promo[i] ? "up" : ""}">${st.promo[i].toFixed(1)}</td></tr>`).join("")}
+        </tbody></table></div>
+        <ul class="ev" style="margin-top:12px">
+          <li>Vie de ton armée : ${fmt(Math.round(life))}</li>
+          <li>Difficulté de la chasse : ${fmt(Math.round(diff))} (facteur de terrain ×${C.huntFactor(s.tdc).toFixed(3)})</li>
+          <li>Pertes : ${st.min} au mieux, ${st.mean.toFixed(1)} en moyenne, ${st.p90} 9 fois sur 10, ${st.max} au pire</li>
+        </ul></div>
+    </div>`;
+    $("#reroll").onclick = () => run(true);
+    // comme le C+ : le formulaire reprend l'armée après la chasse (pertes retirées, promotions appliquées)
+    $("#apply").onclick = () => { const after = s.army.map((n, i) => n - r.lost[i] - r.promo[i]);
+      r.promo.forEach((n, i) => { if (n) after[C.PROMO_TO[i]] += n; });
+      after.forEach((n, i) => app.querySelector(`[data-u="${i}"]`).value = Math.max(0, n));
+      $("#s-tdc").value = s.tdc + s.amt; save(); scrollTo({ top: 0, behavior: "smooth" }); };
+  }
+  $("#fight").onclick = () => run(true);
+  app.querySelectorAll(".simgrid input").forEach(e => e.addEventListener("keydown", ev => { if (ev.key === "Enter" && e.id !== "s-ps") run(true); }));
+}
+
+// Champs numériques : flèches natives masquées, remplacées par des boutons − / + au style du site
+// (clic = ±1, Maj+clic = ±10, appui long = répétition)
+function steppers(root) {
+  root.querySelectorAll('input[type=number]:not([data-st])').forEach(inp => {
+    inp.dataset.st = 1; const w = document.createElement("span"); w.className = "num"; inp.before(w); w.append(inp);
+    const mk = (t, d) => { // <span> et non <button> : dans un <label>, un clic sur le champ serait renvoyé au premier bouton (le −)
+      const b = document.createElement("span"); b.className = "st"; b.textContent = t; b.setAttribute("role", "button"); b.setAttribute("aria-label", d < 0 ? "Diminuer" : "Augmenter");
+      const step = e => { const v = Math.max(+inp.min || 0, (Math.floor(+inp.value) || 0) + d * (e?.shiftKey ? 10 : 1)); inp.value = v; inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); };
+      let t1, t2; const stop = () => { clearTimeout(t1); clearInterval(t2); };
+      b.addEventListener("pointerdown", e => { e.preventDefault(); step(e); t1 = setTimeout(() => t2 = setInterval(() => step(e), 60), 400); });
+      ["pointerup", "pointerleave", "pointercancel"].forEach(ev => b.addEventListener(ev, stop)); return b; };
+    w.prepend(mk("−", -1)); w.append(mk("+", 1));
+  });
+}
+
+// ---------- Coller son armée (message de chasse, d'attaque ou page Armée du jeu) ----------
+// Renvoie { army: 14 effectifs (ordre des unités), amount (cm² à conquérir), lieu, n (unités trouvées) }
+const armyKey = s => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[’'`]/g, "")
+  .split(/\s+/).filter(Boolean).map(w => w.replace(/s$/, "")).join(" ");
+const ARMY_NAMES = UNIT_SG.map((n, i) => [armyKey(n), i]).sort((a, b) => b[0].length - a[0].length); // plus long d'abord (JSN avant JS)
+const toInt = s => +String(s).replace(/[^\d]/g, "") || 0;
+function parseArmy(text) {
+  const army = new Array(14).fill(0); let n = 0, amount = null, lieu = null;
+  const t = text.replace(/\u00a0|\u202f/g, " ");
+  const m = t.match(/conqu[ée]rir\s+([\d ]+)\s*cm/i); if (m) amount = toInt(m[1]);
+  const lm = t.match(/attaquer[^\n]*?\((loge[^)]*|d[oô]me[^)]*|fourmili[eè]re[^)]*|terrain[^)]*)\)\s*dans/i);
+  if (lm) lieu = /loge/i.test(lm[1]) ? "loge" : /terrain/i.test(lm[1]) ? "terrain" : "dome";
+  const find = s => { const k = armyKey(s); for (const [name, i] of ARMY_NAMES) if (k === name) return i; return -1; };
+  // 1) « Troupes en chasses / en attaques : 2 535 Jeunes Soldates Naines, 597 Soldates Naines, ... »
+  const tm = t.match(/Troupes en [^:]*:\s*([^\n.]+)/i);
+  if (tm) for (const part of tm[1].replace(/\.\s*$/, "").split(",")) {
+    const pm = part.trim().match(/^([\d ]+)\s+(.+)$/); if (!pm) continue;
+    const i = find(pm[2]); if (i >= 0) { army[i] += toInt(pm[1]); n++; } }
+  // 2) page Armée : une ligne par unité, ses effectifs (Terrain, Dôme, Loge) sur la ou les lignes suivantes ; on additionne
+  if (!n) { let cur = -1;
+    for (const raw of t.split(/\n/)) { const line = raw.trim(); if (!line) continue;
+      const i = find(line.replace(/\d[\d ]*/g, "").trim());
+      if (i >= 0) { cur = i; const nums = line.match(/\d[\d ]*/g); if (nums) { nums.forEach(x => army[i] += toInt(x)); n++; } continue; }
+      if (/^(vie|d[ée]g[aâ]t|consommation)/i.test(line)) { cur = -1; continue; }
+      if (cur >= 0) { const nums = line.split("\t").map(c => c.trim()).filter(c => /^\d[\d ]*$/.test(c)); if (nums.length) { nums.forEach(x => army[cur] += toInt(x)); n++; } } } }
+  return { army, amount, lieu, n };
+}
+// Zone « Coller mon armée » : targets = [[libellé, (résultat) => void], ...]
+function pasteBox(el, targets) {
+  el.innerHTML = `<details class="paste"><summary>📋 Coller mon armée</summary>
+    <textarea placeholder="Colle ici un message de chasse (« Troupes en chasses : … »), d'attaque (« Troupes en attaques : … ») ou ta page Armée"></textarea>
+    <div class="simrow">${targets.map(([l], i) => `<button class="mini" data-t="${i}">${l}</button>`).join("")}<span class="pmsg muted"></span></div></details>`;
+  el.querySelectorAll("[data-t]").forEach(b => b.onclick = () => {
+    const r = parseArmy(el.querySelector("textarea").value), msg = el.querySelector(".pmsg");
+    if (!r.n) { msg.textContent = "Aucune unité reconnue dans ce texte."; msg.className = "pmsg down"; return; }
+    targets[+b.dataset.t][1](r);
+    const tot = r.army.reduce((a, x) => a + x, 0);
+    msg.className = "pmsg up"; msg.textContent = `${fmt(tot)} unités importées` + (r.lieu ? ` · ${r.lieu === "loge" ? "Loge impériale" : r.lieu === "dome" ? "Dôme" : "terrain"}` : "");
+  });
+}
+
+// ---------- Outils ----------
+async function outils() {
+  app.innerHTML = `<h2>Outils</h2>
+  <div class="grid2 tools">
+    <a class="card tool" href="#/outils/chasse"><span>🏹</span><b>Simulateur de chasse</b><small>Le simulateur de chasse du Compte +, ouvert à tous : proies, pertes, promotions et rapport de combat au format du jeu.</small></a>
+    <a class="card tool" href="#/outils/rc"><span>🔍</span><b>Calculateur Dôme &amp; Loge</b><small>Colle un rapport de combat : retrouve les Armes et le Bouclier des deux camps, et les niveaux de Dôme ou de Loge du défenseur.</small></a>
+    <a class="card tool" href="#/outils/combat"><span>⚔️</span><b>Simulateur de combat</b><small>Attaque ou défense contre un autre joueur, sur le terrain, dans le Dôme ou la Loge impériale, avec le rapport de combat du jeu.</small></a>
+  </div>`;
+}
+
+// ---------- Simulateur de combat (moteur : public/combat.js) ----------
+let combatP = null;
+const loadCombat = () => combatP ??= new Promise((ok, ko) => { const s = document.createElement("script"); s.src = "/combat.js"; s.onload = ok; s.onerror = ko; document.head.append(s); });
+function combatRc(K, s, r) {
+  const att = s.pos === "att", L = [];
+  const nbE = n => `<strong>${nb(n)}</strong> ennemie${n > 1 ? "s" : ""}`;
+  L.push(`Troupes en attaque : ${rcList(s.A, UNIT_SG, UNIT_PL)}. <br>Troupes en défense : ${rcList(s.D, UNIT_SG, UNIT_PL)}. <br><br>`);
+  for (const l of r.log) {
+    const mine = `Vous infligez <strong>${nb(Math.ceil(att ? l.aBase : l.dBase))} (+ ${nb(Math.ceil(att ? l.aBonus : l.dBonus))})</strong> dégâts et tuez ${nbE(att ? l.killedD : l.killedA)}.<br>`;
+    const theirs = `${att ? "L’" : "L'"}ennemie inflige <strong>${nb(Math.ceil(att ? l.dBase : l.aBase))} (+ ${nb(Math.ceil(att ? l.dBonus : l.aBonus))})</strong> dégâts à vos fourmis et en tue <strong>${nb(att ? l.killedA : l.killedD)}</strong>.<br>`;
+    L.push(att ? mine + theirs : theirs + mine);
+  }
+  L.push("<br>");
+  const rep = r.log.length === 1 ? r.log[0].rep : 1, light = r.weightRatio < 0.5;
+  let flav, res;
+  if (att) {
+    if (r.attWin) { flav = rep === .1 ? "Écrasante victoire ! A peine le temps de se dégourdir les pattes qu’ils étaient tous morts ..." : rep === .3 ? "Votre armée a déferlé tel un raz-de-marée, l’ennemi n’a rien pu faire !"
+        : rep === .5 ? "Belle victoire ! L’ennemi n’a même pas eu le temps d’organiser ses défenses efficacement !" : "L’adversaire y a cru, mais vous sortez victorieux de ce combat acharné."; res = "Vous avez gagné cette bataille !"; }
+    else { flav = r.both ? "Quel dommage ! Batailler aussi bien pour perdre à la fin, c’est presque du gâchis !" : light ? "Votre armée n’a fait qu’une égratignure à l’ennemi. Vous n’aviez aucune chance."
+        : "Vos troupes ont été courageuses et combattantes, mais pas assez. L’ennemi se souviendra toutefois de votre passage."; res = "Vos troupes ont échoué"; }
+  } else {
+    if (r.attWin) { flav = rep === .1 ? "Vous venez de subir une cuisante défaite." : rep === .3 ? "L’ennemi était bien trop puissant, nous n’avons rien pu faire."
+        : rep === .5 ? "Vos fourmis ont fait mal à l’adversaire, mais cela n’a pas suffit pour briser son élan." : "Les troupes étaient de force égale, cependant il manqua aux nôtres ce petit plus qui fait gagner la bataille."; res = "Vos troupes ont échoué, l’ennemi pénètre vos défenses."; }
+    else { flav = r.both ? "La bataille semblait indécise mais notre sacrifice a permis d’achever les ennemis en même temps que la bataille." : light ? "Nos défenses ont déchiqueté l’armée ennemie. Il y réfléchira à deux fois avant de revenir."
+        : "Le combat était difficile, l’ennemi était résistant, mais votre stratégie l’a emporté."; res = "Vous avez gagné cette bataille ! L’ennemie est repoussé."; }
+  }
+  L.push(`${flav}<br><strong>${res}</strong><br>`);
+  const promo = att ? r.promoA : r.promoD;
+  const pr = promo.map((n, i) => n ? `- ${nb(n)} ${n > 1 ? UNIT_PL[i] : UNIT_SG[i]} ${n > 1 ? "sont devenues des" : "est devenue une"} <strong>${n > 1 ? UNIT_PL[K.UNITS[i].p] : UNIT_SG[K.UNITS[i].p]}</strong><br>` : "").join("");
+  if (pr) L.push("<br>Les unités survivantes ont appris de cette bataille :<br>" + pr);
+  return `<p><strong>Message que recevrait ${att ? "l'attaquant" : "le défenseur"}:</strong></p><p>${L.join("")}</p>`;
+}
+async function combatPage() {
+  await loadCombat(); const K = window.Combat;
+  let saved = {}; try { saved = JSON.parse(localStorage.getItem("combat") || "{}"); } catch {}
+  const v = (k, d = 0) => saved[k] ?? d;
+  app.innerHTML = `<h2>Simulateur de combat</h2>
+  <p class="note">Le simulateur de combat du jeu, ouvert à tous. Moteur reconstitué par backtest sur le simulateur officiel : sur 120 combats tirés au hasard, les unités tuées à chaque tour, le nombre de tours, le vainqueur et les promotions sont identiques.</p>
+  <div class="simgrid cgrid">
+    <div class="card"><h3>Armées</h3><div id="cpaste"></div>
+      <div class="ctable"><div class="chead"><span>Attaquant</span><span></span><span>Défenseur</span></div>
+      ${UNIT_SG.map((n, i) => `<input type="number" min="0" step="1" data-a="${i}" value="${v("a" + i)}"><span class="cname">${n}</span><input type="number" min="0" step="1" data-d="${i}" value="${v("d" + i)}">`).join("")}
+      <b id="lifeA" class="n"></b><span class="cname muted">Vie</span><b id="lifeD" class="n"></b>
+      <b id="dmgA" class="n"></b><span class="cname muted">Dégâts</span><b id="dmgD" class="n"></b></div>
+      <div class="simrow"><button class="mini" id="clrA">vider l'attaquant</button><button class="mini" id="swap">⇄ inverser</button><button class="mini" id="clrD">vider le défenseur</button></div></div>
+    <div class="card"><h3>Technologies</h3>
+      <div class="ctable small"><div class="chead"><span>Attaquant</span><span></span><span>Défenseur</span></div>
+      ${[["Bou", "Bouclier thoracique"], ["Arm", "Armes"], ["Coch", "Étable à cochenilles"]].map(([k, l]) => `<input type="number" min="0" step="1" id="a${k}" value="${v("a" + k)}"><span class="cname">${l}</span><input type="number" min="0" step="1" id="d${k}" value="${v("d" + k)}">`).join("")}</div>
+      <h3 style="margin-top:16px">Lieu</h3>
+      <div class="radios"><label><input type="radio" name="lieu" value="terrain"> Terrain de chasse</label>
+        <label><input type="radio" name="lieu" value="dome"> Dôme · niveau <input type="number" min="0" step="1" id="nDome" value="${v("nDome")}"></label>
+        <label><input type="radio" name="lieu" value="loge"> Loge impériale · niveau <input type="number" min="0" step="1" id="nLoge" value="${v("nLoge")}"></label></div>
+      <h3 style="margin-top:16px">Votre position</h3>
+      <div class="radios row"><label><input type="radio" name="pos" value="att"> Attaquant</label><label><input type="radio" name="pos" value="def"> Défenseur</label></div>
+      <button class="btn big" id="cfight" style="margin-top:14px;width:100%">Fight !</button></div>
+  </div>
+  <div id="cout"></div>`;
+  app.querySelector(`[name=lieu][value=${v("lieu", "terrain")}]`).checked = true;
+  app.querySelector(`[name=pos][value=${v("pos", "att")}]`).checked = true; steppers(app);
+  const fill = (k, r) => { r.army.forEach((x, i) => app.querySelector(`[data-${k}="${i}"]`).value = x);
+    if (r.lieu) app.querySelector(`[name=lieu][value=${r.lieu}]`).checked = true; save(); };
+  pasteBox($("#cpaste"), [["Coller dans l'attaquant", r => fill("a", r)], ["Coller dans le défenseur", r => fill("d", r)]]);
+  const n = e => Math.max(0, Math.floor(+e.value || 0));
+  const read = () => ({ A: UNIT_SG.map((_, i) => n(app.querySelector(`[data-a="${i}"]`))), D: UNIT_SG.map((_, i) => n(app.querySelector(`[data-d="${i}"]`))),
+    o: { aBou: n($("#aBou")), aArm: n($("#aArm")), aCoch: n($("#aCoch")), dBou: n($("#dBou")), dArm: n($("#dArm")), dCoch: n($("#dCoch")),
+      lieu: app.querySelector("[name=lieu]:checked").value, niveau: app.querySelector("[name=lieu]:checked").value === "dome" ? n($("#nDome")) : n($("#nLoge")) },
+    pos: app.querySelector("[name=pos]:checked").value });
+  const save = () => { const s = read(), o = { ...s.o, lieu: s.o.lieu, pos: s.pos, nDome: n($("#nDome")), nLoge: n($("#nLoge")) };
+    s.A.forEach((x, i) => o["a" + i] = x); s.D.forEach((x, i) => o["d" + i] = x); try { localStorage.setItem("combat", JSON.stringify(o)); } catch {} totals(); };
+  // vie et dégâts totaux de chaque camp (comme le simulateur du jeu), bonus compris
+  const totals = () => { const s = read(), o = s.o, loc = o.lieu === "dome" ? .1 + .05 * o.niveau : o.lieu === "loge" ? .3 + .15 * o.niveau : 0;
+    const sum = (arr, k) => arr.reduce((q, x, i) => q + x * K.UNITS[i][k], 0);
+    $("#lifeA").textContent = fmt(Math.round(sum(s.A, "hp") * (1 + .1 * o.aBou))); $("#lifeD").textContent = fmt(Math.round(sum(s.D, "hp") * (1 + .1 * o.dBou + loc)));
+    $("#dmgA").textContent = fmt(Math.round(sum(s.A, "a") * (1 + .1 * o.aArm))); $("#dmgD").textContent = fmt(Math.round(sum(s.D, "d") * (1 + .1 * o.dArm))); };
+  app.querySelectorAll(".cgrid input").forEach(e => e.addEventListener("input", save));
+  $("#clrA").onclick = () => { app.querySelectorAll("[data-a]").forEach(e => e.value = 0); save(); };
+  $("#clrD").onclick = () => { app.querySelectorAll("[data-d]").forEach(e => e.value = 0); save(); };
+  $("#swap").onclick = () => { UNIT_SG.forEach((_, i) => { const a = app.querySelector(`[data-a="${i}"]`), d = app.querySelector(`[data-d="${i}"]`); [a.value, d.value] = [d.value, a.value]; });
+    for (const k of ["Bou", "Arm", "Coch"]) { const a = $("#a" + k), d = $("#d" + k); [a.value, d.value] = [d.value, a.value]; } save(); };
+  totals();
+  function run() {
+    const s = read(); save(); const out = $("#cout");
+    if (!s.A.some(Boolean) || !s.D.some(Boolean)) { out.innerHTML = `<div class="card" style="margin-top:16px"><p class="down">Mets des unités des deux côtés.</p></div>`; return; }
+    const r = K.combat(s.A, s.D, s.o), lostA = s.A.map((x, i) => x - r.survA[i]), lostD = s.D.map((x, i) => x - r.survD[i]);
+    const rows = (arr, lost, promo) => arr.map((x, i) => x ? `<tr><td>${UNIT_SG[i]}</td><td class="n">${fmt(x)}</td><td class="n ${lost[i] ? "down" : "muted"}">${fmt(lost[i])}</td><td class="n ${promo[i] ? "up" : "muted"}">${fmt(promo[i])}</td></tr>` : "").join("");
+    const sumL = a => a.reduce((q, x) => q + x, 0);
+    out.innerHTML = `
+    <div class="kpis" style="margin-top:16px">
+      <div class="card kpi"><div class="l">Vainqueur</div><div class="v ${r.attWin === (s.pos === "att") ? "up" : "down"}">${r.attWin ? "Attaquant" : "Défenseur"}</div><div class="muted">en ${r.log.length} tour${r.log.length > 1 ? "s" : ""}</div></div>
+      <div class="card kpi"><div class="l">Pertes attaquant</div><div class="v">${fmt(sumL(lostA))}</div><div class="muted">sur ${fmt(sumL(s.A))}</div></div>
+      <div class="card kpi"><div class="l">Pertes défenseur</div><div class="v">${fmt(sumL(lostD))}</div><div class="muted">sur ${fmt(sumL(s.D))}</div></div>
+      <div class="card kpi"><div class="l">Réplique au 1er tour</div><div class="v">${Math.round(r.log[0].rep * 100)} %</div><div class="muted">poids att. / déf. : ${r.weightRatio.toFixed(2)}</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="ch"><h3>Rapport de combat</h3><button class="mini" id="capply">Reporter les survivantes</button></div><div class="rc">${combatRc(K, s, r)}</div></div>
+      <div class="card"><h3>Bilan</h3>
+        <h3 class="muted" style="margin-top:8px">Attaquant</h3><div class="tbl"><table><thead><tr><th>Unité</th><th class="n">Envoyées</th><th class="n">Pertes</th><th class="n">Promues</th></tr></thead><tbody>${rows(s.A, lostA, r.promoA)}</tbody></table></div>
+        <h3 class="muted" style="margin-top:14px">Défenseur</h3><div class="tbl"><table><thead><tr><th>Unité</th><th class="n">Présentes</th><th class="n">Pertes</th><th class="n">Promues</th></tr></thead><tbody>${rows(s.D, lostD, r.promoD)}</tbody></table></div>
+        <p class="note">Une unité entamée mais pas tuée rentre. Les promotions vont au vainqueur.</p></div>
+    </div>`;
+    // comme le jeu : le formulaire reprend les deux armées après le combat (pertes retirées, promotions appliquées)
+    $("#capply").onclick = () => { const after = (surv, promo) => { const x = surv.map((v, i) => v - promo[i]); promo.forEach((p, i) => { if (p) x[K.UNITS[i].p] += p; }); return x; };
+      after(r.survA, r.promoA).forEach((x, i) => app.querySelector(`[data-a="${i}"]`).value = x);
+      after(r.survD, r.promoD).forEach((x, i) => app.querySelector(`[data-d="${i}"]`).value = x); save(); scrollTo({ top: 0, behavior: "smooth" }); };
+  }
+  $("#cfight").onclick = run;
+  app.querySelectorAll(".cgrid input[type=number]").forEach(e => e.addEventListener("keydown", ev => { if (ev.key === "Enter") run(); }));
+}
+
+// ---------- Calculateur Dôme & Loge : retrouve les technologies à partir d'un RC ----------
+function parseRc(text) {
+  const t = text.replace(/ | /g, " "), num = s => +s.replace(/[^\d]/g, "");
+  const list = s => { const army = new Array(14).fill(0);
+    for (const part of (s || "").replace(/\.\s*$/, "").split(",")) { const m = part.trim().match(/^([\d ]+)\s+(.+)$/); if (!m) continue;
+      const k = armyKey(m[2]); const f = ARMY_NAMES.find(([n]) => n === k); if (f) army[f[1]] += num(m[1]); }
+    return army; };
+  // une liste de troupes s'arrête au premier point (les nombres n'en contiennent pas) : marche aussi sans sauts de ligne
+  const A = list((t.match(/Troupes en attaque\s*:\s*([^\n.]+)/i) || [])[1]), D = list((t.match(/Troupes en d[ée]fense\s*:\s*([^\n.]+)/i) || [])[1]);
+  // lignes de dégâts dans l'ordre ; le camp de « Vous » dépend du point de vue (attaquant si la 1re ligne est « Vous infligez »)
+  const lines = [...t.matchAll(/(Vous infligez|L.ennemie inflige)\s+([\d ]+)\s*\(\+\s*([\d ]+)\)\s*d[ée]g[aâ]ts.*?tue[zr]?\s+([\d ]+)/gi)]
+    .map(m => ({ me: /^Vous/i.test(m[1]), base: num(m[2]), bonus: num(m[3]), kills: num(m[4]) }));
+  const view = lines.length && lines[0].me ? "att" : "def";
+  const att = lines.filter(l => l.me === (view === "att")), def = lines.filter(l => l.me !== (view === "att"));
+  const lieu = /loge/i.test(t) ? "loge" : /d[ôo]me|fourmili[èe]re/i.test(t) ? "dome" : null;
+  return { A, D, att, def, view, lieu, ok: A.some(Boolean) && D.some(Boolean) && att.length > 0 };
+}
+async function rcCalc() {
+  await loadCombat(); const K = window.Combat;
+  app.innerHTML = `<h2>Calculateur Dôme &amp; Loge</h2>
+  <p class="note">Colle un rapport de combat (côté attaquant ou défenseur). L'outil lit les Armes dans les dégâts « base (+ bonus) », puis teste toutes les combinaisons de Bouclier, Dôme et Loge avec le moteur du simulateur de combat, et garde celles qui redonnent exactement les mêmes pertes à chaque tour.</p>
+  <div class="card"><textarea id="rc-in" class="bigta" placeholder="Troupes en attaque : …&#10;Troupes en défense : …&#10;&#10;Vous infligez 5 000 (+ 2 000) dégâts et tuez 140 ennemies.&#10;L’ennemie inflige …"></textarea>
+    <div class="simrow"><span class="radios row" id="rc-lieu"><label><input type="radio" name="rcl" value="auto" checked> Lieu : détecter</label><label><input type="radio" name="rcl" value="terrain"> Terrain</label><label><input type="radio" name="rcl" value="dome"> Dôme</label><label><input type="radio" name="rcl" value="loge"> Loge</label></span></div>
+    <button class="btn big" id="rc-go" style="margin-top:12px">Analyser</button></div>
+  <div id="rc-out"></div>`;
+  $("#rc-go").onclick = () => {
+    const r = parseRc($("#rc-in").value), out = $("#rc-out");
+    if (!r.ok) { out.innerHTML = `<div class="card" style="margin-top:16px"><p class="down">Je ne reconnais pas ce texte : il faut les lignes « Troupes en attaque / en défense » et au moins un tour de combat.</p></div>`; return; }
+    // Armes : bonus / base × 10 (premier tour, le plus précis)
+    const armOf = l => l && l.base > 0 ? Math.round(10 * l.bonus / l.base) : null;
+    const aArm = armOf(r.att[0]), dArm = armOf(r.def[0]);
+    const wanted = r.att.map((l, i) => [l.kills, r.def[i]?.kills]);
+    const same = log => log.length === wanted.length && log.every((l, i) => l.killedD === wanted[i][0] && l.killedA === wanted[i][1]);
+    // 1) Bouclier de l'attaquant et vie du défenseur, filtrés sur le 1er tour, puis vérification complète
+    const lieuChoice = app.querySelector("[name=rcl]:checked").value, lieux = lieuChoice !== "auto" ? [lieuChoice] : r.lieu ? [r.lieu] : ["terrain", "dome", "loge"];
+    const MAXB = 40, MAXL = 40, found = [];
+    const aBous = [];
+    for (let b = 0; b <= MAXB; b++) { const g = K.combat(r.A, r.D, { aArm, dArm, aBou: b, dBou: 0, lieu: "terrain", niveau: 0 }); if (g.log[0] && g.log[0].killedA === wanted[0][1]) aBous.push(b); }
+    for (const lieu of lieux) for (let db = 0; db <= MAXB; db++) for (let L = 0; L <= (lieu === "terrain" ? 0 : MAXL); L++) {
+      const o0 = { aArm, dArm, aBou: aBous[0] ?? 0, dBou: db, lieu, niveau: L };
+      if (K.combat(r.A, r.D, o0).log[0]?.killedD !== wanted[0][0]) continue;
+      for (const ab of aBous) { const g = K.combat(r.A, r.D, { ...o0, aBou: ab }); if (same(g.log)) found.push({ lieu, dBou: db, niveau: L, aBou: ab }); }
+    }
+    const aBouSet = [...new Set(found.map(f => f.aBou))], byLieu = l => found.filter(f => f.lieu === l);
+    const range = arr => arr.length ? (Math.min(...arr) === Math.max(...arr) ? `${Math.min(...arr)}` : `${Math.min(...arr)} à ${Math.max(...arr)}`) : "–";
+    const lieuBlock = (l, title) => { const f = byLieu(l); if (!lieux.includes(l)) return "";
+      if (!f.length) return `<div class="card"><h3>${title}</h3><p class="muted">Aucune combinaison ne colle.</p></div>`;
+      if (l === "terrain") return `<div class="card"><h3>${title}</h3><p>Bouclier du défenseur : <b>${range([...new Set(f.map(x => x.dBou))])}</b></p></div>`;
+      const pairs = [...new Map(f.map(x => [x.dBou + "|" + x.niveau, x])).values()].sort((a, b) => a.dBou - b.dBou || a.niveau - b.niveau);
+      return `<div class="card"><h3>${title}</h3><p class="note" style="margin:0 0 6px">${pairs.length} combinaison${pairs.length > 1 ? "s" : ""} possible${pairs.length > 1 ? "s" : ""} (Bouclier → niveau)</p>
+        <div class="pairs">${pairs.slice(0, 60).map(p => `<span class="tag">Bouclier ${p.dBou} → niv. ${p.niveau}</span>`).join("")}${pairs.length > 60 ? `<span class="muted">…</span>` : ""}</div></div>`; };
+    const hpLo = found.length ? Math.min(...found.map(f => 1 + .1 * f.dBou + (f.lieu === "dome" ? .1 + .05 * f.niveau : f.lieu === "loge" ? .3 + .15 * f.niveau : 0))) : 0;
+    const hpHi = found.length ? Math.max(...found.map(f => 1 + .1 * f.dBou + (f.lieu === "dome" ? .1 + .05 * f.niveau : f.lieu === "loge" ? .3 + .15 * f.niveau : 0))) : 0;
+    out.innerHTML = `
+    <div class="kpis" style="margin-top:16px">
+      <div class="card kpi"><div class="l">Armes attaquant</div><div class="v">${aArm ?? "?"}</div></div>
+      <div class="card kpi"><div class="l">Bouclier attaquant</div><div class="v">${aBouSet.length ? range(aBouSet) : "?"}</div></div>
+      <div class="card kpi"><div class="l">Armes défenseur</div><div class="v">${dArm ?? "?"}</div></div>
+      <div class="card kpi"><div class="l">Vie du défenseur</div><div class="v">${found.length ? "×" + (hpLo.toFixed(2) === hpHi.toFixed(2) ? hpLo.toFixed(2) : hpLo.toFixed(2) + "–" + hpHi.toFixed(2)).replace(/\./g, ",") : "?"}</div><div class="muted">1 + 0,1 × Bouclier + lieu</div></div>
+    </div>
+    ${!found.length ? `<div class="card"><p class="down">Aucune combinaison de niveaux (0 à ${MAXB}) ne redonne exactement ce combat. Vérifie que le RC est complet.</p></div>` : `
+    <div class="grid2">${lieuBlock("terrain", "Sur le terrain de chasse")}${lieuBlock("dome", "Dans le Dôme")}${lieuBlock("loge", "Dans la Loge impériale")}</div>
+    <p class="note">Le Bouclier du défenseur et le niveau du Dôme ou de la Loge s'additionnent dans sa vie : plusieurs couples donnent souvent le même résultat. Si tu connais son Bouclier (par exemple grâce à un RC sur son terrain de chasse), lis directement le niveau correspondant.${r.lieu ? "" : " Le lieu n'apparaît pas dans le RC : choisis-le au-dessus pour affiner."}</p>`}`;
+  };
+}
+
+// Les pages construisent leurs liens en « #/… » (route interne) ; ils sont convertis en vraies adresses.
+const NO_SRV = /^\/(outils|jeu|simulateur)(\/|$|\?)/;
+function toPath(r) { // r : route interne, ex. "/a/SHAN", "/tdc?a=X", "/outils/combat"
+  r = r || "/"; if (!r.startsWith("/")) r = "/" + r;
+  if (r.startsWith("/simulateur")) return "/outils/chasse";
+  if (NO_SRV.test(r)) return r;
+  const m = r.match(/^\/(a|j)\/(.*)$/);
+  if (m) return `/s${SRV}/${m[1] === "a" ? "alliance" : "joueur"}/${m[2]}`;
+  return `/s${SRV}${r === "/" ? "/" : r}`;
+}
+function fromPath() { // adresse actuelle -> route interne
+  if (location.pathname.startsWith("/map-avant")) return location.hash.slice(1) || "/";
+  let p = location.pathname.replace(/^\/s[1-5](?=\/|$)/, "") || "/";
+  p = p.replace(/^\/alliance\//, "/a/").replace(/^\/joueur\//, "/j/");
+  return p + location.search.replace(/[?&]srv=\d/, "").replace(/^&/, "?");
+}
+function go(r, replace) { const path = toPath(r); history[replace ? "replaceState" : "pushState"](null, "", path); route(); }
+// liens internes : vraie adresse dans le href (clic du milieu, partage), navigation sans rechargement
+function linkify(root) { root.querySelectorAll('a[href^="#/"]').forEach(a => a.setAttribute("href", toPath(a.getAttribute("href").slice(1)))); }
+document.addEventListener("click", e => {
+  const a = e.target.closest("a"); if (!a || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || a.target) return;
+  const href = a.getAttribute("href") || "";
+  if (href.startsWith("#/")) { e.preventDefault(); go(href.slice(1)); return; }
+  if (href.startsWith("/") && !href.startsWith("/map-avant") && !/\.[a-z0-9]+$/i.test(href.split("?")[0]) && !location.pathname.startsWith("/map-avant")) {
+    const m = href.match(/^\/s([1-5])(\/|$)/); if (m && +m[1] !== SRV) return; // autre serveur : rechargement complet
+    e.preventDefault(); history.pushState(null, "", href); route(); }
+});
+addEventListener("popstate", route);
+
+// ---------- Loterie (S5) ----------
+let stopLot = null;
+const resLabel = (n, r) => `${fmt(n)} de ${r}`;
+const ticketRanges = buys => buys.map(b => b.first_num === b.last_num ? `n° ${b.first_num}` : `n° ${b.first_num} à ${b.last_num}`).join(", ");
+const longDate = iso => new Date(new Date(iso).getTime() - 1000).toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Paris" });
+function countdown(iso) { const s = Math.max(0, Math.floor((Date.parse(iso) - Date.now()) / 1000));
+  const d = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60;
+  return s <= 0 ? "Tirage en cours…" : `${d ? d + " j " : ""}${hh} h ${String(mm).padStart(2, "0")} min ${String(ss).padStart(2, "0")} s`; }
+// vérifie un tirage passé directement depuis drand, dans le navigateur
+async function verifyDraw(w) {
+  const r = await fetch(`https://api.drand.sh/${w.drand_chain}/public/${w.drand_round}`).then(x => x.json());
+  const ticket = Number(BigInt("0x" + r.randomness) % BigInt(w.tickets)) + 1;
+  return r.randomness === w.randomness && ticket === w.winning_ticket;
+}
+async function lotteryPage() {
+  if (SRV !== 5) { app.innerHTML = `<h2>Loterie</h2><div class="card"><p>La loterie n'existe que sur le serveur 5. <a href="/s5/loterie">Voir la loterie du S5</a></p></div>`; return; }
+  const d = await get("/api/lottery"), w = d.current;
+  const byPlayer = {}; for (const b of w.buys) (byPlayer[b.pseudo] ??= []).push(b);
+  const players = Object.entries(byPlayer).map(([p, bs]) => ({ p, n: bs.reduce((a, b) => a + b.qty, 0), bs })).sort((a, b) => b.n - a.n);
+  const pastHtml = d.past.map(p => `<tr><td>${longDate(p.ends_at)}</td>
+    <td>${p.tickets ? `<b>${esc(p.winner ?? "?")}</b> <span class="muted">· ticket n° ${p.winning_ticket} sur ${p.tickets}</span>` : `<span class="muted">aucun ticket vendu</span>`}</td>
+    <td class="n">${p.tickets ? resLabel(p.prize, p.resource) : "–"}</td>
+    <td>${p.tickets ? `<button class="mini" data-verify="${p.id}">vérifier</button> <a class="muted" href="https://api.drand.sh/${p.drand_chain}/public/${p.drand_round}" target="_blank" rel="noopener">drand n° ${p.drand_round}</a>` : ""}</td></tr>`).join("");
+  app.innerHTML = `<h2>🎟️ Loterie du S5</h2>
+  <div class="card lothero"><div><div class="l">Tirage ${longDate(w.ends_at)} à minuit</div><div class="cd" id="lot-cd">${countdown(w.ends_at)}</div></div>
+    <div class="lotpot"><div class="l">Le gagnant remporte</div><div class="v">${resLabel(w.prize, w.resource)}</div><div class="muted">95 % de la cagnotte de ${resLabel(w.pot, w.resource)}</div></div></div>
+  <div class="kpis" style="margin-top:12px">
+    <div class="card kpi"><div class="l">Prix du ticket</div><div class="v">${resLabel(w.price, w.resource)}</div></div>
+    <div class="card kpi"><div class="l">Tickets vendus</div><div class="v">${fmt(w.tickets)}</div><div class="muted">${players.length} participant${players.length > 1 ? "s" : ""}</div></div>
+    <div class="card kpi"><div class="l">Cagnotte</div><div class="v">${resLabel(w.pot, w.resource)}</div></div>
+    <div class="card kpi"><div class="l">Organisation</div><div class="v">5 %</div><div class="muted">gardés par LetaliT pour faire tourner les services</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>Comment participer</h3><ol class="steps">
+      <li>Envoie <b>${resLabel(w.price, w.resource)} par ticket</b> à <b>LetaliT</b> dans le jeu. Tu peux prendre autant de tickets que tu veux.</li>
+      <li>Préviens LetaliT : il enregistre tes tickets, qui apparaissent ici avec leurs numéros.</li>
+      <li>Dimanche à minuit, le tirage désigne un ticket gagnant. Son propriétaire remporte 95 % de la cagnotte.</li></ol>
+      <h3 style="margin-top:14px">Un tirage que personne ne peut truquer</h3>
+      <p class="note">Le ticket gagnant est tiré par <a href="https://drand.love" target="_blank" rel="noopener">drand</a>, une source de hasard publique (utilisée notamment par Cloudflare), qui publie un nombre aléatoire toutes les 3 secondes. On prend le tirage drand publié à minuit pile : ni LetaliT ni personne ne peut le connaître à l'avance ni le choisir. Ticket gagnant = ce nombre modulo le nombre de tickets, + 1. Chacun peut le vérifier avec le bouton « vérifier » des tirages passés.</p></div>
+    <div class="card tbl"><h3>Participants de la semaine</h3>
+      ${players.length ? `<table><thead><tr><th>Joueur</th><th class="n">Tickets</th><th>Numéros</th><th class="n">Chances</th></tr></thead><tbody>
+      ${players.map(x => `<tr><td><b>${esc(x.p)}</b></td><td class="n">${fmt(x.n)}</td><td class="muted">${ticketRanges(x.bs)}</td><td class="n">${(x.n / w.tickets * 100).toFixed(1)} %</td></tr>`).join("")}
+      </tbody></table>` : `<p class="muted">Aucun ticket pour l'instant : sois le premier !</p>`}</div>
+  </div>
+  <h2>Tirages précédents</h2>
+  <div class="card tbl">${pastHtml ? `<table><thead><tr><th>Semaine du</th><th>Gagnant</th><th class="n">Gain</th><th>Preuve</th></tr></thead><tbody>${pastHtml}</tbody></table>` : `<p class="muted">Le premier tirage aura lieu ${longDate(w.ends_at)} à minuit.</p>`}</div>`;
+  const t = setInterval(() => { const e = $("#lot-cd"); if (!e) return clearInterval(t); e.textContent = countdown(w.ends_at); if (Date.parse(w.ends_at) <= Date.now()) { clearInterval(t); setTimeout(lotteryPage, 8000); } }, 1000);
+  stopLot = () => clearInterval(t);
+  app.querySelectorAll("[data-verify]").forEach(b => b.onclick = async () => { const p = d.past.find(x => x.id === +b.dataset.verify); b.textContent = "…";
+    try { b.textContent = (await verifyDraw(p)) ? "✔ vérifié" : "✖ ne correspond pas"; } catch { b.textContent = "drand injoignable"; } });
+}
+async function lotteryAdminPage() {
+  if (SRV !== 5) return lotteryPage();
+  let key = ""; try { key = localStorage.getItem("lotkey") || ""; } catch {}
+  const d = await get("/api/lottery"), w = d.current;
+  app.innerHTML = `<h2>Loterie · administration</h2>
+  <div class="card"><div class="simrow"><input type="password" id="lk" placeholder="Clé d'administration" value="${esc(key)}" style="max-width:340px"><span class="note">gardée seulement dans ce navigateur</span></div></div>
+  <div class="grid2">
+    <div class="card"><h3>Enregistrer un achat</h3><p class="note">Semaine close ${longDate(w.ends_at)} à minuit · ${resLabel(w.price, w.resource)} le ticket</p>
+      <div class="simrow"><input type="search" id="lp" placeholder="Pseudo du joueur"></div>
+      <div class="simrow"><input type="number" id="lq" min="1" step="1" value="1" style="max-width:120px"> <span id="lcost" class="muted"></span></div>
+      <button class="btn" id="ladd" style="margin-top:10px">Ajouter les tickets</button> <span id="lmsg" class="note"></span></div>
+    <div class="card"><h3>Prix de la semaine</h3><p class="note">Modifiable tant qu'aucun ticket n'est vendu cette semaine.</p>
+      <div class="simrow"><input type="number" id="lpr" min="1" step="1" value="${w.price}" style="max-width:140px"> <input id="lres" value="${esc(w.resource)}" style="max-width:120px"></div>
+      <button class="btn" id="lprice" style="margin-top:10px">Changer le prix</button> <span id="lpmsg" class="note"></span></div>
+  </div>
+  <div class="card tbl" style="margin-top:16px"><h3>Achats de la semaine (${fmt(w.tickets)} tickets · cagnotte ${resLabel(w.pot, w.resource)} · gain ${resLabel(w.prize, w.resource)})</h3>
+    ${w.buys.length ? `<table><thead><tr><th>Quand</th><th>Joueur</th><th class="n">Tickets</th><th>Numéros</th><th></th></tr></thead><tbody>
+    ${w.buys.slice().reverse().map((b, i) => `<tr><td class="muted">${new Date(b.created_at).toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}</td><td><b>${esc(b.pseudo)}</b></td><td class="n">${b.qty}</td><td class="muted">${ticketRanges([b])}</td>
+      <td>${i === 0 ? `<button class="mini" data-rm="${b.id}">annuler</button>` : ""}</td></tr>`).join("")}</tbody></table>` : `<p class="muted">Aucun achat cette semaine.</p>`}</div>`;
+  const keyNow = () => { const k = $("#lk").value.trim(); try { localStorage.setItem("lotkey", k); } catch {} return k; };
+  const call = async body => { const r = await fetch("/api/lottery/admin", { method: "POST", headers: { "content-type": "application/json", "x-lottery-key": keyNow() }, body: JSON.stringify(body) });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error || "Erreur"); return j; };
+  const cost = () => $("#lcost").textContent = `= ${resLabel((Math.floor(+$("#lq").value) || 0) * w.price, w.resource)}`; $("#lq").oninput = cost; cost();
+  autocomplete($("#lp"), searchPlayers, it => { $("#lp").value = it.label; });
+  $("#ladd").onclick = async () => { const m = $("#lmsg"); try { const r = await call({ action: "add", pseudo: $("#lp").value, qty: $("#lq").value });
+      m.className = "note up"; m.textContent = `Tickets n° ${r.numbers[0]} à ${r.numbers[1]} enregistrés`; setTimeout(lotteryAdminPage, 900); } catch (e) { m.className = "note down"; m.textContent = e.message; } };
+  $("#lprice").onclick = async () => { const m = $("#lpmsg"); try { await call({ action: "price", price: $("#lpr").value, resource: $("#lres").value }); m.className = "note up"; m.textContent = "Prix enregistré"; setTimeout(lotteryAdminPage, 900); }
+    catch (e) { m.className = "note down"; m.textContent = e.message; } };
+  app.querySelectorAll("[data-rm]").forEach(b => b.onclick = async () => { if (!confirm("Annuler ce dernier achat ?")) return;
+    try { await call({ action: "remove", id: +b.dataset.rm }); lotteryAdminPage(); } catch (e) { alert(e.message); } });
+  steppers(app);
+}
+
+async function route() {
+  stopGame?.(); stopGame = null; stopMap?.(); stopMap = null; stopLot?.(); stopLot = null;
+  charts.forEach(c => c.destroy()); charts = [];
+  const h = fromPath(), [, a, b] = h.split("?")[0].split("/");
+  const navKey = ({ a: "alliances", j: "joueurs", simulateur: "outils" }[a] ?? a ?? "");
+  document.querySelectorAll("nav a").forEach(x => x.classList.toggle("on", (x.dataset.r ?? "") === navKey));
+  app.innerHTML = `<p class="muted">Chargement…</p>`; scrollTo(0, 0);
+  try {
+    // /map-avant : seule la carte (éventuellement filtrée) reste ici ; les autres liens repartent vers le site normal
+    if (location.pathname.startsWith("/map-avant") && a && a !== "carte") { location.replace(toPath(h)); return; }
+    if (location.pathname.startsWith("/map-avant")) await carte(a === "carte" && b ? decodeURIComponent(b) : "", true);
+    else if (a === "alliances") await alliances();
+    else if (a === "a") await alliance(decodeURIComponent(b));
+    else if (a === "joueurs") await joueurs();
+    else if (a === "j") await joueur(b);
+    else if (a === "jeu") await jeu();
+    else if (a === "loterie") await (b === "admin" ? lotteryAdminPage() : lotteryPage());
+    else if (a === "simulateur" || (a === "outils" && b === "chasse")) await simulateur();
+    else if (a === "outils" && b === "combat") await combatPage();
+    else if (a === "outils" && b === "rc") await rcCalc();
+    else if (a === "outils") await outils();
+    else if (a === "carte") await carte(b ? decodeURIComponent(b) : "");
+    else if (a?.startsWith("tdc")) await tdc(new URLSearchParams(h.split("?")[1] || ""));
+    else await home();
+  } catch (e) { app.innerHTML = `<p class="down">Erreur : ${esc(e.message)}</p>`; }
+  linkify(document);
+}
+// sélecteur de serveur dans l'en-tête : recharge la page sur le serveur choisi (adresse partageable avec ?srv=)
+(() => { const sel = $("#srvsel");
+  sel.innerHTML = SERVERS_LIST.map(s => `<option value="${s}" ${s === SRV ? "selected" : ""}>Serveur ${s}</option>`).join("");
+  $("#nav-lot").hidden = SRV !== 5; // la loterie n'existe que sur le S5
+  $("#srvtag").textContent = "S" + SRV; $("#srvsub").textContent = "Fourmizzz · serveur " + SRV;
+  sel.onchange = () => { try { localStorage.setItem("srv", sel.value); } catch {}
+    // une alliance ou un joueur n'existe pas sur l'autre serveur : on retombe sur la liste correspondante
+    const p = location.pathname.replace(/^(\/s[1-5])\/alliance\/.*/, "$1/alliances").replace(/^(\/s[1-5])\/joueur\/.*/, "$1/joueurs");
+    location.href = /^\/s[1-5](\/|$)/.test(p) ? p.replace(/^\/s[1-5]/, "/s" + sel.value) + location.search : p.startsWith("/map-avant") ? "/s" + sel.value + "/" : p + location.search; };
+})();
+if (location.hash.startsWith("#/") && !location.pathname.startsWith("/map-avant")) history.replaceState(null, "", toPath(location.hash.slice(1)));
+else if (location.pathname === "/" || new URLSearchParams(location.search).has("srv")) history.replaceState(null, "", toPath(fromPath()));
+addEventListener("hashchange", () => { if (location.hash.startsWith("#/") && !location.pathname.startsWith("/map-avant")) go(location.hash.slice(1), true); else route(); });
+route();
+// prochaine actualisation des données : import à hh:05 (les exports du jeu sont publiés à hh:00)
+let nextupTick = () => {};
+(() => {
+  const tick = nextupTick = () => { const m = new Date().getMinutes(), s = new Date().getSeconds();
+    const left = ((65 - m) % 60) || 60, txt = m >= 5 && m < 7 ? "Actualisation en cours…" :
+      `Les données s'actualiseront dans ${left <= 1 && s > 0 ? "moins d'une minute" : left + " minute" + (left > 1 ? "s" : "")}`;
+    $("#nextup").textContent = txt; const n = $("#nextup-home"); if (n) n.textContent = txt; };
+  tick(); setInterval(tick, 20e3);
+})();
+// compteur « en ligne » : signal de présence toutes les 2 min tant que l'onglet est visible
+(() => {
+  let id; try { id = localStorage.getItem("vid"); if (!id) localStorage.setItem("vid", id = crypto.randomUUID().replace(/-/g, "")); } catch { id = crypto.randomUUID().replace(/-/g, ""); }
+  // onglet caché : on lit le compteur sans se compter
+  let lastPing = 0;
+  const ping = async (force) => { if (!force && Date.now() - lastPing < 30e3) return; lastPing = Date.now();
+    try { const d = await fetch("/api/online?id=" + id, { method: document.hidden ? "GET" : "POST" }).then(r => r.json());
+      $("#online b").textContent = fmt(d.online); $("#online").hidden = false; } catch {} };
+  ping(true); setInterval(() => ping(true), 120e3); document.addEventListener("visibilitychange", () => { if (!document.hidden) ping(); });
+})();
+</script>
+</body>
+</html>
