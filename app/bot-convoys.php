@@ -46,7 +46,7 @@ function botDemand(PDO $p,string $id): array {
     return $r;
 }
 function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body): array {
-    $allowed=['modification'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee','version_attendue'],'ajustement'=>['commande_id','discord_id','nbpomme_restant','nbmateriaux_restant','nbpomme_attendu','nbmateriaux_attendu'],'terminaison'=>['commande_id','discord_id'],'demande'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee'],'annulation'=>['commande_id','discord_id'],'validation'=>['commande_id','discord_id','version_attendue'],'convoi'=>['commande_id','discord_id','nbpomme','nbmateriaux','date_convoi','date_arrivee']][$action];
+    $allowed=['suspension'=>['commande_id','discord_id'],'modification'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee','version_attendue'],'ajustement'=>['commande_id','discord_id','nbpomme_restant','nbmateriaux_restant','nbpomme_attendu','nbmateriaux_attendu'],'terminaison'=>['commande_id','discord_id'],'demande'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee'],'annulation'=>['commande_id','discord_id'],'validation'=>['commande_id','discord_id','version_attendue'],'convoi'=>['commande_id','discord_id','nbpomme','nbmateriaux','date_convoi','date_arrivee']][$action];
     if(array_diff(array_keys($body),$allowed))throw new DomainException('Champ inconnu dans la requête.',422);
     $command=$body['commande_id']??null;
     if(!is_string($command)||!preg_match('/\A[A-Za-z0-9_.:-]{1,100}\z/',$command))throw new DomainException('commande_id obligatoire : identifiant unique de la commande Discord.',422);
@@ -93,6 +93,7 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
     $hash=hash('sha256',json_encode($payload,JSON_THROW_ON_ERROR));
     $p->beginTransaction();
     try {
+        if($action==='suspension'&&!in_array($discord,botConfiguredAdmins(),true))throw new DomainException('La suspension est réservée aux administrateurs listés dans ADMIN_DISCORD_IDS.',403);
         $actor=botActor($p,$game,$discord,$action==='validation');
         // Same command is serialized even across different endpoints or requests.
         $q=$p->prepare('SELECT pg_advisory_xact_lock(hashtextextended(?,0))');$q->execute(['uptep-bot:'.$command]);
@@ -109,6 +110,7 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
             if($action==='modification'){
                 if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true);
                 if($d['valide']||$d['fini'])throw new DomainException('Seule une demande en attente de validation peut être modifiée. Rouvre le tableau.',409);
+                if((string)$d['nbpomme_restant']!==(string)$d['nbpomme_original']||(string)$d['nbmateriaux_restant']!==(string)$d['nbmateriaux_original'])throw new DomainException('Cette demande conserve des livraisons ou ajustements : valide-la à nouveau avant de modifier son restant.',409);
                 if(!hash_equals(botDemandVersion($d),$payload['version_attendue']))throw new DomainException('La demande a changé depuis l’ouverture du formulaire. Rouvre Modifier une demande.',409);
                 $q=$p->prepare('UPDATE demandes_convois SET nbpomme_original=?,nbpomme_restant=?,nbmateriaux_original=?,nbmateriaux_restant=?,objet=?,niveau=?,date_souhaitee=? WHERE id=?');
                 $q->execute([$apple,$apple,$wood,$wood,$objet,$niveau,$souhaitee,$id]);
@@ -131,6 +133,9 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
                 if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true);
                 if(!$d['valide']||$d['fini'])throw new DomainException('Seule une demande validée et en cours peut être terminée.',409);
                 $q=$p->prepare('UPDATE demandes_convois SET fini=true,fin_manuelle=true,date_fin=now(),discord_cloture=?,pseudo_cloture=? WHERE id=?');$q->execute([$discord,$actor['pseudo'],$id]);
+            }elseif($action==='suspension'){
+                if(!$d['valide']||$d['fini'])throw new DomainException('Seule une demande validée et en cours peut être suspendue.',409);
+                $q=$p->prepare('UPDATE demandes_convois SET valide=false,idvalidateur=NULL,pseudo_validateur=NULL,discord_validateur=NULL,date_validation=NULL WHERE id=?');$q->execute([$id]);
             }elseif($action==='validation'){
                 if($d['valide'])throw new DomainException('Demande déjà validée.',409);
                 if(isset($payload['version_attendue'])&&!hash_equals(botDemandVersion($d),$payload['version_attendue']))throw new DomainException('La demande a été modifiée. Consulte son nouveau contenu avant de la valider.',409);

@@ -56,7 +56,7 @@ try {
         if(!is_string($ids)||!preg_match('/\A[1-9][0-9]{0,18}(?:,[1-9][0-9]{0,18}){0,99}\z/',$ids))botReply(422,['ok'=>false,'error'=>'Liste de demandes invalide (100 maximum).']);
         define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-convoys.php';
         $ids=array_map(fn($id)=>botNumber($id,true),explode(',',$ids));
-        $q=db()->prepare('SELECT id::text,fini,annulee FROM demandes_convois WHERE id IN ('.implode(',',array_fill(0,count($ids),'?')).')');$q->execute($ids);
+        $q=db()->prepare('SELECT id::text,fini,annulee,valide FROM demandes_convois WHERE id IN ('.implode(',',array_fill(0,count($ids),'?')).')');$q->execute($ids);
         botReply(200,['ok'=>true,'demandes'=>$q->fetchAll(PDO::FETCH_ASSOC)]);
     }
     if(in_array($path,['/api/bot/v1/floods','/api/bot/v1/floods/preview'],true)){
@@ -100,10 +100,10 @@ try {
     elseif($path==='/api/bot/v1/convois'){$allowed=['GET'];$action='convois_annulables';}
     elseif(preg_match('~\A/api/bot/v1/convois/([1-9][0-9]{0,18})/annulation\z~',$path,$match)){$allowed=['POST'];$id=$match[1];$action='annulation_convoi';}
     elseif(preg_match('~\A/api/bot/v1/membres/([1-9][0-9]{0,18})\z~',$path,$match)){$allowed=['GET'];$id=$match[1];$action='membre';}
-    elseif(preg_match('~\A/api/bot/v1/demandes/([1-9][0-9]{0,18})/(validation|annulation|terminaison|ajustement|modification|convois)\z~',$path,$match)){$allowed=$match[2]==='convois'?['GET','POST']:['POST'];$id=$match[1];$action=$match[2]!=='convois'?$match[2]:($method==='GET'?'lecture_convois':'convoi');}
+    elseif(preg_match('~\A/api/bot/v1/demandes/([1-9][0-9]{0,18})/(validation|suspension|annulation|terminaison|ajustement|modification|convois)\z~',$path,$match)){$allowed=$match[2]==='convois'?['GET','POST']:['POST'];$id=$match[1];$action=$match[2]!=='convois'?$match[2]:($method==='GET'?'lecture_convois':'convoi');}
     else botReply(404,['ok'=>false,'error'=>'not_found']);
     if(!in_array($method,$allowed,true)){header('Allow: '.implode(', ',$allowed));botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
-    $scope=['modification'=>'demandes:adjust','ajustement'=>'demandes:adjust','terminaison'=>'demandes:finish','annulation_convoi'=>'convois:cancel','convois_annulables'=>'convois:read','membre'=>'membres:read','annulation'=>'demandes:cancel','lecture'=>'demandes:read','lecture_convois'=>'convois:read','demande'=>'demandes:create','validation'=>'demandes:validate','convoi'=>'convois:create'][$action];
+    $scope=['suspension'=>'demandes:validate','modification'=>'demandes:adjust','ajustement'=>'demandes:adjust','terminaison'=>'demandes:finish','annulation_convoi'=>'convois:cancel','convois_annulables'=>'convois:read','membre'=>'membres:read','annulation'=>'demandes:cancel','lecture'=>'demandes:read','lecture_convois'=>'convois:read','demande'=>'demandes:create','validation'=>'demandes:validate','convoi'=>'convois:create'][$action];
     if(!in_array($scope,$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
     define('UPTEP_SCRIPT_API',true);
     require '/home/uptep/private/app/bootstrap.php';
