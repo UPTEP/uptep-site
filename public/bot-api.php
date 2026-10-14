@@ -85,7 +85,7 @@ try {
         botReply(200,botDeliveries(db(),db(true),$_GET));
     }
     $id=null;$reportKind=null;
-    if(preg_match('~\A/api/bot/v1/rapports/(demandes|convois|statistiques)(?:/([1-9][0-9]{0,18}))?\z~',$path,$reportMatch)){
+    if(preg_match('~\A/api/bot/v1/rapports/(demandes|convois|statistiques|recap-demandes)(?:/([1-9][0-9]{0,18}))?\z~',$path,$reportMatch)){
         $reportKind=$reportMatch[1];$id=$reportMatch[2]??null;
         if($id!==null&&$reportKind!=='demandes')botReply(404,['ok'=>false,'error'=>'not_found']);
         if($method!=='GET'){header('Allow: GET');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
