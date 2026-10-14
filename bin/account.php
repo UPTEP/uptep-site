@@ -8,7 +8,7 @@ if (!preg_match('/^[a-z0-9][a-z0-9_.-]{2,39}$/D', $username) || !in_array($actio
     fwrite(STDERR, "Usage: php account.php create USER admin|member OUTPUT_FILE\n       php account.php reset USER OUTPUT_FILE\n       php account.php disable|enable USER\n"); exit(1);
 }
 if (in_array($action, ['disable','enable'], true)) {
-    $q = db()->prepare('UPDATE users SET status = ?, session_version = session_version + 1, permissions_version = permissions_version + 1 WHERE username = ? RETURNING id');
+    $q = db()->prepare('UPDATE users SET status = ?, session_version = session_version + 1, permissions_version = permissions_version + 1 WHERE lower(username) = lower(?) RETURNING id');
     $q->execute([$action === 'disable' ? 'disabled' : 'active', $username]);
     if (!$q->fetchColumn()) { fwrite(STDERR, "Compte introuvable.\n"); exit(1); }
     echo "Compte mis à jour.\n"; exit;
@@ -26,7 +26,7 @@ try {
         $q = db()->prepare("INSERT INTO users (username, display_name, password_hash, role, approved_at) VALUES (?, ?, ?, ?, now())");
         $q->execute([$username, $username === 'admin' ? 'Administrateur' : $username, $hash, $role]);
     } else {
-        $q = db()->prepare('UPDATE users SET password_hash = ?, must_change_password = true, session_version = session_version + 1 WHERE username = ? RETURNING id');
+        $q = db()->prepare('UPDATE users SET password_hash = ?, must_change_password = true, password_setup_required = false, session_version = session_version + 1 WHERE lower(username) = lower(?) RETURNING id');
         $q->execute([$hash, $username]);
         if (!$q->fetchColumn()) throw new RuntimeException('Compte introuvable.');
     }

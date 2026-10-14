@@ -25,7 +25,7 @@ function user(): ?array {
     if (time() - ($_SESSION['last_active'] ?? 0) > 7200 || time() - ($_SESSION['signed_in'] ?? 0) > 43200) {
         $_SESSION = []; session_regenerate_id(true); return null;
     }
-    $q = db()->prepare('SELECT id, username, display_name, game_player_id, role, is_chef, is_chaine, status, session_version, must_change_password FROM users WHERE id = ?');
+    $q = db()->prepare('SELECT id, username, display_name, game_player_id, role, is_chef, is_chaine, status, session_version, must_change_password, password_setup_required FROM users WHERE id = ?');
     $q->execute([$_SESSION['user_id']]); $u = $q->fetch(PDO::FETCH_ASSOC);
     if (!$u || $u['status'] !== 'active' || (int)$u['session_version'] !== ($_SESSION['version'] ?? 0)) {
         $_SESSION = []; session_regenerate_id(true); return null;

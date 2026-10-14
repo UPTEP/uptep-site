@@ -1,0 +1,10 @@
+.public-guide{max-width:660px;margin-top:28px;padding:22px;border:1px solid #dedbc8;border-radius:10px;background:#fff8e7;color:#173747}
+.public-guide-label{display:block;color:#836021;font-size:10px;font-weight:800;letter-spacing:1px;line-height:1.5}
+.public-guide h2{margin:10px 0 8px;font-size:21px;line-height:1.25;letter-spacing:0}
+.public-guide p{margin:0 0 15px;color:#536970;font-size:13px;line-height:1.65}
+.public-guide-download{display:inline-flex;align-items:center;gap:10px;min-height:44px;font-size:14px;font-weight:800;line-height:1.4;color:#173747;text-decoration:underline;text-underline-offset:4px}
+.public-guide-download:hover{color:#836021}
+.public-guide-download:focus-visible{outline:3px solid #836021;outline-offset:4px;border-radius:2px}
+.public-guide-download .icon{width:18px;height:18px;flex:none}
+.public-guide-details{display:block;margin-top:5px;color:#647378;font-size:11px;line-height:1.5}
+@media(max-width:480px){.public-guide{padding:17px}.public-guide h2{font-size:20px}}

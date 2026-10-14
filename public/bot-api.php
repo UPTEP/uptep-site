@@ -31,6 +31,18 @@ try {
         botReply(401,['ok'=>false,'error'=>'unauthorized']);
     }
     $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$method=$_SERVER['REQUEST_METHOD'];
+    if($path==='/api/bot/v1/connexion'){
+        if($method!=='POST'){header('Allow: POST');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
+        if(!in_array('login:create',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
+        if(strtolower(trim(explode(';',$_SERVER['CONTENT_TYPE']??'')[0]))!=='application/json')botReply(415,['ok'=>false,'error'=>'application_json_required']);
+        $raw=file_get_contents('php://input',false,null,0,1025);
+        if(strlen($raw)>1024)botReply(413,['ok'=>false,'error'=>'payload_too_large']);
+        $input=json_decode($raw,true,8,JSON_THROW_ON_ERROR);
+        if(!is_array($input)||array_diff(array_keys($input),['discord_id','guild_id'])||($input['discord_id']??null)!=='1544667516364652659'||!is_string($config['login_guild_id']??null)||($input['guild_id']??null)!==$config['login_guild_id'])botReply(403,['ok'=>false,'error'=>'Connexion réservée au compte et au serveur autorisés.']);
+        define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/discord-login.php';
+        if(!consumeAttempt('discord-login-issue:'.$input['discord_id'],10))botReply(429,['ok'=>false,'error'=>'Trop de liens demandés. Réessaie dans 15 minutes.']);
+        botReply(200,discordLoginIssue(db(),$input['discord_id']));
+    }
     if($path==='/api/bot/v1/health'){
         if($method!=='GET'){header('Allow: GET');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
         if(!in_array('health:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);

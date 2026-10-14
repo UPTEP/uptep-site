@@ -1,252 +1,823 @@
-CREATE TABLE IF NOT EXISTS users (
- id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- username varchar(40) NOT NULL UNIQUE CHECK (username ~ '^[a-z0-9][a-z0-9_.-]{2,39}$'),
- display_name varchar(80) NOT NULL,
- game_player_id bigint CHECK (game_player_id > 0),
- password_hash text NOT NULL,
- role varchar(12) NOT NULL DEFAULT 'member' CHECK (role IN ('admin','member')),
- is_chef boolean NOT NULL DEFAULT false,
- is_chaine boolean NOT NULL DEFAULT false,
- permissions_version integer NOT NULL DEFAULT 1,
- status varchar(12) NOT NULL DEFAULT 'active' CHECK (status IN ('pending','active','disabled')),
- must_change_password boolean NOT NULL DEFAULT true,
- session_version integer NOT NULL DEFAULT 1,
- created_at timestamptz NOT NULL DEFAULT now(),
- approved_at timestamptz,
- approved_by bigint REFERENCES users(id),
- last_login_at timestamptz
-);
-CREATE TABLE IF NOT EXISTS login_limits (
- bucket char(64) PRIMARY KEY,
- attempts integer NOT NULL,
- started_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS login_limits_expiry ON login_limits(started_at);
+--
+-- PostgreSQL database dump
+--
 
-CREATE TABLE IF NOT EXISTS chaine_members (
- server varchar(16) NOT NULL,
- player_id bigint NOT NULL,
- grade text CHECK (grade IN ('Grenier','Passeur','Chasseur','A flooder','Ne pas toucher','Hors chaîne')),
- sort_order integer CHECK (sort_order BETWEEN 1 AND 999999),
- version integer NOT NULL DEFAULT 1,
- updated_by bigint REFERENCES users(id) ON DELETE SET NULL,
- updated_at timestamptz NOT NULL DEFAULT now(),
- PRIMARY KEY (server,player_id)
+\restrict XOsOhMRKTEGlB59fqqvtmFGjPpIpLIbQkplvhgBpP5mxJLaYJu2ygZ5j8Z0Neon
+
+-- Dumped from database version 17.11 (Debian 17.11-1.pgdg13+2)
+-- Dumped by pg_dump version 17.11 (Debian 17.11-1.pgdg13+2)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'SQL_ASCII';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: bot_commandes; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.bot_commandes (
+    commande_id character varying(100) NOT NULL,
+    empreinte character(64) NOT NULL,
+    discord_acteur bigint NOT NULL,
+    action text NOT NULL,
+    statut integer NOT NULL,
+    reponse jsonb NOT NULL,
+    date_creation timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS user_stats (
- user_id bigint PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
- data jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(data) = 'object'),
- version integer NOT NULL DEFAULT 1 CHECK (version > 0),
- updated_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE user_stats OWNER TO fzzz;
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS script_enabled boolean NOT NULL DEFAULT true;
-CREATE TABLE IF NOT EXISTS script_tokens (
- token_hash char(64) PRIMARY KEY,
- user_id bigint NOT NULL REFERENCES users(id) ON DELETE CASCADE,
- player_id bigint NOT NULL CHECK(player_id > 0),
- created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS script_tokens_user ON script_tokens(user_id);
-ALTER TABLE script_tokens OWNER TO fzzz;
+ALTER TABLE public.bot_commandes OWNER TO uptep;
 
-BEGIN;
-CREATE TABLE IF NOT EXISTS script_settings (
- user_id bigint PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
- preferences jsonb NOT NULL DEFAULT '{"buildings":true,"research":true,"chaine":true,"clock":true,"statistics":true}'::jsonb,
- version integer NOT NULL DEFAULT 1 CHECK(version>0),
- buildings_synced_at timestamptz,
- research_synced_at timestamptz,
- updated_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE script_settings OWNER TO fzzz;
-GRANT SELECT,INSERT,UPDATE,DELETE ON script_settings TO uptep;
-COMMIT;
+--
+-- Name: bot_flood_batches; Type: TABLE; Schema: public; Owner: uptep
+--
 
-BEGIN;
-ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS buildings_synced_at timestamptz;
-ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS research_synced_at timestamptz;
-ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS army_synced_at timestamptz;
--- Only transfer known collection dates; never infer a collection from updated_at.
-UPDATE user_stats u SET buildings_synced_at=coalesce(u.buildings_synced_at,s.buildings_synced_at),research_synced_at=coalesce(u.research_synced_at,s.research_synced_at) FROM script_settings s WHERE s.user_id=u.user_id;
-COMMIT;
-BEGIN;
-UPDATE script_settings SET preferences=preferences||'{"army":true}'::jsonb,version=version+1 WHERE NOT preferences ? 'army';
-ALTER TABLE script_settings ALTER COLUMN preferences SET DEFAULT '{"buildings":true,"research":true,"army":true,"chaine":true,"clock":true,"statistics":true}'::jsonb;
-COMMIT;
-
-BEGIN;
-ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS resources_synced_at timestamptz;
-ALTER TABLE user_stats ADD COLUMN IF NOT EXISTS workers_synced_at timestamptz;
-UPDATE script_settings SET preferences=preferences||'{"economy":true}'::jsonb,version=version+1 WHERE NOT preferences ? 'economy';
-ALTER TABLE script_settings ALTER COLUMN preferences SET DEFAULT '{"buildings":true,"research":true,"army":true,"economy":true,"chaine":true,"clock":true,"statistics":true}'::jsonb;
-COMMIT;
-
--- Player display name cache and optional Discord identifier (text preserves exact IDs).
-ALTER TABLE chaine_members ADD COLUMN IF NOT EXISTS pseudo text;
-ALTER TABLE chaine_members ADD COLUMN IF NOT EXISTS iddiscord text;
--- Discord IDs are exact 64-bit integers, never floating-point numbers.
-ALTER TABLE chaine_members ALTER COLUMN iddiscord TYPE bigint USING iddiscord::bigint;
-
-BEGIN;
-CREATE TABLE demandes_convois (
- id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- serveur varchar(16) NOT NULL DEFAULT 's5',
- iddemandeur bigint NOT NULL CHECK(iddemandeur>0), pseudo_demandeur text NOT NULL, discord_demandeur bigint NOT NULL,
- nbpomme_original bigint NOT NULL CHECK(nbpomme_original>=0), nbpomme_restant bigint NOT NULL,
- nbmateriaux_original bigint NOT NULL CHECK(nbmateriaux_original>=0), nbmateriaux_restant bigint NOT NULL,
- valide boolean NOT NULL DEFAULT false, idvalidateur bigint, pseudo_validateur text, discord_validateur bigint,
- date_demande timestamptz NOT NULL DEFAULT now(), date_validation timestamptz,
- fini boolean NOT NULL DEFAULT false, date_fin timestamptz,
- CHECK(nbpomme_original>0 OR nbmateriaux_original>0),
- CHECK(nbpomme_restant BETWEEN 0 AND nbpomme_original), CHECK(nbmateriaux_restant BETWEEN 0 AND nbmateriaux_original),
- CHECK((valide AND idvalidateur IS NOT NULL AND pseudo_validateur IS NOT NULL AND discord_validateur IS NOT NULL AND date_validation IS NOT NULL) OR (NOT valide AND idvalidateur IS NULL AND pseudo_validateur IS NULL AND discord_validateur IS NULL AND date_validation IS NULL)),
- CHECK(fini=(nbpomme_restant=0 AND nbmateriaux_restant=0)),
- CHECK((fini AND valide AND date_fin IS NOT NULL) OR (NOT fini AND date_fin IS NULL))
+CREATE TABLE public.bot_flood_batches (
+    commande_id text NOT NULL,
+    payload_hash text NOT NULL,
+    response jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
-CREATE INDEX demandes_convois_etat ON demandes_convois(valide,id) WHERE NOT fini;
-CREATE TABLE convois_effectues (
- id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- iddemande bigint NOT NULL REFERENCES demandes_convois(id) ON DELETE RESTRICT,
- idenvoyeur bigint NOT NULL CHECK(idenvoyeur>0), pseudo_envoyeur text NOT NULL, discord_envoyeur bigint NOT NULL,
- nbpomme bigint NOT NULL CHECK(nbpomme>=0), nbmateriaux bigint NOT NULL CHECK(nbmateriaux>=0),
- date_convoi timestamptz NOT NULL, date_enregistrement timestamptz NOT NULL DEFAULT now(),
- CHECK(nbpomme>0 OR nbmateriaux>0)
-);
-CREATE INDEX convois_effectues_demande ON convois_effectues(iddemande,id);
--- Transactional command receipts prevent duplicate writes and retain their original response.
-CREATE TABLE bot_commandes (
- commande_id varchar(100) PRIMARY KEY,
- empreinte char(64) NOT NULL,
- discord_acteur bigint NOT NULL,
- action text NOT NULL,
- statut integer NOT NULL,
- reponse jsonb NOT NULL,
- date_creation timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE demandes_convois OWNER TO fzzz;
-ALTER TABLE convois_effectues OWNER TO fzzz;
-ALTER TABLE bot_commandes OWNER TO fzzz;
-GRANT SELECT,INSERT,UPDATE,DELETE ON demandes_convois,convois_effectues,bot_commandes TO uptep;
-GRANT USAGE,SELECT ON SEQUENCE demandes_convois_id_seq,convois_effectues_id_seq TO uptep;
-COMMIT;
-BEGIN;
-ALTER TABLE demandes_convois ADD COLUMN objet text CHECK (length(objet) BETWEEN 1 AND 160);
-ALTER TABLE demandes_convois ADD COLUMN niveau integer CHECK(niveau BETWEEN 1 AND 999);
-ALTER TABLE demandes_convois ADD COLUMN date_souhaitee date;
-ALTER TABLE demandes_convois ADD COLUMN annulee boolean NOT NULL DEFAULT false;
-ALTER TABLE demandes_convois ADD COLUMN date_annulation timestamptz;
-ALTER TABLE demandes_convois ADD COLUMN idannulateur bigint;
-ALTER TABLE demandes_convois ADD COLUMN pseudo_annulateur text;
-ALTER TABLE demandes_convois ADD COLUMN discord_annulateur bigint;
-ALTER TABLE demandes_convois ADD CONSTRAINT demande_annulation CHECK(
- (annulee AND NOT fini AND date_annulation IS NOT NULL AND idannulateur IS NOT NULL AND pseudo_annulateur IS NOT NULL AND discord_annulateur IS NOT NULL)
- OR (NOT annulee AND date_annulation IS NULL AND idannulateur IS NULL AND pseudo_annulateur IS NULL AND discord_annulateur IS NULL));
-ALTER TABLE convois_effectues ADD COLUMN date_arrivee timestamptz;
-COMMIT;
 
-BEGIN;
-ALTER TABLE demandes_convois ADD COLUMN fin_manuelle boolean NOT NULL DEFAULT false;
-ALTER TABLE demandes_convois ADD COLUMN discord_cloture bigint;
-ALTER TABLE demandes_convois ADD COLUMN pseudo_cloture text;
-ALTER TABLE demandes_convois DROP CONSTRAINT demandes_convois_check4;
-ALTER TABLE demandes_convois ADD CONSTRAINT demande_solde_fin CHECK(fini=(fin_manuelle OR (nbpomme_restant=0 AND nbmateriaux_restant=0)));
-ALTER TABLE demandes_convois ADD CONSTRAINT demande_fin_audit CHECK((fin_manuelle AND fini AND discord_cloture IS NOT NULL AND pseudo_cloture IS NOT NULL) OR (NOT fin_manuelle AND discord_cloture IS NULL AND pseudo_cloture IS NULL));
-ALTER TABLE convois_effectues ADD COLUMN annule boolean NOT NULL DEFAULT false;
-ALTER TABLE convois_effectues ADD COLUMN date_annulation timestamptz;
-ALTER TABLE convois_effectues ADD COLUMN discord_annulateur bigint;
-ALTER TABLE convois_effectues ADD COLUMN pseudo_annulateur text;
-ALTER TABLE convois_effectues ADD CONSTRAINT convoi_annulation_audit CHECK((annule AND date_annulation IS NOT NULL AND discord_annulateur IS NOT NULL AND pseudo_annulateur IS NOT NULL) OR (NOT annule AND date_annulation IS NULL AND discord_annulateur IS NULL AND pseudo_annulateur IS NULL));
-COMMIT;
 
--- Manual adjustments of remaining convoy demand, with separate audit.
-BEGIN;
-CREATE TABLE demandes_ajustements (
- id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- iddemande bigint NOT NULL REFERENCES demandes_convois(id) ON DELETE RESTRICT,
- discord_acteur bigint NOT NULL,
- pseudo_acteur text NOT NULL,
- pommes_avant bigint NOT NULL CHECK(pommes_avant>=0),
- pommes_apres bigint NOT NULL CHECK(pommes_apres>=0),
- materiaux_avant bigint NOT NULL CHECK(materiaux_avant>=0),
- materiaux_apres bigint NOT NULL CHECK(materiaux_apres>=0),
- date_ajustement timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX demandes_ajustements_demande ON demandes_ajustements(iddemande,id);
-ALTER TABLE demandes_ajustements OWNER TO fzzz;
-GRANT SELECT,INSERT ON demandes_ajustements TO uptep;
-GRANT USAGE,SELECT ON SEQUENCE demandes_ajustements_id_seq TO uptep;
-COMMIT;
--- Add the optional laboratory comparison without overwriting saved choices.
-UPDATE script_settings SET preferences=preferences||'{"laboratory":true}'::jsonb,version=version+1 WHERE NOT preferences ? 'laboratory';
-ALTER TABLE script_settings ALTER COLUMN preferences SET DEFAULT '{"buildings":true,"research":true,"army":true,"economy":true,"chaine":true,"clock":true,"statistics":true,"laboratory":true}'::jsonb;
+ALTER TABLE public.bot_flood_batches OWNER TO uptep;
 
-CREATE TABLE IF NOT EXISTS terrain_discord_channels (
- guild_id text NOT NULL, channel_id text NOT NULL, last_message_id numeric(20,0) NOT NULL DEFAULT 0,
- updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(guild_id,channel_id)
-);
-CREATE TABLE IF NOT EXISTS terrain_discord_batches (
- id text PRIMARY KEY, guild_id text NOT NULL, channel_id text NOT NULL, payload_hash text NOT NULL,
- response jsonb NOT NULL, warnings jsonb NOT NULL DEFAULT '[]', published_message_id text,
- created_at timestamptz NOT NULL DEFAULT now(),
- FOREIGN KEY(guild_id,channel_id) REFERENCES terrain_discord_channels(guild_id,channel_id)
-);
-CREATE TABLE IF NOT EXISTS terrain_discord_reports (
- guild_id text NOT NULL, channel_id text NOT NULL, message_id text NOT NULL,
- author_id text, content text NOT NULL, fingerprint text, duplicate_of text,
- batch_id text NOT NULL REFERENCES terrain_discord_batches(id), PRIMARY KEY(guild_id,channel_id,message_id)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS terrain_discord_report_fingerprint ON terrain_discord_reports(guild_id,channel_id,fingerprint) WHERE fingerprint IS NOT NULL AND duplicate_of IS NULL;
-CREATE TABLE IF NOT EXISTS terrain_discord_movements (
- guild_id text NOT NULL, channel_id text NOT NULL, event_id text NOT NULL, message_id text NOT NULL,
- direction text NOT NULL CHECK(direction IN ('gain','loss')), amount numeric(30,0) NOT NULL CHECK(amount>0),
- enemy text NOT NULL, member text, occurred_at_text text, quote text NOT NULL,
- PRIMARY KEY(guild_id,channel_id,event_id),
- FOREIGN KEY(guild_id,channel_id,message_id) REFERENCES terrain_discord_reports(guild_id,channel_id,message_id)
-);
-ALTER TABLE terrain_discord_channels OWNER TO uptep;
-ALTER TABLE terrain_discord_batches OWNER TO uptep;
-ALTER TABLE terrain_discord_reports OWNER TO uptep;
-ALTER TABLE terrain_discord_movements OWNER TO uptep;
+--
+-- Name: chaine_members; Type: TABLE; Schema: public; Owner: uptep
+--
 
--- Optional existing phpPgAdmin administrator; application access remains owned by uptep.
-DO $$ BEGIN
- IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fzzz_admin') THEN
-  GRANT ALL PRIVILEGES ON TABLE terrain_discord_channels, terrain_discord_batches, terrain_discord_reports, terrain_discord_movements TO fzzz_admin;
- END IF;
-END $$;
-
--- Discord identity of the identified report owner (not necessarily its poster).
-ALTER TABLE terrain_discord_movements ADD COLUMN IF NOT EXISTS member_discord_id text;
-
-CREATE TABLE IF NOT EXISTS bot_flood_batches (
- commande_id text PRIMARY KEY, payload_hash text NOT NULL, response jsonb NOT NULL,
- created_at timestamptz NOT NULL DEFAULT now()
+CREATE TABLE public.chaine_members (
+    server character varying(16) NOT NULL,
+    player_id bigint NOT NULL,
+    grade text,
+    sort_order integer,
+    version integer DEFAULT 1 NOT NULL,
+    updated_by bigint,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    pseudo text,
+    iddiscord bigint,
+    CONSTRAINT chaine_members_grade_check CHECK ((grade = ANY (ARRAY['Grenier'::text, 'Passeur'::text, 'Chasseur'::text, 'A flooder'::text, 'Ne pas toucher'::text, 'Hors chaîne'::text]))),
+    CONSTRAINT chaine_members_sort_order_check CHECK (((sort_order >= 1) AND (sort_order <= 999999)))
 );
-CREATE TABLE IF NOT EXISTS floods (
- id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
- commande_id text NOT NULL REFERENCES bot_flood_batches(commande_id),
- ordinal integer NOT NULL CHECK(ordinal>=0),
- sender_id bigint NOT NULL, sender_pseudo text NOT NULL, sender_discord bigint NOT NULL,
- target_id bigint, target_pseudo text NOT NULL, target_discord bigint,
- location text NOT NULL, troops text, arrival_at timestamptz NOT NULL,
- captured_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
- UNIQUE(commande_id,ordinal)
-);
-CREATE INDEX IF NOT EXISTS floods_arrival ON floods(arrival_at,id);
-CREATE INDEX IF NOT EXISTS floods_target_arrival ON floods(target_id,arrival_at,id);
-ALTER TABLE bot_flood_batches OWNER TO uptep;
-ALTER TABLE floods OWNER TO uptep;
-DO $$ BEGIN IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='fzzz_admin') THEN
- GRANT ALL PRIVILEGES ON bot_flood_batches,floods TO fzzz_admin;
- GRANT ALL PRIVILEGES ON SEQUENCE floods_id_seq TO fzzz_admin;
-END IF; END $$;
 
--- Personal userscript traffic indexes.
--- Personal incoming/outgoing traffic; no changes to declarations or resource balances.
-CREATE INDEX IF NOT EXISTS floods_sender_arrival ON floods(sender_id,arrival_at,id);
-CREATE INDEX IF NOT EXISTS convois_sender_arrival ON convois_effectues(idenvoyeur,date_arrivee,id) WHERE NOT annule AND date_arrivee IS NOT NULL;
-CREATE INDEX IF NOT EXISTS convois_demand_arrival ON convois_effectues(iddemande,date_arrivee,id) WHERE NOT annule AND date_arrivee IS NOT NULL;
-CREATE INDEX IF NOT EXISTS demandes_requester ON demandes_convois(serveur,iddemandeur,id);
+
+ALTER TABLE public.chaine_members OWNER TO uptep;
+
+--
+-- Name: convois_effectues; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.convois_effectues (
+    id bigint NOT NULL,
+    iddemande bigint NOT NULL,
+    idenvoyeur bigint NOT NULL,
+    pseudo_envoyeur text NOT NULL,
+    discord_envoyeur bigint NOT NULL,
+    nbpomme bigint NOT NULL,
+    nbmateriaux bigint NOT NULL,
+    date_convoi timestamp with time zone NOT NULL,
+    date_enregistrement timestamp with time zone DEFAULT now() NOT NULL,
+    date_arrivee timestamp with time zone,
+    annule boolean DEFAULT false NOT NULL,
+    date_annulation timestamp with time zone,
+    discord_annulateur bigint,
+    pseudo_annulateur text,
+    CONSTRAINT convoi_annulation_audit CHECK (((annule AND (date_annulation IS NOT NULL) AND (discord_annulateur IS NOT NULL) AND (pseudo_annulateur IS NOT NULL)) OR ((NOT annule) AND (date_annulation IS NULL) AND (discord_annulateur IS NULL) AND (pseudo_annulateur IS NULL)))),
+    CONSTRAINT convois_effectues_check CHECK (((nbpomme > 0) OR (nbmateriaux > 0))),
+    CONSTRAINT convois_effectues_idenvoyeur_check CHECK ((idenvoyeur > 0)),
+    CONSTRAINT convois_effectues_nbmateriaux_check CHECK ((nbmateriaux >= 0)),
+    CONSTRAINT convois_effectues_nbpomme_check CHECK ((nbpomme >= 0))
+);
+
+
+ALTER TABLE public.convois_effectues OWNER TO uptep;
+
+--
+-- Name: convois_effectues_id_seq; Type: SEQUENCE; Schema: public; Owner: uptep
+--
+
+ALTER TABLE public.convois_effectues ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.convois_effectues_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: demandes_ajustements; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.demandes_ajustements (
+    id bigint NOT NULL,
+    iddemande bigint NOT NULL,
+    discord_acteur bigint NOT NULL,
+    pseudo_acteur text NOT NULL,
+    pommes_avant bigint NOT NULL,
+    pommes_apres bigint NOT NULL,
+    materiaux_avant bigint NOT NULL,
+    materiaux_apres bigint NOT NULL,
+    date_ajustement timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT demandes_ajustements_materiaux_apres_check CHECK ((materiaux_apres >= 0)),
+    CONSTRAINT demandes_ajustements_materiaux_avant_check CHECK ((materiaux_avant >= 0)),
+    CONSTRAINT demandes_ajustements_pommes_apres_check CHECK ((pommes_apres >= 0)),
+    CONSTRAINT demandes_ajustements_pommes_avant_check CHECK ((pommes_avant >= 0))
+);
+
+
+ALTER TABLE public.demandes_ajustements OWNER TO uptep;
+
+--
+-- Name: demandes_ajustements_id_seq; Type: SEQUENCE; Schema: public; Owner: uptep
+--
+
+ALTER TABLE public.demandes_ajustements ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.demandes_ajustements_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: demandes_convois; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.demandes_convois (
+    id bigint NOT NULL,
+    serveur character varying(16) DEFAULT 's5'::character varying NOT NULL,
+    iddemandeur bigint NOT NULL,
+    pseudo_demandeur text NOT NULL,
+    discord_demandeur bigint NOT NULL,
+    nbpomme_original bigint NOT NULL,
+    nbpomme_restant bigint NOT NULL,
+    nbmateriaux_original bigint NOT NULL,
+    nbmateriaux_restant bigint NOT NULL,
+    valide boolean DEFAULT false NOT NULL,
+    idvalidateur bigint,
+    pseudo_validateur text,
+    discord_validateur bigint,
+    date_demande timestamp with time zone DEFAULT now() NOT NULL,
+    date_validation timestamp with time zone,
+    fini boolean DEFAULT false NOT NULL,
+    date_fin timestamp with time zone,
+    objet text,
+    niveau integer,
+    date_souhaitee date,
+    annulee boolean DEFAULT false NOT NULL,
+    date_annulation timestamp with time zone,
+    idannulateur bigint,
+    pseudo_annulateur text,
+    discord_annulateur bigint,
+    fin_manuelle boolean DEFAULT false NOT NULL,
+    discord_cloture bigint,
+    pseudo_cloture text,
+    CONSTRAINT demande_annulation CHECK (((annulee AND (NOT fini) AND (date_annulation IS NOT NULL) AND (idannulateur IS NOT NULL) AND (pseudo_annulateur IS NOT NULL) AND (discord_annulateur IS NOT NULL)) OR ((NOT annulee) AND (date_annulation IS NULL) AND (idannulateur IS NULL) AND (pseudo_annulateur IS NULL) AND (discord_annulateur IS NULL)))),
+    CONSTRAINT demande_fin_audit CHECK (((fin_manuelle AND fini AND (discord_cloture IS NOT NULL) AND (pseudo_cloture IS NOT NULL)) OR ((NOT fin_manuelle) AND (discord_cloture IS NULL) AND (pseudo_cloture IS NULL)))),
+    CONSTRAINT demande_solde_fin CHECK ((fini = (fin_manuelle OR ((nbpomme_restant = 0) AND (nbmateriaux_restant = 0))))),
+    CONSTRAINT demandes_convois_check CHECK (((nbpomme_original > 0) OR (nbmateriaux_original > 0))),
+    CONSTRAINT demandes_convois_check1 CHECK (((nbpomme_restant >= 0) AND (nbpomme_restant <= nbpomme_original))),
+    CONSTRAINT demandes_convois_check2 CHECK (((nbmateriaux_restant >= 0) AND (nbmateriaux_restant <= nbmateriaux_original))),
+    CONSTRAINT demandes_convois_check3 CHECK (((valide AND (idvalidateur IS NOT NULL) AND (pseudo_validateur IS NOT NULL) AND (discord_validateur IS NOT NULL) AND (date_validation IS NOT NULL)) OR ((NOT valide) AND (idvalidateur IS NULL) AND (pseudo_validateur IS NULL) AND (discord_validateur IS NULL) AND (date_validation IS NULL)))),
+    CONSTRAINT demandes_convois_check5 CHECK (((fini AND valide AND (date_fin IS NOT NULL)) OR ((NOT fini) AND (date_fin IS NULL)))),
+    CONSTRAINT demandes_convois_iddemandeur_check CHECK ((iddemandeur > 0)),
+    CONSTRAINT demandes_convois_nbmateriaux_original_check CHECK ((nbmateriaux_original >= 0)),
+    CONSTRAINT demandes_convois_nbpomme_original_check CHECK ((nbpomme_original >= 0)),
+    CONSTRAINT demandes_convois_niveau_check CHECK (((niveau >= 1) AND (niveau <= 999))),
+    CONSTRAINT demandes_convois_objet_check CHECK (((length(objet) >= 1) AND (length(objet) <= 160)))
+);
+
+
+ALTER TABLE public.demandes_convois OWNER TO uptep;
+
+--
+-- Name: demandes_convois_id_seq; Type: SEQUENCE; Schema: public; Owner: uptep
+--
+
+ALTER TABLE public.demandes_convois ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.demandes_convois_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: discord_login_tokens; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.discord_login_tokens (
+    token_hash character(64) NOT NULL,
+    user_id bigint,
+    discord_id character varying(20) NOT NULL,
+    session_version integer,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    expires_at timestamp with time zone DEFAULT (now() + '00:02:00'::interval) NOT NULL,
+    player_id bigint NOT NULL,
+    test_mode boolean DEFAULT false NOT NULL
+);
+
+
+ALTER TABLE public.discord_login_tokens OWNER TO uptep;
+
+--
+-- Name: floods; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.floods (
+    id bigint NOT NULL,
+    commande_id text NOT NULL,
+    ordinal integer NOT NULL,
+    sender_id bigint NOT NULL,
+    sender_pseudo text NOT NULL,
+    sender_discord bigint NOT NULL,
+    target_id bigint,
+    target_pseudo text NOT NULL,
+    target_discord bigint,
+    location text NOT NULL,
+    troops text,
+    arrival_at timestamp with time zone NOT NULL,
+    captured_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT floods_ordinal_check CHECK ((ordinal >= 0))
+);
+
+
+ALTER TABLE public.floods OWNER TO uptep;
+
+--
+-- Name: floods_id_seq; Type: SEQUENCE; Schema: public; Owner: uptep
+--
+
+ALTER TABLE public.floods ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.floods_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: login_limits; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.login_limits (
+    bucket character(64) NOT NULL,
+    attempts integer NOT NULL,
+    started_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.login_limits OWNER TO uptep;
+
+--
+-- Name: script_settings; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.script_settings (
+    user_id bigint NOT NULL,
+    preferences jsonb DEFAULT '{"army": true, "clock": true, "chaine": true, "economy": true, "research": true, "buildings": true, "laboratory": true, "statistics": true}'::jsonb NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    buildings_synced_at timestamp with time zone,
+    research_synced_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT script_settings_version_check CHECK ((version > 0))
+);
+
+
+ALTER TABLE public.script_settings OWNER TO uptep;
+
+--
+-- Name: script_tokens; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.script_tokens (
+    token_hash character(64) NOT NULL,
+    user_id bigint NOT NULL,
+    player_id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT script_tokens_player_id_check CHECK ((player_id > 0))
+);
+
+
+ALTER TABLE public.script_tokens OWNER TO uptep;
+
+--
+-- Name: terrain_discord_batches; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.terrain_discord_batches (
+    id text NOT NULL,
+    guild_id text NOT NULL,
+    channel_id text NOT NULL,
+    payload_hash text NOT NULL,
+    response jsonb NOT NULL,
+    warnings jsonb DEFAULT '[]'::jsonb NOT NULL,
+    published_message_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.terrain_discord_batches OWNER TO uptep;
+
+--
+-- Name: terrain_discord_channels; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.terrain_discord_channels (
+    guild_id text NOT NULL,
+    channel_id text NOT NULL,
+    last_message_id numeric(20,0) DEFAULT 0 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.terrain_discord_channels OWNER TO uptep;
+
+--
+-- Name: terrain_discord_movements; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.terrain_discord_movements (
+    guild_id text NOT NULL,
+    channel_id text NOT NULL,
+    event_id text NOT NULL,
+    message_id text NOT NULL,
+    direction text NOT NULL,
+    amount numeric(30,0) NOT NULL,
+    enemy text NOT NULL,
+    member text,
+    occurred_at_text text,
+    quote text NOT NULL,
+    member_discord_id text,
+    CONSTRAINT terrain_discord_movements_amount_check CHECK ((amount > (0)::numeric)),
+    CONSTRAINT terrain_discord_movements_direction_check CHECK ((direction = ANY (ARRAY['gain'::text, 'loss'::text])))
+);
+
+
+ALTER TABLE public.terrain_discord_movements OWNER TO uptep;
+
+--
+-- Name: terrain_discord_reports; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.terrain_discord_reports (
+    guild_id text NOT NULL,
+    channel_id text NOT NULL,
+    message_id text NOT NULL,
+    author_id text,
+    content text NOT NULL,
+    fingerprint text,
+    duplicate_of text,
+    batch_id text NOT NULL
+);
+
+
+ALTER TABLE public.terrain_discord_reports OWNER TO uptep;
+
+--
+-- Name: user_stats; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.user_stats (
+    user_id bigint NOT NULL,
+    data jsonb DEFAULT '{}'::jsonb NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    buildings_synced_at timestamp with time zone,
+    research_synced_at timestamp with time zone,
+    army_synced_at timestamp with time zone,
+    resources_synced_at timestamp with time zone,
+    workers_synced_at timestamp with time zone,
+    CONSTRAINT user_stats_data_check CHECK ((jsonb_typeof(data) = 'object'::text)),
+    CONSTRAINT user_stats_version_check CHECK ((version > 0))
+);
+
+
+ALTER TABLE public.user_stats OWNER TO uptep;
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: uptep
+--
+
+CREATE TABLE public.users (
+    id bigint NOT NULL,
+    username character varying(80) NOT NULL,
+    display_name character varying(80) NOT NULL,
+    password_hash text NOT NULL,
+    role character varying(12) DEFAULT 'member'::character varying NOT NULL,
+    status character varying(12) DEFAULT 'active'::character varying NOT NULL,
+    must_change_password boolean DEFAULT true NOT NULL,
+    session_version integer DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    approved_at timestamp with time zone,
+    approved_by bigint,
+    last_login_at timestamp with time zone,
+    is_chef boolean DEFAULT false NOT NULL,
+    is_chaine boolean DEFAULT false NOT NULL,
+    permissions_version integer DEFAULT 1 NOT NULL,
+    game_player_id bigint,
+    script_enabled boolean DEFAULT true NOT NULL,
+    discord_login_id bigint,
+    password_setup_required boolean DEFAULT false NOT NULL,
+    CONSTRAINT users_game_player_id_check CHECK ((game_player_id > 0)),
+    CONSTRAINT users_role_check CHECK (((role)::text = ANY (ARRAY[('admin'::character varying)::text, ('member'::character varying)::text]))),
+    CONSTRAINT users_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('active'::character varying)::text, ('disabled'::character varying)::text]))),
+    CONSTRAINT users_username_check CHECK ((((username)::text = btrim((username)::text)) AND ((char_length((username)::text) >= 1) AND (char_length((username)::text) <= 80)) AND ((username)::text !~ '[[:cntrl:]]'::text)))
+);
+
+
+ALTER TABLE public.users OWNER TO uptep;
+
+--
+-- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: uptep
+--
+
+ALTER TABLE public.users ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.users_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: bot_commandes bot_commandes_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.bot_commandes
+    ADD CONSTRAINT bot_commandes_pkey PRIMARY KEY (commande_id);
+
+
+--
+-- Name: bot_flood_batches bot_flood_batches_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.bot_flood_batches
+    ADD CONSTRAINT bot_flood_batches_pkey PRIMARY KEY (commande_id);
+
+
+--
+-- Name: chaine_members chaine_members_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.chaine_members
+    ADD CONSTRAINT chaine_members_pkey PRIMARY KEY (server, player_id);
+
+
+--
+-- Name: convois_effectues convois_effectues_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.convois_effectues
+    ADD CONSTRAINT convois_effectues_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: demandes_ajustements demandes_ajustements_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.demandes_ajustements
+    ADD CONSTRAINT demandes_ajustements_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: demandes_convois demandes_convois_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.demandes_convois
+    ADD CONSTRAINT demandes_convois_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: discord_login_tokens discord_login_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.discord_login_tokens
+    ADD CONSTRAINT discord_login_tokens_pkey PRIMARY KEY (token_hash);
+
+
+--
+-- Name: floods floods_commande_id_ordinal_key; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.floods
+    ADD CONSTRAINT floods_commande_id_ordinal_key UNIQUE (commande_id, ordinal);
+
+
+--
+-- Name: floods floods_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.floods
+    ADD CONSTRAINT floods_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: login_limits login_limits_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.login_limits
+    ADD CONSTRAINT login_limits_pkey PRIMARY KEY (bucket);
+
+
+--
+-- Name: script_settings script_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.script_settings
+    ADD CONSTRAINT script_settings_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: script_tokens script_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.script_tokens
+    ADD CONSTRAINT script_tokens_pkey PRIMARY KEY (token_hash);
+
+
+--
+-- Name: terrain_discord_batches terrain_discord_batches_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.terrain_discord_batches
+    ADD CONSTRAINT terrain_discord_batches_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: terrain_discord_channels terrain_discord_channels_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.terrain_discord_channels
+    ADD CONSTRAINT terrain_discord_channels_pkey PRIMARY KEY (guild_id, channel_id);
+
+
+--
+-- Name: terrain_discord_movements terrain_discord_movements_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.terrain_discord_movements
+    ADD CONSTRAINT terrain_discord_movements_pkey PRIMARY KEY (guild_id, channel_id, event_id);
+
+
+--
+-- Name: terrain_discord_reports terrain_discord_reports_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.terrain_discord_reports
+    ADD CONSTRAINT terrain_discord_reports_pkey PRIMARY KEY (guild_id, channel_id, message_id);
+
+
+--
+-- Name: user_stats user_stats_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.user_stats
+    ADD CONSTRAINT user_stats_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_username_key UNIQUE (username);
+
+
+--
+-- Name: convois_demand_arrival; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX convois_demand_arrival ON public.convois_effectues USING btree (iddemande, date_arrivee, id) WHERE ((NOT annule) AND (date_arrivee IS NOT NULL));
+
+
+--
+-- Name: convois_effectues_demande; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX convois_effectues_demande ON public.convois_effectues USING btree (iddemande, id);
+
+
+--
+-- Name: convois_sender_arrival; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX convois_sender_arrival ON public.convois_effectues USING btree (idenvoyeur, date_arrivee, id) WHERE ((NOT annule) AND (date_arrivee IS NOT NULL));
+
+
+--
+-- Name: demandes_ajustements_demande; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX demandes_ajustements_demande ON public.demandes_ajustements USING btree (iddemande, id);
+
+
+--
+-- Name: demandes_convois_etat; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX demandes_convois_etat ON public.demandes_convois USING btree (valide, id) WHERE (NOT fini);
+
+
+--
+-- Name: demandes_requester; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX demandes_requester ON public.demandes_convois USING btree (serveur, iddemandeur, id);
+
+
+--
+-- Name: discord_login_tokens_expiry; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX discord_login_tokens_expiry ON public.discord_login_tokens USING btree (expires_at);
+
+
+--
+-- Name: floods_arrival; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX floods_arrival ON public.floods USING btree (arrival_at, id);
+
+
+--
+-- Name: floods_sender_arrival; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX floods_sender_arrival ON public.floods USING btree (sender_id, arrival_at, id);
+
+
+--
+-- Name: floods_target_arrival; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX floods_target_arrival ON public.floods USING btree (target_id, arrival_at, id);
+
+
+--
+-- Name: login_limits_expiry; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX login_limits_expiry ON public.login_limits USING btree (started_at);
+
+
+--
+-- Name: script_tokens_user; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE INDEX script_tokens_user ON public.script_tokens USING btree (user_id);
+
+
+--
+-- Name: terrain_discord_report_fingerprint; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE UNIQUE INDEX terrain_discord_report_fingerprint ON public.terrain_discord_reports USING btree (guild_id, channel_id, fingerprint) WHERE ((fingerprint IS NOT NULL) AND (duplicate_of IS NULL));
+
+
+--
+-- Name: users_discord_login_id_unique; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE UNIQUE INDEX users_discord_login_id_unique ON public.users USING btree (discord_login_id) WHERE (discord_login_id IS NOT NULL);
+
+
+--
+-- Name: users_username_lower_unique; Type: INDEX; Schema: public; Owner: uptep
+--
+
+CREATE UNIQUE INDEX users_username_lower_unique ON public.users USING btree (lower((username)::text));
+
+
+--
+-- Name: chaine_members chaine_members_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.chaine_members
+    ADD CONSTRAINT chaine_members_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: convois_effectues convois_effectues_iddemande_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.convois_effectues
+    ADD CONSTRAINT convois_effectues_iddemande_fkey FOREIGN KEY (iddemande) REFERENCES public.demandes_convois(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: demandes_ajustements demandes_ajustements_iddemande_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.demandes_ajustements
+    ADD CONSTRAINT demandes_ajustements_iddemande_fkey FOREIGN KEY (iddemande) REFERENCES public.demandes_convois(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: discord_login_tokens discord_login_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.discord_login_tokens
+    ADD CONSTRAINT discord_login_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: floods floods_commande_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.floods
+    ADD CONSTRAINT floods_commande_id_fkey FOREIGN KEY (commande_id) REFERENCES public.bot_flood_batches(commande_id);
+
+
+--
+-- Name: script_settings script_settings_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.script_settings
+    ADD CONSTRAINT script_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: script_tokens script_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.script_tokens
+    ADD CONSTRAINT script_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: terrain_discord_batches terrain_discord_batches_guild_id_channel_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.terrain_discord_batches
+    ADD CONSTRAINT terrain_discord_batches_guild_id_channel_id_fkey FOREIGN KEY (guild_id, channel_id) REFERENCES public.terrain_discord_channels(guild_id, channel_id);
+
+
+--
+-- Name: terrain_discord_movements terrain_discord_movements_guild_id_channel_id_message_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.terrain_discord_movements
+    ADD CONSTRAINT terrain_discord_movements_guild_id_channel_id_message_id_fkey FOREIGN KEY (guild_id, channel_id, message_id) REFERENCES public.terrain_discord_reports(guild_id, channel_id, message_id);
+
+
+--
+-- Name: terrain_discord_reports terrain_discord_reports_batch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.terrain_discord_reports
+    ADD CONSTRAINT terrain_discord_reports_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES public.terrain_discord_batches(id);
+
+
+--
+-- Name: user_stats user_stats_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.user_stats
+    ADD CONSTRAINT user_stats_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: users users_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: uptep
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.users(id);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict XOsOhMRKTEGlB59fqqvtmFGjPpIpLIbQkplvhgBpP5mxJLaYJu2ygZ5j8Z0Neon
