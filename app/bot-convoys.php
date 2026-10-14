@@ -20,13 +20,13 @@ function botConfiguredAdmins(): array {
     return array_values(array_unique($ids));
 }
 function botActor(PDO $p,PDO $game,string $discord,bool $validate): array {
-    $q=$p->prepare("SELECT player_id::text FROM chaine_members WHERE server='s5' AND iddiscord=? FOR SHARE");$q->execute([$discord]);$rows=$q->fetchAll(PDO::FETCH_COLUMN);
+    $q=$p->prepare("SELECT player_id::text FROM chaine_members WHERE server='s5' AND iddiscord=?".($p->inTransaction()?' FOR SHARE':''));$q->execute([$discord]);$rows=$q->fetchAll(PDO::FETCH_COLUMN);
     if(count($rows)===0)throw new DomainException('Ton compte Discord n’est pas encore associé à un joueur UPTEP. Contacte NoobEnCDI pour qu’il ajoute ton ID Discord à ton compte joueur.',403);
     if(count($rows)!==1)throw new DomainException('Ton ID Discord est associé à plusieurs joueurs. Contacte NoobEnCDI pour corriger cette association.',403);
     $q=$game->prepare("SELECT pseudo FROM players WHERE server='s5' AND player_id=? AND upper(alliance_tag)='UPTEP' AND is_present=true");$q->execute([$rows[0]]);$pseudo=$q->fetchColumn();
     if($pseudo===false)throw new DomainException('Le joueur ne fait plus partie de l’alliance UPTEP.',403);
     if($validate && !in_array($discord,botConfiguredAdmins(),true)){
-        $q=$p->prepare('SELECT status,is_chaine,must_change_password FROM users WHERE game_player_id=? FOR SHARE');$q->execute([$rows[0]]);$users=$q->fetchAll(PDO::FETCH_ASSOC);
+        $q=$p->prepare('SELECT status,is_chaine,must_change_password FROM users WHERE game_player_id=?'.($p->inTransaction()?' FOR SHARE':''));$q->execute([$rows[0]]);$users=$q->fetchAll(PDO::FETCH_ASSOC);
         if(count($users)!==1 || $users[0]['status']!=='active' || !$users[0]['is_chaine'] || $users[0]['must_change_password'])throw new DomainException('Un droit administrateur du bot ou le droit chaîne sur un compte UPTEP validé est nécessaire.',403);
     }
     return ['id'=>$rows[0],'pseudo'=>$pseudo,'discord'=>$discord];
@@ -45,7 +45,7 @@ function botDemand(PDO $p,string $id): array {
     $q=$p->prepare('SELECT id::text,discord_acteur::text,pseudo_acteur,pommes_avant::text,pommes_apres::text,materiaux_avant::text,materiaux_apres::text,date_ajustement FROM demandes_ajustements WHERE iddemande=? ORDER BY id DESC LIMIT 10');$q->execute([$id]);$r['ajustements']=$q->fetchAll(PDO::FETCH_ASSOC);
     return $r;
 }
-function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body): array {
+function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body,?callable $eventSink=null): array {
     $allowed=['suspension'=>['commande_id','discord_id'],'modification'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee','version_attendue'],'ajustement'=>['commande_id','discord_id','nbpomme_restant','nbmateriaux_restant','nbpomme_attendu','nbmateriaux_attendu'],'terminaison'=>['commande_id','discord_id'],'demande'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee'],'annulation'=>['commande_id','discord_id'],'validation'=>['commande_id','discord_id','version_attendue'],'convoi'=>['commande_id','discord_id','nbpomme','nbmateriaux','date_convoi','date_arrivee']][$action];
     if(array_diff(array_keys($body),$allowed))throw new DomainException('Champ inconnu dans la requête.',422);
     $command=$body['commande_id']??null;
@@ -152,6 +152,7 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
         $out=['ok'=>true,'demande'=>botDemand($p,$id)];
         if(isset($convoy))$out['convoi']=$convoy+['iddemande'=>$id,'idenvoyeur'=>$actor['id'],'pseudo_envoyeur'=>$actor['pseudo'],'discord_envoyeur'=>$discord,'nbpomme'=>$apple,'nbmateriaux'=>$wood];
         $q=$p->prepare('INSERT INTO bot_commandes(commande_id,empreinte,discord_acteur,action,statut,reponse) VALUES(?,?,?,?,?,?::jsonb)');$q->execute([$command,$hash,$discord,$action,$status,json_encode($out,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE)]);
+        if($eventSink!==null && in_array($action,['validation','convoi'],true))$eventSink($p,$action,$out);
         $p->commit();return [$status,$out,false];
     }catch(Throwable $e){if($p->inTransaction())$p->rollBack();throw $e;}
 }

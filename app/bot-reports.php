@@ -6,6 +6,18 @@ function botReportAccess(PDO $p,PDO $game,array $query): void {
     if(!in_array($id,botConfiguredAdmins(),true))throw new DomainException('Ces historiques et statistiques sont réservés aux chefs listés dans ADMIN_DISCORD_IDS.',403);
     botActor($p,$game,$id,false);
 }
+// Website reports use the effective profile and recheck the trusted account binding.
+function botSiteReportRights(array $u): bool {
+    return ($u['role']??'')==='admin' || ($u['is_chef']??false)===true;
+}
+function botSiteReportAccess(PDO $p,PDO $game,array $query,array $u): void {
+    $discord=botNumber($query['discord_id']??null,true);
+    $legacy=!isset($u['_preview']) && in_array($discord,botConfiguredAdmins(),true);
+    if(!botSiteReportRights($u) && !$legacy)throw new DomainException('Les historiques, statistiques et récapitulatifs sont réservés aux chefs et administrateurs.',403);
+    $q=$p->prepare('SELECT role,is_chef,status,must_change_password,discord_login_id::text FROM users WHERE id=?');$q->execute([$u['id']??0]);$actual=$q->fetch(PDO::FETCH_ASSOC);
+    if(!$actual || $actual['status']!=='active' || $actual['must_change_password'] || $actual['discord_login_id']!==$discord || (!botSiteReportRights($actual) && !in_array($discord,botConfiguredAdmins(),true)))throw new DomainException('Tes droits ou ton association Discord ont changé. Recharge la page.',403);
+    botActor($p,$game,$discord,false);
+}
 function botReportPeriod(array $query,?DateTimeImmutable $now=null): array {
     $tz=new DateTimeZone('Europe/Paris');$today=($now??new DateTimeImmutable('now',$tz))->setTimezone($tz)->setTime(0,0);
     $period=$query['periode']??'7j';
@@ -26,16 +38,17 @@ function botReportPeriod(array $query,?DateTimeImmutable $now=null): array {
     if($days>366)throw new DomainException('La période est limitée à 366 jours.',422);
     return ['debut'=>$start->format('d-m-Y'),'fin'=>$end->format('d-m-Y'),'jours'=>$days,'fuseau'=>'Europe/Paris','depuis'=>$start->format('c'),'avant'=>$end->modify('+1 day')->format('c')];
 }
-function botReportRows(PDO $p,string $sql,array $args,int $page): array {
-    $q=$p->prepare("SELECT report.*,count(*) OVER()::text AS total_lignes FROM ($sql) report LIMIT 8 OFFSET ".(($page-1)*8));$q->execute($args);$rows=$q->fetchAll(PDO::FETCH_ASSOC);
+function botReportRows(PDO $p,string $sql,array $args,int $page,bool $paginate=true): array {
+    if(!$paginate)$page=1;
+    $q=$p->prepare("SELECT report.*,count(*) OVER()::text AS total_lignes FROM ($sql) report".($paginate?" LIMIT 8 OFFSET ".(($page-1)*8):""));$q->execute($args);$rows=$q->fetchAll(PDO::FETCH_ASSOC);
     $total=isset($rows[0])?(int)$rows[0]['total_lignes']:0;
     // An empty late page can occur when the period changes at midnight or data is removed.
     if(!$rows&&$page>1){$q=$p->prepare("SELECT count(*) FROM ($sql) report");$q->execute($args);$total=(int)$q->fetchColumn();}
     foreach($rows as &$r){unset($r['total_lignes']);foreach($r as $key=>&$value){if($value!==null&&preg_match('/^(?:id|iddemande|idenvoyeur|iddemandeur|idvalidateur|idannulateur|discord_.*|nbpomme.*|nbmateriaux.*)$/',$key))$value=(string)$value;}unset($value);}unset($r);
-    return ['lignes'=>$rows,'page'=>$page,'pages'=>max(1,(int)ceil($total/8)),'total'=>$total];
+    return ['lignes'=>$rows,'page'=>$page,'pages'=>$paginate?max(1,(int)ceil($total/8)):1,'total'=>$total];
 }
-function botReports(PDO $p,PDO $game,string $kind,array $query,?string $id=null): array {
-    botReportAccess($p,$game,$query);
+function botReports(PDO $p,PDO $game,string $kind,array $query,?string $id=null,bool $paginate=true,?array $siteUser=null): array {
+    if($siteUser===null)botReportAccess($p,$game,$query);else botSiteReportAccess($p,$game,$query,$siteUser);
     $allowed=$kind==='recap-demandes'?['discord_id','page']:['discord_id','periode','debut','fin','page'];
     $allowed=array_merge($allowed,match($kind){'demandes'=>['joueur','etat'],'convois'=>['expediteur','destinataire','demande'],'statistiques'=>['joueur'],default=>[]});
     if(array_diff(array_keys($query),$allowed))throw new DomainException('Paramètre de rapport inconnu.',422);
@@ -60,7 +73,7 @@ function botReports(PDO $p,PDO $game,string $kind,array $query,?string $id=null)
             r.derniere_demande
         FROM joueurs j FULL OUTER JOIN recap r ON r.id_joueur=j.player_id
         ORDER BY coalesce(r.demandes_effectuees,0) DESC,coalesce(nullif(j.pseudo,''),r.pseudo,'Joueur '||j.player_id::text),coalesce(j.player_id,r.id_joueur)";
-        return ['ok'=>true]+botReportRows($p,$sql,[],$page);
+        return ['ok'=>true]+botReportRows($p,$sql,[],$page,$paginate);
     }
     if($id!==null){
         $d=botDemand($p,botNumber($id,true));
@@ -93,5 +106,5 @@ function botReports(PDO $p,PDO $game,string $kind,array $query,?string $id=null)
         foreach(['pommes_envoyees','materiaux_envoyes','pommes_recues','materiaux_recus'] as $col)$cte.=",$col::text,round($col/".$period['jours'].",2)::text AS moyenne_$col";
         $sql=$cte.' FROM grouped WHERE true'.$filter('joueur','pseudo').' ORDER BY (pommes_envoyees::numeric+materiaux_envoyes::numeric) DESC,joueur_id';
     }
-    return ['ok'=>true,'periode'=>$period]+botReportRows($p,$sql,$args,$page);
+    return ['ok'=>true,'periode'=>$period]+botReportRows($p,$sql,$args,$page,$kind!=='statistiques'||$paginate);
 }

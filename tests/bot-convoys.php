@@ -203,6 +203,19 @@ try{
  botConvoyAction($p,$p,'annulation',$suspId,['commande_id'=>'suspend-cancel','discord_id'=>'102']);
  rejects(fn()=>botConvoyAction($p,$p,'suspension',$suspId,['commande_id'=>'suspend-cancelled','discord_id'=>'102']),409);
  echo "OK: suspension allowlist, state, partial deliveries, edit protection, replay, revocation and revalidation.\n";
+ // A web notification must commit atomically with the operation, exactly once.
+ $p->exec('CREATE TABLE web_test_events(payload jsonb)');
+ $eventId=botConvoyAction($p,$p,'demande',null,['commande_id'=>'event-create','discord_id'=>'101','nbpomme'=>'30','nbmateriaux'=>'0'])[1]['demande']['id'];
+ $eventCommand=['commande_id'=>'event-validate','discord_id'=>'102'];
+ $sink=function(PDO $db,string $kind,array $out):void {check($db->inTransaction(),'event in transaction');$q=$db->prepare('INSERT INTO web_test_events VALUES(?::jsonb)');$q->execute([json_encode($out)]);};
+ botConvoyAction($p,$p,'validation',$eventId,$eventCommand,$sink);
+ botConvoyAction($p,$p,'validation',$eventId,$eventCommand,$sink);
+ check((int)$p->query('SELECT count(*) FROM web_test_events')->fetchColumn()===1,'no duplicate event on replay');
+ $before=botDemand($p,$eventId)['nbpomme_restant'];
+ try{botConvoyAction($p,$p,'convoi',$eventId,['commande_id'=>'event-rollback','discord_id'=>'102','nbpomme'=>'5','nbmateriaux'=>'0'],function(){throw new RuntimeException('outbox unavailable');});throw new LogicException('missing rollback');}catch(RuntimeException $e){check($e->getMessage()==='outbox unavailable','sink failure');}
+ check(botDemand($p,$eventId)['nbpomme_restant']===$before,'event failure rolls back resources');
+ check((int)$p->query("SELECT count(*) FROM bot_commandes WHERE commande_id='event-rollback'")->fetchColumn()===0,'event failure rolls back idempotence');
+ echo "OK: atomic web notifications, replay deduplication and rollback.\n";
  require __DIR__.'/bot-reports-checks.php';
  echo "OK: creation, validation permissions, membership, precise integers, pagination filters, partial/completed convoys, replays/conflicts, date checks and concurrent over-send protection.\n";
 }finally{$p->exec('DROP SCHEMA '.$schema.' CASCADE');}

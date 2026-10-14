@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/preview.php';
 
 function config(): array {
     static $config;
@@ -20,19 +21,32 @@ function post(string $name): string { return is_string($_POST[$name] ?? null) ? 
 function redirect(string $path): never { header('Location: '.$path, true, 303); exit; }
 function csrf(): string { return $_SESSION['csrf'] ??= bin2hex(random_bytes(32)); }
 function validCsrf(): bool { return isset($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], post('csrf')); }
-function user(): ?array {
+function userRecord(int $id): ?array {
+    $q = db()->prepare('SELECT id, username, display_name, game_player_id, role, is_chef, is_chaine, script_enabled, status, session_version, must_change_password, password_setup_required FROM users WHERE id = ?');
+    $q->execute([$id]); return $q->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+function authenticatedUser(): ?array {
     if (!isset($_SESSION['user_id'])) return null;
     if (time() - ($_SESSION['last_active'] ?? 0) > 7200 || time() - ($_SESSION['signed_in'] ?? 0) > 43200) {
         $_SESSION = []; session_regenerate_id(true); return null;
     }
-    $q = db()->prepare('SELECT id, username, display_name, game_player_id, role, is_chef, is_chaine, status, session_version, must_change_password, password_setup_required FROM users WHERE id = ?');
-    $q->execute([$_SESSION['user_id']]); $u = $q->fetch(PDO::FETCH_ASSOC);
+    $u = userRecord((int)$_SESSION['user_id']);
     if (!$u || $u['status'] !== 'active' || (int)$u['session_version'] !== ($_SESSION['version'] ?? 0)) {
         $_SESSION = []; session_regenerate_id(true); return null;
     }
     $_SESSION['last_active'] = time();
     if (time() - ($_SESSION['rotated_at'] ?? 0) > 900) { session_regenerate_id(true); $_SESSION['rotated_at'] = time(); }
     return $u;
+}
+function user(): ?array {
+    $actor = authenticatedUser();
+    if (!$actor) return null;
+    $state = $_SESSION['preview'] ?? null;
+    $effective = previewResolve($actor, is_array($state) ? $state : null, 'userRecord');
+    if (!$effective) { unset($_SESSION['preview']); return $actor; }
+    // Guard against incidental GET handlers writing while an administrator previews.
+    db()->exec('SET default_transaction_read_only = on');
+    return $effective;
 }
 function requireUser(bool $allowPasswordChange = false): array {
     $u = user();
@@ -87,4 +101,16 @@ if (PHP_SAPI !== 'cli') {
     session_cache_limiter('');
     session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
     session_start();
+    if (isset($_SESSION['preview'])) {
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+        $control = previewControlRequest($path, post('action'));
+        if (($_SERVER['REQUEST_METHOD'] === 'POST' && !$control && $path !== '/logout.php') || $path === '/uptep.user.js') {
+            $u = user();
+            http_response_code(403);
+            if ($u) { require_once __DIR__.'/view.php'; workspaceStart($u, 'Mode visualisation'); }
+            echo '<h1>Visualisation en lecture seule</h1><p>Aucune modification ni installation ne peut être effectuée dans cet aperçu. Quitte le mode visualisation pour continuer.</p>';
+            if ($u) workspaceEnd();
+            exit;
+        }
+    }
 }

@@ -3,7 +3,13 @@ declare(strict_types=1);
 require '/home/uptep/private/app/bootstrap.php';
 require '/home/uptep/private/app/view.php';
 require '/home/uptep/private/app/chaine.php';
-$u=requireUser();$players=[];$latest='';$unavailable=false;
+$u=requireUser();
+if ($u['role'] !== 'admin') {
+    http_response_code(403); workspaceStart($u, 'Accès réservé');
+    echo '<h1>Accès réservé</h1><p>La gestion des ressources est réservée aux administrateurs.</p>';
+    workspaceEnd(); exit;
+}
+$players=[];$latest='';$unavailable=false;
 try {
     $q=db()->prepare('SELECT player_id,grade,sort_order FROM chaine_members WHERE server=?');
     $q->execute([CHAINE_SERVER]);$grades=[];

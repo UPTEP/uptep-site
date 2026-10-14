@@ -96,6 +96,24 @@ try {
         define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-convoys.php';require '/home/uptep/private/app/bot-deliveries.php';
         botReply(200,botDeliveries(db(),db(true),$_GET));
     }
+    if($path==='/api/bot/v1/notifications-web'){
+        if(!in_array('convois:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
+        define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';
+        header('Content-Type: application/json; charset=utf-8');
+        if($method==='GET'){
+            $rows=db()->query("SELECT id::text,kind,payload FROM convoy_web_events WHERE acknowledged_at IS NULL ORDER BY id LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+            foreach($rows as &$row)$row['payload']=json_decode($row['payload'],true,512,JSON_THROW_ON_ERROR);unset($row);
+            botReply(200,['ok'=>true,'events'=>$rows]);
+        }
+        if($method==='POST'){
+            if(!in_array('convois:create',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
+            $body=json_decode(file_get_contents('php://input'),true,16,JSON_THROW_ON_ERROR);
+            $id=$body['id']??null;if(!is_string($id)||!preg_match('/\A[1-9][0-9]{0,18}\z/',$id))botReply(422,['ok'=>false,'error'=>'invalid_id']);
+            $q=db()->prepare('UPDATE convoy_web_events SET acknowledged_at=coalesce(acknowledged_at,now()) WHERE id=?');$q->execute([$id]);
+            botReply(200,['ok'=>true]);
+        }
+        header('Allow: GET, POST');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);
+    }
     $id=null;$reportKind=null;
     if(preg_match('~\A/api/bot/v1/rapports/(demandes|convois|statistiques|recap-demandes)(?:/([1-9][0-9]{0,18}))?\z~',$path,$reportMatch)){
         $reportKind=$reportMatch[1];$id=$reportMatch[2]??null;

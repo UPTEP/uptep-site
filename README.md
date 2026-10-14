@@ -72,4 +72,21 @@ La simulation `/connexion-test` a été retirée du bot et de l’API après val
 
 ### Guide public
 
-Le guide « L’attaque à la 59e seconde » est accessible sans compte depuis la page de connexion et depuis l’accueil. Le PDF et ses fichiers de présentation sont versionnés dans `public/assets/`.
+Le guide « L’attaque à la 59e seconde » est présenté sur l’accueil après connexion. Le PDF et ses fichiers de présentation sont versionnés dans `public/assets/`.
+
+### Ressources et visualisation des droits
+
+Le menu et `/ressources.php` sont réservés au rôle `admin`, avec contrôle côté serveur et HTTP403 pour tout autre rôle, même chef ou gestionnaire de chaîne.
+
+Dans Administration, « Mode visualisation » propose les profils Membre, Chef, Gestion de chaîne et Chef+Chaîne, avec UPTEP+ autorisé ou désactivé. Ces profils utilisent les données de l’administrateur avec les droits sélectionnés. Le bouton « Voir comme » d’un compte actif affiche ses données et ses droits actuels, relus à chaque page. Les comptes non validés ou désactivés ne peuvent pas être visualisés.
+
+L’identité de connexion reste celle de l’administrateur. Un bandeau indique l’aperçu et propose « Revenir à mon compte admin ». Les écritures de page sont refusées avant les contrôleurs pendant l’aperçu, les connexions SQL sont placées en lecture seule et le téléchargement d’une installation personnelle UPTEP+ est bloqué. Les changements de profil, la sortie d’aperçu et la déconnexion restent possibles avec CSRF. Aucun droit de compte n’est modifié par la visualisation. La suppression du compte cible ou la perte du droit administrateur met fin à l’aperçu.
+
+Vérification autonome : `php tests/preview.php`. Les tests fonctionnels HTTPS ont également vérifié les accès directs, les quatre profils, les droits relus, les refus de modification et le retour au compte admin.
+
+
+Demandes et convois : `/convois.php` réutilise les services `bot-convoys.php`, `bot-deliveries.php` et `bot-reports.php`. L'identité provient exclusivement de `users.discord_login_id`, jamais de l'ID joueur modifiable du profil. Les droits de validation restent ceux du bot. Sur le site, les chefs (`is_chef`) et administrateurs peuvent consulter les historiques, statistiques et récapitulatifs ; les droits actifs et le lien Discord sont revérifiés côté serveur. Le mode visualisation applique les droits du profil choisi. Les formulaires utilisent CSRF, confirmation en session et commandes idempotentes ; le mode visualisation reste en lecture seule.
+
+Appliquer `app/convoy-events.sql` dans la base UPTEP avec propriétaire `uptep`, autoriser `convois.php` dans la liste PHP Nginx et déployer `src/web-events.js` sur le bot. Les validations et convois du site enregistrent un événement dans la même transaction ; le bot les copie dans ses files persistantes avant d'accuser réception via `/api/bot/v1/notifications-web` (scopes existants `convois:read` / `convois:create`). Les notifications sont traitées à l'actualisation du tableau, environ chaque minute. Les ressources restent envoyées dans Fourmizzz ; la déclaration enregistre cet envoi.
+
+Vérification : `php tests/web-convoys.php`, `python3 tests/run-bot-convoys.py` (PostgreSQL local, schéma temporaire), et `npm test` dans le dépôt du bot. Aucune notification Discord réelle n'est nécessaire aux tests.

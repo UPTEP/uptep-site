@@ -24,7 +24,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 authStart('Connexion');
 ?>
-<link rel="stylesheet" href="/assets/public-guide.css?v=1">
 <span class="form-kicker"><?= icon('lock') ?> ACCÈS MEMBRES</span>
 <h1>Bienvenue au repaire.</h1><p class="form-intro">Connecte-toi pour retrouver l’alliance.</p>
 <?php if ($error): ?><div class="form-error" role="alert"><?= e($error) ?></div><?php endif; ?>
@@ -35,11 +34,4 @@ authStart('Connexion');
 <button class="primary-button" type="submit">Se connecter <?= icon('arrow') ?></button>
 </form><p class="login-help">Un souci pour te connecter ?<br>Contacte un administrateur de l’alliance.</p>
 <div class="secure-note"><?= icon('shield') ?> Connexion sécurisée · Accès réservé aux membres</div>
-<section class="public-guide" aria-labelledby="public-guide-title">
-<span class="public-guide-label">GUIDE PUBLIC · SANS CONNEXION</span>
-<h2 id="public-guide-title">L’attaque à la 59e seconde</h2>
-<p>Un tutoriel illustré pour comprendre le timing des attaques sur Fourmizzz, avec les astuces pour vérifier son horloge et son envoi.</p>
-<a class="public-guide-download" href="/assets/guides/fourmizzz-59e-seconde.pdf" download="Fourmizzz-le-secret-de-la-59e-seconde.pdf">Télécharger le guide <?= icon('arrow') ?></a>
-<span class="public-guide-details">PDF · 6 pages · 2,6 Mo</span>
-</section>
 <?php authEnd(); ?>

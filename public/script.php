@@ -4,6 +4,7 @@ require '/home/uptep/private/app/bootstrap.php';
 require '/home/uptep/private/app/view.php';
 require '/home/uptep/private/app/userscript.php';
 $u=requireUser();$error='';$account=scriptAccount((int)$u['id']);$player=null;
+if (isset($u['_preview'])) $account['script_enabled'] = $u['script_enabled'];
 try{if($account['game_player_id'])$player=scriptPlayer((int)$account['game_player_id']);}catch(Throwable $e){$error='Le relevé du jeu est momentanément indisponible.';}
 if($_SERVER['REQUEST_METHOD']==='POST')try{
  if(!validCsrf())throw new DomainException('Le formulaire a expiré. Recharge la page.',403);
