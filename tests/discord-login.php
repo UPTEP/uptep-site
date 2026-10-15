@@ -13,6 +13,11 @@ foreach (['https://uptep.top', 'null', ''] as $origin) {
 }
 check(discordLoginRequestAllowed([],true),'legacy browser with valid CSRF');
 check(!discordLoginRequestAllowed(['HTTP_ORIGIN'=>'https://evil.example'],true),'foreign origin rejected');
+check(discordLoginPayloadAllowed(['discord_id'=>'222222222222222222','guild_id'=>'guild'],'guild'),'any member payload accepted');
+foreach ([null, [], ['discord_id'=>222,'guild_id'=>'guild'], ['discord_id'=>'0','guild_id'=>'guild'], ['discord_id'=>'9223372036854775808','guild_id'=>'guild'], ['discord_id'=>'123','guild_id'=>'other'], ['discord_id'=>'123','guild_id'=>'guild','user_id'=>1]] as $payload) {
+ check(!discordLoginPayloadAllowed($payload,'guild'),'invalid identity, guild or extra fields rejected');
+}
+check(!discordLoginPayloadAllowed(['discord_id'=>'123','guild_id'=>''],''),'empty guild denied');
 $p=new PDO('pgsql:dbname=uptep','postgres',null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
 if (($argv[1] ?? '') === 'redeem') {
  check((bool)preg_match('/\Aqa_discord_login_[a-f0-9]+\z/', $argv[2]), 'worker schema');
@@ -61,11 +66,23 @@ try{
  check($u['username']==='Test Player'&&$u['display_name']==='Test Player'&&$u['password_setup_required'],'name and password prompt');
  check((string)$u['discord_login_id']===DISCORD_LOGIN_USER&&(int)$u['game_player_id']===1530,'dedicated binding');check(password_get_info($u['password_hash'])['algoName']==='argon2id','random password hashed');
  $h=hashOf(discordLoginIssue($p,DISCORD_LOGIN_USER));check(discordLoginConsume($p,$h)['id']===$u['id'],'subsequent login reuses account');check((int)$p->query('SELECT count(*) FROM users')->fetchColumn()===1,'no duplicate');
- // Simulation uses a fixed target and never grants direct access to that Discord ID.
+ // A second ordinary member can register and then reconnect to their own account.
+ $member='222222222222222222';
+ $p->exec("INSERT INTO chaine_members VALUES('s5',777,222222222222222222,'Ordinary Member')");
+ $memberLink=hashOf(discordLoginIssue($p,$member));$ownerLink=hashOf(discordLoginIssue($p,DISCORD_LOGIN_USER));
+ check(discordLoginLookup($p,$memberLink)['discord_login_id']===$member,'member preview identity');
+ $newMember=discordLoginConsume($p,$memberLink);
+ check($newMember['role']==='member'&&!$newMember['is_chef']&&!$newMember['is_chaine']&&$newMember['password_setup_required'],'ordinary member registration has no elevated rights');
+ check((string)$newMember['discord_login_id']===$member,'member binding');
+ check(discordLoginConsume($p,$ownerLink)['id']===$u['id'],'member request does not invalidate another user token');
+ check(discordLoginConsume($p,hashOf(discordLoginIssue($p,$member)))['id']===$newMember['id'],'member reconnects to own account');
+ $p->exec("UPDATE users SET status='disabled' WHERE discord_login_id=222222222222222222");reject(fn()=>discordLoginIssue($p,$member));
+ reject(fn()=>discordLoginIssue($p,'333333333333333333'));
+ // Legacy simulation still requires the explicit temporary configuration.
  $settings=['login_test_target'=>DISCORD_LOGIN_TEST_TARGET,'login_test_enabled'=>true,'login_test_until'=>time()+300];
  file_put_contents(UPTEP_LOGIN_TEST_CONFIG,json_encode($settings));
  $p->exec("INSERT INTO chaine_members VALUES('s5',360,757857297903910954,'Hardware')");
- reject(fn()=>discordLoginIssue($p,DISCORD_LOGIN_TEST_TARGET));
+ check(discordLoginLookup($p,hashOf(discordLoginIssue($p,DISCORD_LOGIN_TEST_TARGET)))['id']===null,'associated target can request normal registration');
  reject(fn()=>discordLoginIssue($p,DISCORD_LOGIN_USER,true));
  reject(fn()=>discordLoginIssue($p,'123',true));
  $h=hashOf(discordLoginIssue($p,DISCORD_LOGIN_TEST_TARGET,true));
@@ -74,7 +91,7 @@ try{
  $settings['login_test_enabled']=true;$settings['login_test_until']=time()-1;file_put_contents(UPTEP_LOGIN_TEST_CONFIG,json_encode($settings));reject(fn()=>discordLoginConsume($p,$h));
  $settings['login_test_until']=time()+300;file_put_contents(UPTEP_LOGIN_TEST_CONFIG,json_encode($settings));
  $created=discordLoginConsume($p,$h);check($created['username']==='Hardware'&&$created['display_name']==='Hardware'&&$created['password_setup_required']&&$created['role']==='member'&&(string)$created['discord_login_id']===DISCORD_LOGIN_TEST_TARGET,'fixed-target member registration');
- reject(fn()=>discordLoginIssue($p,DISCORD_LOGIN_TEST_TARGET,true));reject(fn()=>discordLoginIssue($p,DISCORD_LOGIN_TEST_TARGET));reject(fn()=>discordLoginConsume($p,$h));
+ reject(fn()=>discordLoginIssue($p,DISCORD_LOGIN_TEST_TARGET,true));check(discordLoginConsume($p,hashOf(discordLoginIssue($p,DISCORD_LOGIN_TEST_TARGET)))['id']===$created['id'],'associated target can reconnect normally');reject(fn()=>discordLoginConsume($p,$h));
  check(discordLoginConsume($p,hashOf(discordLoginIssue($p,DISCORD_LOGIN_USER)))['id']===$u['id'],'normal owner login unchanged');
  unlink(UPTEP_LOGIN_TEST_CONFIG);
  echo "OK: request security, pinned identity, existing-account protection, preview without creation, least-privilege registration, concurrent single creation, expiry, replay and revocation\n";

@@ -31,7 +31,7 @@ authStart('Premier accès');
 <?php if ($error): ?><div class="form-error" role="alert"><?= e($error) ?></div><?php endif; ?>
 <form method="post" action="/password.php" class="login-form"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="username" autocomplete="username" value="<?= e($u['username']) ?>">
 <?php passwordField('password', 'Nouveau mot de passe', 'new-password', true); ?>
-<p class="field-hint">15 caractères minimum. Une longue phrase convient très bien.</p>
+<p class="field-hint"><strong>Utilise un mot de passe propre à UPTEP, différent de celui de ton compte Fourmizzz.</strong><br>15 caractères minimum. Une longue phrase convient très bien.</p>
 <?php passwordField('confirmation', 'Confirmer le mot de passe', 'new-password', true); ?>
 <button class="primary-button" type="submit">Enregistrer et entrer <?= icon('arrow') ?></button></form>
 <form class="back-form" method="post" action="/logout.php"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><button type="submit">Se déconnecter</button></form>

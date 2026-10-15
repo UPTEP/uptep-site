@@ -38,8 +38,9 @@ try {
         $raw=file_get_contents('php://input',false,null,0,1025);
         if(strlen($raw)>1024)botReply(413,['ok'=>false,'error'=>'payload_too_large']);
         $input=json_decode($raw,true,8,JSON_THROW_ON_ERROR);
-        if(!is_array($input)||array_diff(array_keys($input),['discord_id','guild_id'])||($input['discord_id']??null)!=='1544667516364652659'||!is_string($config['login_guild_id']??null)||($input['guild_id']??null)!==$config['login_guild_id'])botReply(403,['ok'=>false,'error'=>'Connexion réservée au compte et au serveur autorisés.']);
-        define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/discord-login.php';
+        require '/home/uptep/private/app/discord-login.php';
+        if(!discordLoginPayloadAllowed($input,$config['login_guild_id']??null))botReply(403,['ok'=>false,'error'=>'Identité Discord invalide ou serveur non autorisé.']);
+        define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';
         if(!consumeAttempt('discord-login-issue:'.$input['discord_id'],10))botReply(429,['ok'=>false,'error'=>'Trop de liens demandés. Réessaie dans 15 minutes.']);
         botReply(200,discordLoginIssue(db(),$input['discord_id']));
     }

@@ -21,8 +21,19 @@ function discordLoginRequestAllowed(array $server, bool $csrfValid): bool {
         && !in_array($server['HTTP_SEC_FETCH_SITE'] ?? '', ['cross-site', 'same-site'], true);
 }
 
+function discordLoginIdValid(mixed $discord): bool {
+    return is_string($discord) && preg_match('/\A[1-9][0-9]{0,18}\z/', $discord)
+        && (strlen($discord) < 19 || strcmp($discord, '9223372036854775807') <= 0);
+}
+function discordLoginPayloadAllowed(mixed $input, mixed $guild): bool {
+    return is_array($input) && !array_diff(array_keys($input), ['discord_id', 'guild_id'])
+        && discordLoginIdValid($input['discord_id'] ?? null)
+        && is_string($guild) && $guild !== '' && ($input['guild_id'] ?? null) === $guild;
+}
+
 function discordLoginAccount(PDO $p, string $discord, bool $test = false): array {
-    if ($test ? !discordLoginTestAllowed($discord) : $discord !== DISCORD_LOGIN_USER) throw new DomainException('Connexion de test réservée à NoobEnCDI.', 403);
+    if (!discordLoginIdValid($discord)) throw new DomainException('Identifiant Discord invalide.', 403);
+    if ($test && !discordLoginTestAllowed($discord)) throw new DomainException('Simulation de connexion non autorisée.', 403);
     $q = $p->prepare("SELECT player_id, pseudo FROM chaine_members WHERE server = 's5' AND iddiscord = ?");
     $q->execute([$discord]); $players = $q->fetchAll(PDO::FETCH_ASSOC);
     if (count($players) !== 1) throw new DomainException('Association Discord absente ou ambiguë. Contacte un administrateur.', 403);
