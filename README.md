@@ -92,3 +92,24 @@ Appliquer `app/convoy-events.sql` dans la base UPTEP avec propriétaire `uptep`,
 Vérification : `php tests/web-convoys.php`, `python3 tests/run-bot-convoys.py` (PostgreSQL local, schéma temporaire), et `npm test` dans le dépôt du bot. Aucune notification Discord réelle n'est nécessaire aux tests.
 
 Le lien de navigation UPTEP+ est temporairement visible uniquement pour les administrateurs, comme Ressources, y compris en mode visualisation membre. Cette restriction porte sur le menu ; les autorisations du userscript restent gérées séparément.
+
+### Outils et calculateur de bonus RC
+
+`/outils.php` est accessible à tous les membres connectés, avec un menu commun et des onglets extensibles. Le premier onglet, « Bonus de combat », reprend le calculateur Dôme & Loge conservé dans `references/spyzzz-rc/`. Le moteur `public/assets/tools-combat.js` est identique à l’archive ; le parseur, la recherche des niveaux de 0 à 40 et les résultats du calculateur sont repris dans `tools-rc.js`. L’interface utilise les couleurs UPTEP, des contrôles accessibles et des styles externes compatibles avec la CSP du site. Aucun rapport n’est envoyé ni enregistré sur le serveur.
+
+Déployer `public/outils.php`, les quatre fichiers `public/assets/tools*` et `app/view.php`. Ajouter `outils` à la liste des scripts PHP autorisés dans Nginx, puis valider et recharger sa configuration. Pour ajouter un outil, ajouter un bouton `data-tool-tab` et un panneau lié par `aria-controls` ; la navigation clavier est commune.
+
+Vérification : `node tests/tools-rc.cjs` compare le moteur et les résultats à l’archive sur les trois lieux, les deux points de vue, les nombres espacés et les rapports invalides. La fidélité à l’archive ne constitue pas une nouvelle validation des règles du jeu.
+
+
+## Archives des rapports de combat (administrateurs)
+
+`/combats.php` conserve les RC bruts et les armées initiales des deux camps, datées à l’heure du combat. Import en deux étapes : analyse serveur, puis vérification de la date (Europe/Paris), du lieu et des joueurs S5 avec autocomplétion. La cible doit être liée à un ID de `fzzz.players` ; le second joueur peut rester non identifié. Les noms sont conservés en instantané. Les dates et pseudos reconnus dans les en-têtes restent à vérifier ; aucune date manquante n’est inventée.
+
+La migration additive `database/combat-reports.sql` crée les rapports, les relevés, leurs 14 unités et les combinaisons corrélées de niveaux. Lancer avec le rôle propriétaire `uptep`. Les références aux joueurs de la base séparée `fzzz` n’ont pas de clé étrangère ; la recherche y reste en lecture seule. Un RC identique après normalisation des espaces est refusé comme doublon. L’historique est consultable par joueur et période.
+
+`app/combat-analyze.cjs` reprend le moteur et la recherche du calculateur archivé Spyzzz (niveaux 0–40). Le processus Node est lancé sans shell via PHP, avec une limite de 25 secondes et un texte de 100 Ko maximum. Dépendances serveur : `/usr/bin/node`, `/usr/bin/timeout`, `proc_open`. Une valeur indéterminée reste NULL ; les corrections facultatives 0–100 sont identifiées comme manuelles et l’analyse initiale est conservée. L’attaque stockée est la capacité offensive de l’armée, y compris pour le défenseur, et non ses dégâts de riposte. Les PV du défenseur n’incluent que le bâtiment du lieu effectivement observé. Les hypothèses initiales restent visibles même après une correction manuelle.
+
+Déploiement : appliquer la migration, copier les deux fichiers privés `app/combat-*`, `app/view.php`, la page et ses deux assets, puis ajouter `combats` à la liste PHP Nginx autorisée. Les scripts de tests ne doivent jamais être déployés sous le document root. Les sauvegardes habituelles de la base `uptep` incluent automatiquement ces tables.
+
+Vérification : `node tests/combat-reports.cjs` et `node tests/tools-rc.cjs`. Le test `tests/combat-storage.php` nécessite des connexions PostgreSQL locales aux bases `uptep` et `fzzz`, avec création/suppression de schéma autorisée : il crée un schéma au nom aléatoire, y teste les écritures et les permissions, puis le supprime dans un bloc finally. Aucune ligne métier existante n’est modifiée.
