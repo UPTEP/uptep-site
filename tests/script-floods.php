@@ -7,10 +7,10 @@ $p=new PDO('pgsql:dbname=uptep',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEP
 $schema='qa_floods_'.bin2hex(random_bytes(5));$p->exec('CREATE SCHEMA '.$schema);$p->exec('SET search_path TO '.$schema);
 try{
 foreach(['bot-floods.sql','convoy-events.sql','script-floods.sql'] as $file){$sql=file_get_contents(dirname(__DIR__).'/app/'.$file);$sql=preg_replace('/^ALTER TABLE .* OWNER TO .*;$/m','',$sql);$sql=preg_replace('/DO \$\$.*?END \$\$;/s','',$sql);$p->exec($sql);}
-$p->exec("CREATE TABLE chaine_members(server text,player_id bigint,iddiscord bigint);CREATE TABLE players(server text,player_id bigint,pseudo text,alliance_tag text,is_present boolean);CREATE TABLE users(id bigint,game_player_id bigint,discord_login_id bigint,status text,script_enabled boolean,must_change_password boolean);
+$p->exec("CREATE TABLE chaine_members(server text,player_id bigint,iddiscord bigint);CREATE TABLE players(server text,player_id bigint,pseudo text,alliance_tag text,is_present boolean);CREATE TABLE users(id bigint,game_player_id bigint,discord_login_id bigint,status text,script_enabled boolean,must_change_password boolean,is_chaine boolean DEFAULT false);
 INSERT INTO chaine_members VALUES('s5',1,101),('s5',2,102),('s5',3,103);
 INSERT INTO players VALUES('s5',1,'Target','UPTEP',true),('s5',2,'Sender','UPTEP',true),('s5',3,'Other','UPTEP',true);
-INSERT INTO users VALUES(2,2,102,'active',true,false),(3,3,103,'active',true,false)");
+INSERT INTO users VALUES(2,2,102,'active',true,false,false),(3,3,103,'active',true,false,false)");
 $actor=['id'=>2,'game_player_id'=>2];$now=gmdate('Y-m-d\TH:i:s\Z');$arrival=gmdate('Y-m-d\TH:i:s\Z',time()+3600);
 $f=['game_id'=>'33359','pseudo'=>'Target','location'=>'Terrain de chasse','troops'=>'2 204 Jeunes Soldates Naines, 9 Naines d’Elites.','arrival_at'=>$arrival];
 $b=['action'=>'flood-check','captured_at'=>$now,'floods'=>[$f]];

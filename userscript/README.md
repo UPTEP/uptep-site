@@ -97,3 +97,24 @@ Après confirmation du convoi dans le jeu et enregistrement UPTEP, le suivi loca
 Les actions authentifiées `flood-check` et `flood-declare` passent par le pont du portail. L’identité vient du compte autorisé. La table `script_flood_links` associe expéditeur, identifiant du jeu et flood UPTEP ; les retries sont idempotents, y compris après réponse perdue. Avant déclaration, les anciens floods sont rapprochés par expéditeur, cible, lieu, arrivée à trois secondes près (jusqu’à deux minutes lorsque les troupes normalisées sont identiques et renseignées) et troupes quand connues. Plusieurs correspondances sont signalées sans création. Une correspondance Discord sans identifiant reste un rapprochement, pas une preuve de l’identifiant du jeu.
 
 Appliquer `app/script-floods.sql` et mettre à jour le consommateur Discord avant le runtime : l’événement `flood` est écrit dans la même transaction que la déclaration puis transmis à la file de MP existante du bot. Pas de notification au simple chargement ni sur retry. Les tests PHP créent un schéma isolé ; les tests navigateur utilisent le HTML fourni avec ses jetons remplacés et interceptent toutes les requêtes.
+
+
+## Gestion des demandes sur Commerce
+
+Le module `src/convoy-management.js` complète les onglets existants par **Mes demandes** et **Consulter / Historique**. Les listes sont filtrables par état et paginées ; le détail présente les convois et les dix derniers ajustements. Les responsables peuvent aussi valider depuis l’onglet des demandes en attente.
+
+Le demandeur peut modifier les quantités et les informations avant validation, puis ajuster uniquement le restant après validation, annuler sa demande ou terminer une demande validée. Un restant nul dans les deux ressources termine la demande manuellement. Le droit `users.is_chaine`, relu en BDD, permet de gérer les autres demandes, les valider et les suspendre. La suspension remet en attente sans effacer les convois ou le restant. La liste privée des administrateurs Discord ne donne aucun droit supplémentaire dans le userscript ; les permissions du bot restent inchangées.
+
+Le détail permet à l’expéditeur d’annuler sa propre déclaration de convoi et aux responsables chaîne d’annuler celles des autres. Les quantités reviennent dans le restant ; une demande soldée automatiquement peut rouvrir, tandis qu’une demande annulée ou terminée manuellement reste fermée. Le trajet dans Fourmizzz continue. Aucun formulaire de déclaration manuelle ou par copier-coller n’est ajouté : les envois du userscript sont déjà déclarés automatiquement.
+
+Les opérations affichent une confirmation. Une commande est conservée avant son envoi dans le stockage du navigateur, sans clé d’authentification ; après une réponse incertaine, la reprise réutilise cette commande. Les mutations utilisent les services transactionnels du bot, avec vérification des propriétaires et du droit chaîne côté serveur, et contrôle de version pour les modifications/validations. Une validation enregistre l’événement Discord dans la même transaction, une seule fois.
+
+Déployer `app/bot-convoys.php`, `app/script-convoy-management.php`, `app/script-convoys.php`, `public/portal-api.php`, `public/assets/portal.js`, `public/portal.php` (version de l’asset), puis le runtime reconstruit. Aucune migration ni réinstallation du chargeur n’est nécessaire. Le runtime est actualisé au rechargement de la page du jeu.
+
+Validation : `php tests/script-convoys.php` (schéma temporaire PostgreSQL), `python3 tests/run-bot-convoys.py`, `php tests/script-floods.php`, `node tests/script-convoy-management-browser.cjs` et `node tests/script-convoys-browser.cjs`. Les tests navigateur interceptent les requêtes : aucun convoi réel n’est envoyé.
+
+Le détail et les formulaires de gestion s’ouvrent dans une modale native : synthèse des quantités demandées/restantes, dates, actions, convois et derniers ajustements repliables. La fermeture par bouton, Échap ou clic sur le fond rétablit le focus. Les erreurs restent visibles dans la modale et son nettoyage accompagne celui du runtime. Les demandes en attente utilisent une présentation compacte avec badge « À valider ».
+
+Les actions de responsable sont regroupées dans « Consulter / Historique », selon le droit chaîne du compte. L’onglet séparé « Gestion chaîne » est retiré.
+
+Dans « Consulter / Historique », les filtres État et Joueur se combinent côté serveur avant pagination. Le sélecteur contient les membres S5 actuels UPTEP ayant au moins une demande, tous états et pages confondus, triés par pseudo. « Tous les joueurs » retire le filtre personnel.

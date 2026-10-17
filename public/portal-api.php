@@ -14,7 +14,7 @@ try{
  if(!is_array($body)||!is_string($body['pseudo']??null)||!is_string($body['alliance']??null))throw new DomainException('Requête invalide.',400);
  $header=$_SERVER['HTTP_AUTHORIZATION']??'';$token=str_starts_with($header,'Bearer ')?substr($header,7):'';
  $actor=authorizeScript($token,$body['pseudo'],$body['alliance']);
- if(in_array($body['action']??'', ['convoy-demands','convoy-pending','convoy-create','convoy-check','convoy-declare'],true))$result=scriptConvoys(db(),db(true),$actor,$body);
+ if(in_array($body['action']??'', SCRIPT_CONVOY_ACTIONS,true))$result=scriptConvoys(db(),db(true),$actor,$body);
  elseif(in_array($body['action']??'', ['flood-check','flood-declare'],true))$result=scriptFloods(db(),db(true),$actor,$body);
  elseif(in_array($body['action']??'', ['settings','save-settings','collect'],true))$result=scriptSettingsAction($actor,$body);
  else{if(!scriptSettings((int)$actor['id'])['preferences']['statistics'])throw new DomainException('Statistiques désactivées dans tes paramètres.',409);$result=observatory($body);}

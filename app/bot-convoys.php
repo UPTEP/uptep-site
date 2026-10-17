@@ -19,15 +19,15 @@ function botConfiguredAdmins(): array {
     foreach($ids as $id){try{botNumber($id,true);}catch(DomainException $e){return [];}}
     return array_values(array_unique($ids));
 }
-function botActor(PDO $p,PDO $game,string $discord,bool $validate): array {
+function botActor(PDO $p,PDO $game,string $discord,bool $validate,bool $chainOnly=false): array {
     $q=$p->prepare("SELECT player_id::text FROM chaine_members WHERE server='s5' AND iddiscord=?".($p->inTransaction()?' FOR SHARE':''));$q->execute([$discord]);$rows=$q->fetchAll(PDO::FETCH_COLUMN);
     if(count($rows)===0)throw new DomainException('Ton compte Discord n’est pas encore associé à un joueur UPTEP. Contacte NoobEnCDI pour qu’il ajoute ton ID Discord à ton compte joueur.',403);
     if(count($rows)!==1)throw new DomainException('Ton ID Discord est associé à plusieurs joueurs. Contacte NoobEnCDI pour corriger cette association.',403);
     $q=$game->prepare("SELECT pseudo FROM players WHERE server='s5' AND player_id=? AND upper(alliance_tag)='UPTEP' AND is_present=true");$q->execute([$rows[0]]);$pseudo=$q->fetchColumn();
     if($pseudo===false)throw new DomainException('Le joueur ne fait plus partie de l’alliance UPTEP.',403);
-    if($validate && !in_array($discord,botConfiguredAdmins(),true)){
-        $q=$p->prepare('SELECT status,is_chaine,must_change_password FROM users WHERE game_player_id=?'.($p->inTransaction()?' FOR SHARE':''));$q->execute([$rows[0]]);$users=$q->fetchAll(PDO::FETCH_ASSOC);
-        if(count($users)!==1 || $users[0]['status']!=='active' || !$users[0]['is_chaine'] || $users[0]['must_change_password'])throw new DomainException('Un droit administrateur du bot ou le droit chaîne sur un compte UPTEP validé est nécessaire.',403);
+    if($validate && ($chainOnly || !in_array($discord,botConfiguredAdmins(),true))){
+        $q=$p->prepare('SELECT status,is_chaine,must_change_password'.($chainOnly?',script_enabled':'').' FROM users WHERE game_player_id=?'.($p->inTransaction()?' FOR SHARE':''));$q->execute([$rows[0]]);$users=$q->fetchAll(PDO::FETCH_ASSOC);
+        if(count($users)!==1 || $users[0]['status']!=='active' || !$users[0]['is_chaine'] || $users[0]['must_change_password'] || ($chainOnly && !$users[0]['script_enabled']))throw new DomainException($chainOnly?'Le droit chaîne sur un compte UPTEP actif est nécessaire.':'Un droit administrateur du bot ou le droit chaîne sur un compte UPTEP validé est nécessaire.',403);
     }
     return ['id'=>$rows[0],'pseudo'=>$pseudo,'discord'=>$discord];
 }
@@ -45,7 +45,7 @@ function botDemand(PDO $p,string $id): array {
     $q=$p->prepare('SELECT id::text,discord_acteur::text,pseudo_acteur,pommes_avant::text,pommes_apres::text,materiaux_avant::text,materiaux_apres::text,date_ajustement FROM demandes_ajustements WHERE iddemande=? ORDER BY id DESC LIMIT 10');$q->execute([$id]);$r['ajustements']=$q->fetchAll(PDO::FETCH_ASSOC);
     return $r;
 }
-function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body,?callable $eventSink=null): array {
+function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body,?callable $eventSink=null,bool $chainOnly=false): array {
     $allowed=['suspension'=>['commande_id','discord_id'],'modification'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee','version_attendue'],'ajustement'=>['commande_id','discord_id','nbpomme_restant','nbmateriaux_restant','nbpomme_attendu','nbmateriaux_attendu'],'terminaison'=>['commande_id','discord_id'],'demande'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee'],'annulation'=>['commande_id','discord_id'],'validation'=>['commande_id','discord_id','version_attendue'],'convoi'=>['commande_id','discord_id','nbpomme','nbmateriaux','date_convoi','date_arrivee']][$action];
     if(array_diff(array_keys($body),$allowed))throw new DomainException('Champ inconnu dans la requête.',422);
     $command=$body['commande_id']??null;
@@ -93,12 +93,12 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
     $hash=hash('sha256',json_encode($payload,JSON_THROW_ON_ERROR));
     $p->beginTransaction();
     try {
-        if($action==='suspension'&&!in_array($discord,botConfiguredAdmins(),true))throw new DomainException('La suspension est réservée aux administrateurs listés dans ADMIN_DISCORD_IDS.',403);
-        $actor=botActor($p,$game,$discord,$action==='validation');
+        if($action==='suspension'&&!$chainOnly&&!in_array($discord,botConfiguredAdmins(),true))throw new DomainException('La suspension est réservée aux administrateurs listés dans ADMIN_DISCORD_IDS.',403);
+        $actor=botActor($p,$game,$discord,$action==='validation'||($chainOnly&&$action==='suspension'),$chainOnly);
         // Same command is serialized even across different endpoints or requests.
         $q=$p->prepare('SELECT pg_advisory_xact_lock(hashtextextended(?,0))');$q->execute(['uptep-bot:'.$command]);
         $q=$p->prepare('SELECT empreinte,statut,reponse FROM bot_commandes WHERE commande_id=?');$q->execute([$command]);$prior=$q->fetch(PDO::FETCH_ASSOC);
-        if($prior){if(in_array($action,['annulation','terminaison','ajustement','modification'],true)){$priorDemand=botDemand($p,$id);if($actor['id']!==$priorDemand['iddemandeur'])botActor($p,$game,$discord,true);}if(!hash_equals($prior['empreinte'],$hash))throw new DomainException('commande_id déjà utilisé pour une autre action ou un autre contenu.',409);$p->commit();return [(int)$prior['statut'],json_decode($prior['reponse'],true,512,JSON_THROW_ON_ERROR),true];}
+        if($prior){if(in_array($action,['annulation','terminaison','ajustement','modification'],true)){$priorDemand=botDemand($p,$id);if($actor['id']!==$priorDemand['iddemandeur'])botActor($p,$game,$discord,true,$chainOnly);}if(!hash_equals($prior['empreinte'],$hash))throw new DomainException('commande_id déjà utilisé pour une autre action ou un autre contenu.',409);$p->commit();return [(int)$prior['statut'],json_decode($prior['reponse'],true,512,JSON_THROW_ON_ERROR),true];}
         $status=200;
         if($action==='demande'){
             $q=$p->prepare('INSERT INTO demandes_convois(iddemandeur,pseudo_demandeur,discord_demandeur,nbpomme_original,nbpomme_restant,nbmateriaux_original,nbmateriaux_restant,objet,niveau,date_souhaitee) VALUES(?,?,?,?,?,?,?,?,?,?) RETURNING id');
@@ -108,14 +108,14 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
             if(!$d)throw new DomainException('Demande introuvable.',404);
             if($d['annulee'])throw new DomainException('Cette demande a été annulée.',409);
             if($action==='modification'){
-                if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true);
+                if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true,$chainOnly);
                 if($d['valide']||$d['fini'])throw new DomainException('Seule une demande en attente de validation peut être modifiée. Rouvre le tableau.',409);
                 if((string)$d['nbpomme_restant']!==(string)$d['nbpomme_original']||(string)$d['nbmateriaux_restant']!==(string)$d['nbmateriaux_original'])throw new DomainException('Cette demande conserve des livraisons ou ajustements : valide-la à nouveau avant de modifier son restant.',409);
                 if(!hash_equals(botDemandVersion($d),$payload['version_attendue']))throw new DomainException('La demande a changé depuis l’ouverture du formulaire. Rouvre Modifier une demande.',409);
                 $q=$p->prepare('UPDATE demandes_convois SET nbpomme_original=?,nbpomme_restant=?,nbmateriaux_original=?,nbmateriaux_restant=?,objet=?,niveau=?,date_souhaitee=? WHERE id=?');
                 $q->execute([$apple,$apple,$wood,$wood,$objet,$niveau,$souhaitee,$id]);
             }elseif($action==='ajustement'){
-                if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true);
+                if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true,$chainOnly);
                 if(!$d['valide']||$d['fini'])throw new DomainException('Seule une demande validée et en cours peut être ajustée.',409);
                 if((string)$d['nbpomme_restant']!==$payload['nbpomme_attendu']||(string)$d['nbmateriaux_restant']!==$payload['nbmateriaux_attendu'])throw new DomainException('Le restant a changé depuis l’ouverture du formulaire. Rouvre Modifier une demande pour utiliser les nouvelles quantités.',409);
                 $q=$p->prepare('SELECT (?::numeric-COALESCE(sum(nbpomme),0))::text AS pommes,(?::numeric-COALESCE(sum(nbmateriaux),0))::text AS materiaux FROM convois_effectues WHERE iddemande=? AND NOT annule');$q->execute([$d['nbpomme_original'],$d['nbmateriaux_original'],$id]);$maximum=$q->fetch(PDO::FETCH_ASSOC);
@@ -127,10 +127,10 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
                 $q=$p->prepare('UPDATE demandes_convois SET nbpomme_restant=?,nbmateriaux_restant=?,fini=?::boolean,fin_manuelle=?::boolean,date_fin=CASE WHEN ?::boolean THEN now() ELSE NULL END,discord_cloture=?,pseudo_cloture=? WHERE id=?');$q->execute([$apple,$wood,$done?'true':'false',$done?'true':'false',$done?'true':'false',$done?$discord:null,$done?$actor['pseudo']:null,$id]);
             }elseif($action==='annulation'){
                 if($d['fini'])throw new DomainException('Une demande terminée ne peut pas être annulée.',409);
-                if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true);
+                if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true,$chainOnly);
                 $q=$p->prepare('UPDATE demandes_convois SET annulee=true,date_annulation=now(),idannulateur=?,pseudo_annulateur=?,discord_annulateur=? WHERE id=?');$q->execute([$actor['id'],$actor['pseudo'],$discord,$id]);
             }elseif($action==='terminaison'){
-                if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true);
+                if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true,$chainOnly);
                 if(!$d['valide']||$d['fini'])throw new DomainException('Seule une demande validée et en cours peut être terminée.',409);
                 $q=$p->prepare('UPDATE demandes_convois SET fini=true,fin_manuelle=true,date_fin=now(),discord_cloture=?,pseudo_cloture=? WHERE id=?');$q->execute([$discord,$actor['pseudo'],$id]);
             }elseif($action==='suspension'){
@@ -210,7 +210,7 @@ function botCancelableConvoys(PDO $p,PDO $game,array $query): array {
     $q=$p->prepare('SELECT c.id::text,c.iddemande::text,c.idenvoyeur::text,c.pseudo_envoyeur,c.nbpomme::text,c.nbmateriaux::text,c.date_convoi,c.date_arrivee,d.pseudo_demandeur FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande WHERE NOT c.annule AND c.id>?'.$where.' ORDER BY c.id LIMIT '.((int)$limit+1));$q->execute($params);$rows=$q->fetchAll(PDO::FETCH_ASSOC);$more=count($rows)>(int)$limit;$rows=array_slice($rows,0,(int)$limit);
     return ['ok'=>true,'convois'=>$rows,'suite_apres'=>$more?end($rows)['id']:null];
 }
-function botCancelConvoy(PDO $p,PDO $game,string $id,array $body): array {
+function botCancelConvoy(PDO $p,PDO $game,string $id,array $body,bool $chainOnly=false): array {
     if(array_diff(array_keys($body),['commande_id','discord_id']))throw new DomainException('Champ inconnu.',422);
     $command=$body['commande_id']??null;if(!is_string($command)||!preg_match('/\A[A-Za-z0-9_.:-]{1,100}\z/',$command))throw new DomainException('commande_id invalide.',422);
     $id=botNumber($id,true);$discord=botNumber($body['discord_id']??null,true);
@@ -221,7 +221,7 @@ function botCancelConvoy(PDO $p,PDO $game,string $id,array $body): array {
         $q=$p->prepare('SELECT pg_advisory_xact_lock(hashtextextended(?,0))');$q->execute(['uptep-bot:'.$command]);
         $q=$p->prepare('SELECT iddemande::text,idenvoyeur::text FROM convois_effectues WHERE id=?');$q->execute([$id]);$link=$q->fetch(PDO::FETCH_ASSOC);
         if(!$link)throw new DomainException('Convoi introuvable.',404);
-        if($actor['id']!==$link['idenvoyeur'])botActor($p,$game,$discord,true);
+        if($actor['id']!==$link['idenvoyeur'])botActor($p,$game,$discord,true,$chainOnly);
         $q=$p->prepare('SELECT empreinte,statut,reponse FROM bot_commandes WHERE commande_id=?');$q->execute([$command]);$prior=$q->fetch(PDO::FETCH_ASSOC);
         if($prior){if(!hash_equals($prior['empreinte'],$hash))throw new DomainException('commande_id déjà utilisé pour un autre contenu.',409);$p->commit();return [(int)$prior['statut'],json_decode($prior['reponse'],true,512,JSON_THROW_ON_ERROR),true];}
         // All writers lock the demand first, so cancel/send operations serialize together.

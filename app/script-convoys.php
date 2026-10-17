@@ -1,11 +1,14 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/bot-convoys.php';
+require_once __DIR__.'/script-convoy-management.php';
+const SCRIPT_CONVOY_ACTIONS=['convoy-demands','convoy-pending','convoy-create','convoy-check','convoy-declare','convoy-list','convoy-detail','convoy-manage'];
 function scriptConvoyIdentity(PDO $p,PDO $game,array $actor):array {
-    $q=$p->prepare('SELECT discord_login_id::text,game_player_id::text FROM users WHERE id=? AND status=\'active\' AND script_enabled AND NOT must_change_password');$q->execute([$actor['id']]);$u=$q->fetch(PDO::FETCH_ASSOC);
+    $q=$p->prepare('SELECT discord_login_id::text,game_player_id::text,is_chaine FROM users WHERE id=? AND status=\'active\' AND script_enabled AND NOT must_change_password');$q->execute([$actor['id']]);$u=$q->fetch(PDO::FETCH_ASSOC);
     if(!$u||!$u['discord_login_id']||(string)$u['game_player_id']!==(string)$actor['game_player_id'])throw new DomainException('Ton compte UPTEP doit être associé à ton joueur et à ton compte Discord pour déclarer un convoi.',403);
     $member=botActor($p,$game,$u['discord_login_id'],false);
     if((string)$member['id']!==(string)$u['game_player_id'])throw new DomainException('Les associations joueur et Discord ne correspondent pas. Contacte un administrateur.',403);
+    $member['is_chaine']=(bool)$u['is_chaine'];
     return $member;
 }
 function scriptConvoyEvent(PDO $p,string $kind,array $payload):void {
@@ -19,9 +22,10 @@ function scriptConvoyResult(PDO $p,string $command,array $member,string $target,
     return ['declared'=>true,'convoy_id'=>(string)$c['id'],'demand_id'=>(string)$c['iddemande'],'cancelled'=>(bool)$cancelled];
 }
 function scriptConvoys(PDO $p,PDO $game,array $actor,array $body):array {
-    $action=$body['action']??'';if(!in_array($action,['convoy-demands','convoy-pending','convoy-create','convoy-check','convoy-declare'],true))throw new DomainException('Action inconnue.',422);
-    if(array_diff(array_keys($body),['action','pseudo','alliance','game_id','target','apples','wood','arrival','demand_id','confirmed','sent_at','request_key','object','level','wanted_date']))throw new DomainException('Champ inconnu.',422);
+    $action=$body['action']??'';if(!in_array($action,SCRIPT_CONVOY_ACTIONS,true))throw new DomainException('Action inconnue.',422);
     $member=scriptConvoyIdentity($p,$game,$actor);
+    if(in_array($action,['convoy-list','convoy-detail','convoy-manage'],true))return scriptConvoyManagement($p,$game,$member,$body);
+    if(array_diff(array_keys($body),['action','pseudo','alliance','game_id','target','apples','wood','arrival','demand_id','confirmed','sent_at','request_key','object','level','wanted_date']))throw new DomainException('Champ inconnu.',422);
     if($action==='convoy-create'){
         $key=$body['request_key']??null;if(!is_string($key)||!preg_match('/\A[a-f0-9-]{36}\z/',$key))throw new DomainException('Identifiant de demande invalide.',422);
         if(($body['confirmed']??false)!==true)throw new DomainException('Confirme la création de la demande.',422);
@@ -40,7 +44,7 @@ function scriptConvoys(PDO $p,PDO $game,array $actor,array $body):array {
         $rows=$p->query("SELECT id::text,iddemandeur::text,pseudo_demandeur,objet,niveau,nbpomme_restant::text,nbmateriaux_restant::text FROM demandes_convois WHERE ".$validation." AND NOT fini AND NOT annulee ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
         $q=$game->prepare("SELECT pseudo FROM players WHERE server='s5' AND player_id=? AND is_present");
         foreach($rows as &$row){$q->execute([$row['iddemandeur']]);$row['target']=$q->fetchColumn()?:null;$row['self']=$row['iddemandeur']===(string)$member['id'];}unset($row);
-        return ['demands'=>$rows];
+        return ['demands'=>$rows,'permissions'=>['is_chaine'=>$member['is_chaine'],'player_id'=>(string)$member['id']]];
     }
     if($action==='convoy-check'){
         $d=botDemand($p,botNumber($body['demand_id']??null,true));$apple=botNumber($body['apples']??null);$wood=botNumber($body['wood']??null);

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UPTEP+
 // @namespace    https://uptep.top/
-// @version      1.0.0
+// @version      1.0.1
 // @description  UPTEP+ pour les membres autorisés de l’alliance UPTEP sur le serveur 5. Fonctionnalités chargées depuis uptep.top.
 // @match        https://s5.fourmizzz.fr/*
 // @match        http://s5.fourmizzz.fr/*
@@ -49,9 +49,8 @@
    }
   }catch(e){stop();console.warn('UPTEP+ : accès indisponible ou désactivé.');}finally{busy=false;}
  }
- // Authorize every page and recheck/reload remote revisions without reinstalling.
- refresh();setInterval(refresh,30000);
+ // Load once per page; keep forms intact until navigation.
+ refresh();
  setInterval(()=>{const p=player();if(p.alliance!=='UPTEP'||(identity&&p.pseudo!==identity))stop();},1000);
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
  window.addEventListener('pagehide',stop);
 })();

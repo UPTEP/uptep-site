@@ -12,7 +12,7 @@
   if(!auth)throw Error('Accès non initialisé.');
   const r=await fetch('/portal-api.php',{method:'POST',credentials:'omit',cache:'no-store',headers:{'Content-Type':'application/json',Authorization:'Bearer '+auth.token},body:JSON.stringify({...data,pseudo:auth.pseudo,alliance:'UPTEP'}),signal});
   const response=await r.json();
-  if(r.status===403){auth=null;$('statistics').hidden=true;$('script-settings').hidden=true;results.replaceChildren();status.textContent='Accès UPTEP+ désactivé ou non autorisé.';throw Error(status.textContent);}
+  if(r.status===403){auth=null;$('statistics').hidden=true;$('script-settings').hidden=true;results.replaceChildren();status.textContent='Accès UPTEP+ désactivé ou non autorisé.';const error=Error(response.error||status.textContent);error.status=403;throw error;}
   if(!r.ok||!response.ok){const error=Error(response.error||'Service indisponible.');error.status=r.status;throw error;}return response;
  }
  window.addEventListener('message',async event=>{
@@ -20,7 +20,7 @@
   if(auth)return;auth={token:event.data.token,pseudo:event.data.pseudo};parentOrigin=event.origin;
   if(new URLSearchParams(location.search).get('bridge')==='convoys'){
    const job=event.data.convoy;
-   try{if(!job||!['convoy-demands','convoy-pending','convoy-create','convoy-check','convoy-declare','flood-check','flood-declare'].includes(job.action)||typeof job.requestId!=='string')throw Error('Déclaration invalide.');const {requestId,...payload}=job;const result=await api(payload);send({type:'uptep-convoy-result',ok:true,requestId,result});}
+   try{if(!job||!['convoy-demands','convoy-pending','convoy-create','convoy-check','convoy-declare','convoy-list','convoy-detail','convoy-manage','flood-check','flood-declare'].includes(job.action)||typeof job.requestId!=='string')throw Error('Déclaration invalide.');const {requestId,...payload}=job;const result=await api(payload);send({type:'uptep-convoy-result',ok:true,requestId,result});}
    catch(e){send({type:'uptep-convoy-result',ok:false,requestId:job?.requestId,error:e.message,status:e.status||0});}return;
   }
   if(bridgeOnly){try{const collection=event.data.collection;if(!collection||!['buildings','research','army','economy'].includes(collection.group))throw Error('Relevé invalide.');await api({action:'collect',group:collection.group,values:collection.values});send({type:'uptep-collection-result',ok:true,requestId:collection.requestId});}catch(e){send({type:'uptep-collection-result',ok:false,error:e.message,requestId:event.data.collection?.requestId});}return;}

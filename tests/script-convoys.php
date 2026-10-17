@@ -1,5 +1,9 @@
 <?php
 declare(strict_types=1);
+$adminFixture=tempnam(sys_get_temp_dir(),'uptep-script-admins-');
+file_put_contents($adminFixture,"ADMIN_DISCORD_IDS=102\n");
+define('UPTEP_BOT_ENV_FILE',$adminFixture);
+register_shutdown_function(static function()use($adminFixture){unlink($adminFixture);});
 require dirname(__DIR__).'/app/script-convoys.php';
 function check(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);}
 function rejects(callable $fn,int $code):void{try{$fn();}catch(DomainException $e){check($e->getCode()===$code,$e->getMessage());return;}throw new RuntimeException('Expected rejection');}
@@ -52,10 +56,84 @@ $datedId=scriptConvoys($p,$p,$u,$dated)['demand_id'];check(scriptConvoys($p,$p,$
 echo "Tabs OK: creation, pending state, recipient binding, replay and pending send refused.\n";
 echo "Script convoys OK: demands, preflight, identity, rights, confirmation, recipient, amounts, replay, concurrent retries, events, failures and late recovery.\n";
 
+// The management API must use database chain rights even for a bot admin.
+$manager=['id'=>3,'game_player_id'=>3];$owner=['id'=>1,'game_player_id'=>1];
+$seq=0;
+$manage=function(array $who,string $op,string $id,array $extra=[])use($p,&$seq){return scriptConvoys($p,$p,$who,['action'=>'convoy-manage','operation'=>$op,'demand_id'=>$id,'request_key'=>sprintf('aaaaaaaa-aaaa-4aaa-8aaa-%012d',++$seq),'confirmed'=>true]+$extra);};
+$createdDemand=botDemand($p,$created['demand_id']);
+check(!scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['permissions']['is_chaine'],'bot admin is not a script chain manager');
+rejects(fn()=>scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'chain']),403);
+rejects(fn()=>$manage($u,'validation',$createdDemand['id'],['version'=>$createdDemand['version_modification']]),403);
+rejects(fn()=>$manage($u,'annulation',$ids[0]),403);
+$foreign=botConvoyAction($p,$p,'demande',null,['commande_id'=>'foreign-manage','discord_id'=>'101','nbpomme'=>'100','nbmateriaux'=>'100','objet'=>'Dôme','niveau'=>'3'])[1]['demande'];
+rejects(fn()=>$manage($u,'modification',$foreign['id'],['version'=>$foreign['version_modification'],'apples'=>'20','wood'=>'30','object'=>'Loge','level'=>'4']),403);
+$edited=$manage($owner,'modification',$foreign['id'],['version'=>$foreign['version_modification'],'apples'=>'200','wood'=>'300','object'=>'Loge','level'=>'4','wanted_date'=>null])['demande'];
+check($edited['nbpomme_original']==='200'&&$edited['objet']==='Loge'&&!$edited['valide'],'owner modifies all fields before validation');
+rejects(fn()=>$manage($manager,'validation',$foreign['id'],['version'=>$foreign['version_modification']]),409);
+$eventsBefore=(int)$p->query('SELECT count(*) FROM convoy_web_events')->fetchColumn();
+$job=['action'=>'convoy-manage','operation'=>'validation','demand_id'=>$foreign['id'],'version'=>$edited['version_modification'],'request_key'=>'bbbbbbbb-bbbb-4bbb-8bbb-111111111111','confirmed'=>true];
+$validated=scriptConvoys($p,$p,$manager,$job);
+check(scriptConvoys($p,$p,$manager,$job)==$validated,'management replay');
+check((int)$p->query('SELECT count(*) FROM convoy_web_events')->fetchColumn()===$eventsBefore+1,'one validation event for replay');
+rejects(fn()=>$manage($u,'suspension',$foreign['id']),403);
+$suspended=$manage($manager,'suspension',$foreign['id'])['demande'];check(!$suspended['valide']&&$suspended['nbpomme_restant']==='200','chain suspension preserves remaining');
+$manage($manager,'validation',$foreign['id'],['version'=>$suspended['version_modification']]);
+rejects(fn()=>$manage($u,'ajustement',$foreign['id'],['apples'=>'100','wood'=>'100','expected_apples'=>'200','expected_wood'=>'300']),403);
+$adjusted=$manage($owner,'ajustement',$foreign['id'],['apples'=>'100','wood'=>'120','expected_apples'=>'200','expected_wood'=>'300'])['demande'];
+check($adjusted['nbpomme_restant']==='100'&&count($adjusted['ajustements'])===1,'owner adjusts remaining');
+rejects(fn()=>$manage($owner,'ajustement',$foreign['id'],['apples'=>'50','wood'=>'50','expected_apples'=>'200','expected_wood'=>'300']),409);
+$closed=$manage($owner,'terminaison',$foreign['id'])['demande'];check($closed['fin_manuelle']&&$closed['nbpomme_restant']==='100','manual close preserves remaining');
+rejects(fn()=>$manage($owner,'annulation',$foreign['id']),409);
+$cancelled=$manage($u,'annulation',$datedId)['demande'];check($cancelled['annulee'],'owner cancels pending request');
+$detail=scriptConvoys($p,$p,$u,['action'=>'convoy-detail','demand_id'=>$ids[0]]);
+check(count($detail['convoys'])===2&&$detail['demand']['id']===$ids[0],'detail and convoy history');
+$cancelJob=['action'=>'convoy-manage','operation'=>'annulation_convoi','convoy_id'=>$out['convoy_id'],'confirmed'=>true,'request_key'=>'cccccccc-cccc-4ccc-8ccc-111111111111'];
+rejects(fn()=>scriptConvoys($p,$p,$owner,$cancelJob),403); // Recipient is not the sender.
+$cancelOut=scriptConvoys($p,$p,$u,$cancelJob);check($cancelOut['convoi']['annule'],'sender cancels own declaration');
+check(scriptConvoys($p,$p,$u,$cancelJob)==$cancelOut,'cancel replay');
+$otherConvoy=botConvoyAction($p,$p,'convoi',$ids[1],['commande_id'=>'foreign-convoy','discord_id'=>'103','nbpomme'=>'1','nbmateriaux'=>'0'])[1]['convoi']['id'];
+rejects(fn()=>scriptConvoys($p,$p,$u,array_replace($cancelJob,['convoy_id'=>(string)$otherConvoy,'request_key'=>'cccccccc-cccc-4ccc-8ccc-222222222222'])),403);
+$ownSecond=$p->query("SELECT id::text FROM convois_effectues WHERE idenvoyeur=2 AND NOT annule ORDER BY id LIMIT 1")->fetchColumn();
+check($manage($manager,'annulation_convoi',$ids[1],['convoy_id'=>$ownSecond])['convoi']['annule'],'chain cancels another sender declaration');
+$p->exec('UPDATE users SET is_chaine=false WHERE id=3');
+rejects(fn()=>$manage($manager,'validation',$createdDemand['id'],['version'=>$createdDemand['version_modification']]),403);
+$p->exec('UPDATE users SET is_chaine=true WHERE id=3');
+$mine=scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'mine']);check(!array_filter($mine['demands'],fn($d)=>$d['iddemandeur']!=='2'),'personal list isolated');
+check(count(scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'history','state'=>'annulee'])['demands'])>=1,'cancelled history');
+rejects(fn()=>scriptConvoys($p,$p,$manager,array_replace($job,['confirmed'=>false])),422);
+rejects(fn()=>scriptConvoys($p,$p,$manager,$job+['discord_id'=>'101']),422);
+echo "Management OK: database chain policy, ownership, versions, adjustment, suspension, closure, cancellation, history, revocation, replay and validation notification.\n";
+
 for($i=0;$i<130;$i++)botConvoyAction($p,$p,'demande',null,['commande_id'=>'pagination'.$i,'discord_id'=>'101','nbpomme'=>'1','nbmateriaux'=>'1']);
 $expected=$p->query('SELECT id::text FROM demandes_convois WHERE NOT annulee AND NOT fini ORDER BY demandes_convois.id')->fetchAll(PDO::FETCH_COLUMN);
 $seen=[];$after='0';$pages=0;
 do{$page=botListDemands($p,['limite'=>'100','apres'=>$after,'include'=>'convois']);foreach($page['demandes'] as $d)$seen[]=$d['id'];$after=$page['suite_apres'];check(++$pages<10,'pagination terminates');}while($after!==null);
 check($seen===$expected,'pagination returns every demand once in numeric order');
+$expectedHistory=$p->query("SELECT id::text FROM demandes_convois WHERE serveur='s5' ORDER BY demandes_convois.id DESC")->fetchAll(PDO::FETCH_COLUMN);
+$historyIds=[];$after='0';$pages=0;
+do{$page=scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'history','after'=>$after]);foreach($page['demands'] as $d)$historyIds[]=$d['id'];$after=$page['next'];check(++$pages<20,'management pagination terminates');}while($after!==null);
+check($historyIds===$expectedHistory,'management history pages include closed/cancelled requests exactly once');
+$expectedMine=$p->query("SELECT id::text FROM demandes_convois WHERE serveur='s5' AND iddemandeur=1 ORDER BY demandes_convois.id DESC")->fetchAll(PDO::FETCH_COLUMN);
+$mineIds=[];$after='0';$pages=0;
+do{$page=scriptConvoys($p,$p,$owner,['action'=>'convoy-list','scope'=>'mine','after'=>$after]);foreach($page['demands'] as $d)$mineIds[]=$d['id'];$after=$page['next'];check(++$pages<20,'personal pagination terminates');}while($after!==null);
+check($mineIds===$expectedMine,'personal pages are newest first without omissions or duplicates');
+$options=scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'history'])['players'];
+check(array_column($options,'player_id')===['2','1'],'player options are sorted, span all pages and omit members without requests');
+$filtered=[];$after='0';$pages=0;
+do{$page=scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'history','player_id'=>'1','after'=>$after]);foreach($page['demands'] as $d)$filtered[]=$d['id'];$after=$page['next'];check(++$pages<20,'filtered pagination terminates');}while($after!==null);
+check($filtered===$expectedMine,'player filter covers all pages newest first');
+$cancelledPlayer=scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'history','player_id'=>'2','state'=>'annulee']);
+check(count($cancelledPlayer['demands'])===1&&$cancelledPlayer['demands'][0]['id']===$datedId,'player and state filters combine');
+check(scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'mine','player_id'=>'1'])['demands']===[],'player filter cannot escape personal scope');
+rejects(fn()=>scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'history','player_id'=>'invalid']),422);
+$p->exec("UPDATE players SET alliance_tag='OTHER' WHERE player_id=1");
+check(array_column(scriptConvoys($p,$p,$u,['action'=>'convoy-list','scope'=>'history'])['players'],'player_id')===['2'],'only current alliance members offered');
+$p->exec("UPDATE players SET alliance_tag='UPTEP' WHERE player_id=1");
+echo "Player filter OK: current members with requests, complete options, combined states and descending pagination.\n";
+// The default bot policy is preserved, including its configured administrator override.
+check(botMember($p,$p,'102')['membre']['is_chaine'],'bot allowlist still authorizes the bot');
+$cancelledBefore=$p->query("SELECT nbpomme_restant::text FROM demandes_convois WHERE id=".$ids[0])->fetchColumn();
+check((int)$cancelledBefore===90,'own cancellation restores only its quantities, once');
+echo "Management history pagination and unchanged bot admin policy OK.\n";
 echo "Pagination over 130 demands OK.\n";
 }finally{if($p->inTransaction())$p->rollBack();$p->exec('DROP SCHEMA '.$schema.' CASCADE');}
