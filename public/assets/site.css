@@ -76,3 +76,5 @@
 
 /* A viewport header follows the page and horizontal table scrolling. */
 .convoy-floating-head{position:fixed;top:0;z-index:30;overflow:hidden;pointer-events:none;background:#eaf0f2;box-shadow:0 3px 8px #153e5026}.convoy-floating-head[hidden]{display:none}.convoy-floating-head .users-table{table-layout:fixed;margin:0;border-collapse:collapse;max-width:none;min-width:0}.convoy-floating-head .users-table thead th{position:static;background:#eaf0f2;color:#345564;border-bottom:2px solid #aabec7}.convoy-page .users-table thead th{color:#345564;background:#eaf0f2}
+
+.legal-footer{padding:18px 24px;text-align:center;font-size:13px;line-height:1.8;color:#52666b}.legal-footer a,.auth-footer a{color:inherit}.auth-footer{flex-wrap:wrap;gap:8px}

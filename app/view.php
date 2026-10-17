@@ -15,7 +15,7 @@ function icon(string $name): string {
     return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'.($paths[$name] ?? '').'</svg>';
 }
 function head(string $title, string $class): void { ?>
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#153e50"><title><?= e($title) ?> · UPTEP</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/fonts.css"><link rel="stylesheet" href="/assets/site.css?v=20"><script src="/assets/site.js?v=6" defer></script></head><body class="<?= e($class) ?>">
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#153e50"><title><?= e($title) ?> · UPTEP</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/fonts.css"><link rel="stylesheet" href="/assets/site.css?v=21"><script src="/assets/site.js?v=6" defer></script></head><body class="<?= e($class) ?>">
 <?php }
 function previewBanner(array $u): void { ?>
 <?php if (isset($u['_preview'])): ?>
@@ -32,7 +32,7 @@ function workspaceStart(array $u, string $page): void {
 <div class="admin-success" role="status"><strong>Crée ton mot de passe.</strong> Ton identifiant est <strong><?= e($u['username']) ?></strong>. <a href="/password.php">Créer mon mot de passe</a> pour pouvoir aussi te connecter sans Discord.</div>
 <?php endif; ?>
 <?php }
-function workspaceEnd(): void { ?></main></div></body></html><?php }
+function workspaceEnd(): void { ?></main></div><footer class="legal-footer"><a href="/mentions-legales.html">Mentions légales</a> · <a href="/cgu.html">CGU</a> · <a href="/confidentialite.html">Confidentialité</a></footer></body></html><?php }
 function brand(): void { ?>
 <a class="brand" href="/" aria-label="UPTEP — Accueil"><img src="/assets/ant.png" width="60" height="72" alt=""><span><strong>UPTEP</strong><small>Un petit truc en plus</small></span></a>
 <?php }
@@ -45,7 +45,7 @@ function authStart(string $title): void { $viewer = user(); head($title, 'auth-p
 <main class="auth-main" id="main"><section class="auth-card"><aside class="auth-art" aria-label="Le repaire UPTEP"><span class="eyebrow">LE REPAIRE</span><?php bus(); ?><div class="art-caption"><span></span><p>Petites fourmis,<br>grandes aventures.</p><span></span></div></aside><div class="auth-form">
 <?php }
 function authEnd(): void { ?>
-</div></section></main><footer class="auth-footer">UPTEP <span>·</span> Un petit truc en plus</footer></body></html>
+</div></section></main><footer class="auth-footer">UPTEP <span>·</span> Un petit truc en plus <span>·</span> <a href="/mentions-legales.html">Mentions légales</a> · <a href="/cgu.html">CGU</a> · <a href="/confidentialite.html">Confidentialité</a></footer></body></html>
 <?php }
 function passwordField(string $name, string $label, string $autocomplete, bool $newPassword = false): void { ?>
 <label for="<?= e($name) ?>"><?= e($label) ?></label><div class="password-field"><input id="<?= e($name) ?>" name="<?= e($name) ?>" type="password" autocomplete="<?= e($autocomplete) ?>" required maxlength="128" <?= $newPassword ? 'minlength="15"' : '' ?>><button class="password-toggle" type="button" data-password="<?= e($name) ?>" aria-label="Afficher le mot de passe" aria-pressed="false"><?= icon('eye') ?></button></div>

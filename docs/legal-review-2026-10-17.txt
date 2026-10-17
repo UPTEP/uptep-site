@@ -1,0 +1,30 @@
+UPTEP — revue juridique et technique — 17 octobre 2026
+
+Les pages publiées décrivent les traitements constatés ; elles ne certifient pas une conformité complète.
+
+Actions opérationnelles à finaliser :
+1. Fixer des durées justifiées pour comptes inactifs, relevés, rapports, opérations, messages sources IA et journaux, puis mettre en place les purges. Le script /usr/local/sbin/uptep-db-backup ne prévoit pas de purge ; ses archives sont distinctes des rotations Proton. Ne pas supprimer ces copies sans définir la politique de restauration.
+2. Vérifier le pays du VPS dans le contrat Contabo, les contrats de protection des données applicables à Contabo, Proton et OpenAI et les garanties de transferts hors EEE. Le compte ChatGPT Pro ne doit pas être présenté comme une offre API/Business avec les mêmes garanties contractuelles. L’option d’amélioration des modèles est désactivée depuis le 17 octobre selon l’éditeur ; cela ne règle ni la conservation ni les obligations contractuelles.
+3. Documenter le fondement et la mise en balance pour les données des autres joueurs et les messages du salon envoyés à OpenAI ; minimiser les auteurs, identifiants et discussions non nécessaires. Informer les personnes concernées conformément à l’article 14 lorsque leurs données viennent du jeu ou d’autres membres. Une notice accessible seule ne prouve pas cette information. La commande de l’administrateur ne vaut pas consentement de tous les auteurs.
+4. Organiser la preuve des choix facultatifs et de l’information reçue, ainsi que le retrait, les demandes de droits et leur réapplication après restauration. Pour les traitements fondés sur le consentement concernant des moins de 15 ans, prévoir le consentement conjoint requis ; les CGU seules ne le recueillent pas.
+5. Tenir un registre proportionné des traitements, documenter les accès, incidents et notifications éventuelles, et sensibiliser l’opérateur à l’usage de l’IA. L’évaluation du risque IA repose ici sur un calcul de jeu, sans décision à effet juridique ; réévaluer si la finalité change.
+
+Sources officielles consultées :
+Mentions professionnelles : https://www.economie.gouv.fr/entreprises/developper-son-entreprise/innover-et-numeriser-son-entreprise/mentions-sur-votre-site-internet-les-obligations-respecter
+LCEN : https://www.legifrance.gouv.fr/loda/id/JORFTEXT000000801164
+RGPD : https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=fr
+Droits et information : https://www.cnil.fr/fr/reglement-europeen-protection-donnees/chapitre3
+Conservation : https://www.cnil.fr/fr/passer-laction/les-durees-de-conservation-des-donnees
+Données publiées : https://www.cnil.fr/fr/recommandations-reutilisateurs-donnees-internet
+Cookies : https://cnil.fr/fr/cookies-et-autres-traceurs/que-dit-la-loi
+Mineurs : https://www.cnil.fr/fr/recommandation-4-rechercher-le-consentement-dun-parent-pour-les-mineurs-de-moins-de-15-ans
+IA : https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai
+Transparence IA : https://digital-strategy.ec.europa.eu/en/policies/guidelines-ai-transparency-obligations
+OpenAI données : https://help.openai.com/en/articles/7730893-data-controls-in-chatgpt
+OpenAI confidentialité : https://openai.com/policies/eu-privacy-policy/
+Contabo identité : https://contabo.com/en-us/legal/impressum/
+Contabo contact : https://contabo.com/en/legal/privacy/
+Proton : https://proton.me/drive/privacy-policy
+Discord : https://discord.com/privacy
+
+Le numéro de téléphone de Contabo provient de sa page de confidentialité, l’adresse de ses mentions légales plus récentes ; vérifier les coordonnées contractuelles lors de la revue fournisseur. UPTEP est indépendant de Fourmizzz ; aucune autorisation du userscript par l’éditeur du jeu n’est présumée.
