@@ -1,0 +1,89 @@
+<center>
+<p style="max-width:600px" class="pas_sur_telephone">Vous pouvez répartir vos troupes parmi 3 lieux différents: Le terrain de chasse, la fourmilière et la loge Impériale. A vous de décider quelle sera votre stratégie.</p>		
+<div id="uptep-army-sync" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; margin: 16px 0px; text-align: center; font: 12px Verdana; color: rgb(48, 43, 24);"><button type="button" style="padding: 10px 18px; background: linear-gradient(rgb(56, 109, 120), rgb(37, 78, 89)); color: rgb(255, 243, 211); border: 1px solid rgb(28, 65, 74); border-radius: 5px; box-shadow: rgba(255, 255, 255, 0.145) 0px 1px 0px inset, rgba(48, 43, 24, 0.145) 0px 2px 4px; font: 700 12px Verdana; cursor: pointer; max-width: 100%;">Synchroniser mon armée sur UPTEP+</button><span role="status"></span></div><table class="simulateur" style="text-align:center" cellspacing="0">
+
+<tbody><tr><td colspan="10"><h3> Troupes en Garnison </h3></td></tr><tr class="ligne_paire"><td><strong class="pas_sur_telephone">Unités</strong></td><td style="width:180px" colspan="3"><a href="Armee.php?deplacement=1&amp;t=fixture-token"><img src="/images/bouton/fleche-armee.gif" width="20" height="20" style="position :relative ;left:-6px; top :5px; cursor : pointer" title="Tout déplacer ici"></a><strong>Terrain de Chasse</strong></td><td style="width:180px" colspan="3"><a href="Armee.php?deplacement=2&amp;t=fixture-token"><img src="/images/bouton/fleche-armee.gif" width="20" height="20" style="position :relative ;left:-6px; top :5px; cursor : pointer" title="Tout déplacer ici"></a><strong><span title="Dôme : niveau 1 ">Dôme  (1)</span></strong></td><td style="width:180px" colspan="3"><a href="Armee.php?deplacement=3&amp;t=fixture-token"><img src="/images/bouton/fleche-armee.gif" width="20" height="20" style="position :relative ;left:-6px; top :5px; cursor : pointer" title="Tout déplacer ici"></a><strong><span title="Loge Impériale : niveau 1 ">Loge (1)</span></strong></td></tr><tr align="center"><td><div class="pas_sur_telephone">Jeune Soldate Naine</div><div class="que_sur_telephone">JSN</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center" class="ligne_paire"><td><div class="pas_sur_telephone">Soldate Naine</div><div class="que_sur_telephone">SN</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center"><td><div class="pas_sur_telephone">Naine d’Elite</div><div class="que_sur_telephone">NE</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center" class="ligne_paire"><td><div class="pas_sur_telephone">Jeune Soldate</div><div class="que_sur_telephone">JS</div></td><td style="width:20px"></td>
+		<td style="width:120px"><span class="cliquable" onclick="remplirFormulaire(1,'unite4',1,3);">1</span></td><td style="width:20px"><a style="float:left" href="Armee.php?Transferer&amp;nbTroupes=1&amp;ChoixUnite=unite4&amp;LieuOrigine=1&amp;LieuDestination=2&amp;t=fixture-token"><img title="Vers la Fourmilière" src="/images/bouton/fleche-champs-droite.gif" width="9" height="15"></a></td><td style="width:20px"><a style="float:right" href="Armee.php?Transferer&amp;nbTroupes=10&amp;ChoixUnite=unite4&amp;LieuOrigine=2&amp;LieuDestination=1&amp;t=fixture-token"><img title="Vers le Terrain de Chasse" src="/images/bouton/fleche-champs-gauche.gif" width="9" height="15"></a></td><td style="width:120px"><span class="cliquable" onclick="remplirFormulaire(10,'unite4',2,3);">10</span></td><td style="width:20px"><a style="float:left" href="Armee.php?Transferer&amp;nbTroupes=10&amp;ChoixUnite=unite4&amp;LieuOrigine=2&amp;LieuDestination=3&amp;t=fixture-token"><img title="Vers la Loge" src="/images/bouton/fleche-champs-droite.gif" width="9" height="15"></a></td><td style="width:20px"><a style="float:right" href="Armee.php?Transferer&amp;nbTroupes=253&amp;ChoixUnite=unite4&amp;LieuOrigine=3&amp;LieuDestination=2&amp;t=fixture-token"><img title="Vers la Fourmilière" src="/images/bouton/fleche-champs-gauche.gif" width="9" height="15"></a></td><td style="width:120px"><span class="cliquable" onclick="remplirFormulaire(253,'unite4',3,2);">253</span></td><td style="width:20px"></td></tr><tr align="center"><td><div class="pas_sur_telephone">Soldate</div><div class="que_sur_telephone">S</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center" class="ligne_paire"><td><div class="pas_sur_telephone">Concierge</div><div class="que_sur_telephone">C</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center"><td><div class="pas_sur_telephone">Artilleuse</div><div class="que_sur_telephone">A</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center" class="ligne_paire"><td><div class="pas_sur_telephone">Artilleuse d’élite</div><div class="que_sur_telephone">AE</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center"><td><div class="pas_sur_telephone">Soldate d’élite</div><div class="que_sur_telephone">SE</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center" class="ligne_paire"><td><div class="pas_sur_telephone">Tank</div><div class="que_sur_telephone">Tk</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center"><td><div class="pas_sur_telephone">Tueuse</div><div class="que_sur_telephone">T</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr><tr align="center" class="ligne_paire"><td><div class="pas_sur_telephone">Tueuse d’élite</div><div class="que_sur_telephone">TE</div></td><td colspan="3"></td><td colspan="3"></td><td colspan="3"></td></tr>
+<tr><td colspan="10"><span id="Vie"></span></td></tr>
+
+<tr align="center" onclick="spoilerId('detailVieLegende');spoilerId('detailVieTerrain');spoilerId('detailVieFourmiliere');spoilerId('detailVieLoge');"><td>
+<span class="cliquable">Vie</span>
+<div id="detailVieLegende" style="display:none">Base
+<br>Bonus Bouclier (5)
+<br>Bonus du Lieu</div></td>
+<td colspan="3">
+<span class="cliquable"><img alt="Vie :" src="/images/icone/icone_coeur.gif" width="19" height="19" title="Vie" \=""> 24</span>
+<div id="detailVieTerrain" style="display:none">= 16
+<br>+ 8
+<br>+ 0</div></td>
+<td colspan="3">
+<span class="cliquable"><img alt="Vie :" src="/images/icone/icone_coeur.gif" width="19" height="19" title="Vie" \=""> 264</span>
+<div id="detailVieFourmiliere" style="display:none">= 160
+<br>+ 80
+<br>+ 24</div></td>
+<td colspan="3">
+<span class="cliquable"><img alt="Vie :" src="/images/icone/icone_coeur.gif" width="19" height="19" title="Vie" \=""> 7 893</span>
+<div id="detailVieLoge" style="display:none">= 4 048
+<br>+ 2 024
+<br>+ 1 821</div></td>
+</tr><tr class="ligne_paire" align="center" onclick="spoilerId('detailAttaqueLegende');spoilerId('detailAttaqueTerrain');spoilerId('detailAttaqueFourmiliere');spoilerId('detailAttaqueLoge');"><td>
+<span class="cliquable">Dégats en Attaque</span>
+<div id="detailAttaqueLegende" style="display:none">Base
+<br>Bonus Arme (6)</div></td>
+<td colspan="3">
+<span class="cliquable"><img alt="Dégat en attaque :" src="/images/icone/icone_degat_attaque.gif" width="18" height="18" title="Dégat en attaque"> 16</span>
+<div id="detailAttaqueTerrain" style="display:none">= 10
+<br>+ 6</div></td>
+<td colspan="3">
+<span class="cliquable"><img alt="Dégat en attaque :" src="/images/icone/icone_degat_attaque.gif" width="18" height="18" title="Dégat en attaque"> 160</span>
+<div id="detailAttaqueFourmiliere" style="display:none">= 100
+<br>+ 60</div></td>
+<td colspan="3">
+<span class="cliquable"><img alt="Dégat en attaque :" src="/images/icone/icone_degat_attaque.gif" width="18" height="18" title="Dégat en attaque"> 4 048</span>
+<div id="detailAttaqueLoge" style="display:none">= 2 530
+<br>+ 1 518</div></td>
+</tr><tr align="center" onclick="spoilerId('detailDefenseLegende');spoilerId('detailDefenseTerrain');spoilerId('detailDefenseFourmiliere');spoilerId('detailDefenseLoge');"><td>
+<span class="cliquable">Dégats en Défense</span>
+<div id="detailDefenseLegende" style="display:none">Base
+<br>Bonus Arme (6)</div></td>
+<td colspan="3">
+<span class="cliquable"><img alt="Dégat en défense :" src="/images/icone/icone_degat_defense.gif" width="18" height="18" title="Dégat en défense"> 14</span>
+<div id="detailDefenseTerrain" style="display:none">= 9
+<br>+ 5</div></td>
+<td colspan="3">
+<span class="cliquable"><img alt="Dégat en défense :" src="/images/icone/icone_degat_defense.gif" width="18" height="18" title="Dégat en défense"> 144</span>
+<div id="detailDefenseFourmiliere" style="display:none">= 90
+<br>+ 54</div></td>
+<td colspan="3">
+<span class="cliquable"><img alt="Dégat en défense :" src="/images/icone/icone_degat_defense.gif" width="18" height="18" title="Dégat en défense"> 3 643</span>
+<div id="detailDefenseLoge" style="display:none">= 2 277
+<br>+ 1 366</div></td>
+</tr><tr align="center" class="ligne_paire"><td><div class="pas_sur_telephone">Consommation Journalière</div></td>
+<td colspan="3"><img alt="Consommation Journalière" src="/images/icone/icone_pomme.png" width="18" height="18" title="Consommation Journalière"> 1</td>
+<td colspan="3"><img alt="Consommation Journalière" src="/images/icone/icone_pomme.png" width="18" height="18" title="Consommation Journalière"> 30</td>
+<td colspan="3"><img alt="Consommation Journalière" src="/images/icone/icone_pomme.png" width="18" height="18" title="Consommation Journalière"> 1 138</td>
+</tr></tbody></table><br>
+<table class="simulateur"><tbody><tr><td colspan="5">
+<h3 style="text-align:center;"> Déplacer son armée </h3>
+<form action="Armee.php" method="post">
+Déplacer<input type="hidden" name="t" id="t" value="o830"> 
+<input type="text" id="nbTroupes" name="nbTroupes" size="8">
+<select name="ChoixUnite" id="ChoixUnite"><option value="unite4">Jeune Soldate</option></select> 
+</form></td></tr><tr><td> De  </td>  <td> 
+<input type="radio" name="LieuOrigine" value="1" id="TerrainOrigine"> <label for="TerrainOrigine">Terrain de Chasse</label><br>
+<input type="radio" name="LieuOrigine" value="2" id="FourmiliereOrigine"> <label for="FourmiliereOrigine">Fourmilière</label><br>
+<input type="radio" name="LieuOrigine" value="3" id="LogeOrigine" checked="checked"> <label for="LogeOrigine">Loge Impériale</label><br>
+ </td>
+  <td> Vers  </td>  <td> 
+<input type="radio" name="LieuDestination" value="1" id="TerrainDestination"> <label for="TerrainDestination">Terrain de Chasse</label><br>
+<input type="radio" name="LieuDestination" value="2" id="FourmiliereDestination" checked="checked"> <label for="FourmiliereDestination">Fourmilière</label><br>
+<input type="radio" name="LieuDestination" value="3" id="LogeDestination"> <label for="LogeDestination">Loge Impériale</label><br>
+ </td>
+  <td> <input type="submit" name="Transferer" value="Envoyer"> </td>
+</tr></tbody></table>
+<p><img src="/images/icone/favicon.gif" width="18" height="18">
+Cliquez sur la taille d’une troupe pour préremplir le déplacement, ou sur les caractéristiques de l’armée pour avoir des détails... 
+</p>		
+<h3>Attaque(s) en cours</h3>- Vous allez attaquer <span class="gras"><a href="Membre.php?Pseudo=SSovietsky">SSovietsky</a>(<a href="classementAlliance.php?alliance=UPTEP">UPTEP</a>)</span> (Terrain de chasse) dans <span class="gras" id="attaque_33359">5 heures 41 minutes 38 secondes</span><script language="JavaScript">reste(20524, "attaque_33359");</script><br><small><em> Troupes en attaques :  2 204 Jeunes Soldates Naines.<br>
+		Arrivée à 20h55</em></small><br><br>- Vous allez attaquer <span class="gras"><a href="Membre.php?Pseudo=SSovietsky">SSovietsky</a>(<a href="classementAlliance.php?alliance=UPTEP">UPTEP</a>)</span> (Terrain de chasse) dans <span class="gras" id="attaque_33360">5 heures 41 minutes 38 secondes</span><script language="JavaScript">reste(20524, "attaque_33360");</script><br><small><em> Troupes en attaques :  7 796 Jeunes Soldates Naines, 311 Soldates Naines, 9 Naines d’Elites, 3 093 Jeunes Soldates, 5 Soldates.<br>
+		Arrivée à 20h55</em></small><br><br></center>

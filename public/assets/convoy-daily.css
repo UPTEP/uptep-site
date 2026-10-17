@@ -1,0 +1,21 @@
+.convoy-daily{min-width:0}.daily-note{font-size:.88rem;color:#526d78;line-height:1.6}.daily-scroll{margin-top:20px}.daily-table{min-width:1550px}.daily-table th,.daily-table td{vertical-align:top;min-width:150px}.daily-table thead small{font-weight:400}.daily-table tbody th{position:sticky;left:0;z-index:1;background:#fff;max-width:190px;white-space:normal;overflow-wrap:anywhere;border-right:1px solid #d8e3e4}.daily-table tbody tr:nth-child(even) th{background:#f5f8f9}.daily-metric{display:grid;gap:3px;margin-bottom:12px;white-space:nowrap}.daily-metric:last-child{margin-bottom:0}.daily-metric span,.daily-metric small{font-size:.75rem;color:#5d737c;font-weight:400}.daily-metric strong{font-size:.95rem;font-variant-numeric:tabular-nums}.daily-table .daily-total{background:#edf5ef;min-width:185px}.daily-caption{text-align:left;padding:15px 18px;font-weight:700;color:#214b5b}.daily-scroll:focus-visible{outline:3px solid #b08338;outline-offset:3px}@media(max-width:650px){.daily-table tbody th{min-width:105px;max-width:130px}.daily-table{min-width:1450px}}
+
+/* Statistics use the whole window; keep account access in a compact row. */
+.dashboard-page .workspace:has(.convoy-daily){flex-direction:column}
+.dashboard-page .workspace:has(.convoy-daily)>.sidebar{position:relative;top:auto;width:100%;height:auto;min-height:0;padding:6px 18px;overflow:visible}
+.workspace:has(.convoy-daily)>.sidebar .account{width:100%;padding:0;border:0}
+.workspace:has(.convoy-daily)>.sidebar .account-link{flex:0 1 auto}
+.workspace:has(.convoy-daily)>.sidebar .account form{margin-left:auto}
+.workspace:has(.convoy-daily)>.sidebar .sidebar-illustration,.workspace:has(.convoy-daily)>.sidebar .sidebar-footer{display:none}
+.dashboard-page .dashboard-main:has(.convoy-daily){width:100%;padding:22px 16px}
+.convoy-page:has(.convoy-daily){max-width:none;width:100%}
+.convoy-daily .daily-table{width:100%;min-width:1360px;table-layout:fixed}
+.convoy-daily .daily-table th,.convoy-daily .daily-table td{min-width:0;padding-left:12px;padding-right:12px}
+.convoy-daily .daily-table th:first-child{width:150px;min-width:0;max-width:none}
+.convoy-daily .daily-table th:last-child{width:180px}
+@media(max-width:680px){.dashboard-page .dashboard-main:has(.convoy-daily){padding:20px 12px}.convoy-daily .daily-table th:first-child{width:120px}}
+
+.convoy-daily .daily-grand-total>th,.convoy-daily .daily-grand-total>td{background:#e4efe8;border-bottom:2px solid #86aa96}
+.convoy-daily .daily-grand-total>th>small{display:block;font-weight:400;font-size:.75rem;margin-top:7px;color:#426457}
+.convoy-daily .daily-grand-total .daily-metric small{white-space:normal}
+.convoy-daily .daily-grand-total .daily-total{background:#d6e8dc}

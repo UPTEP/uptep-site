@@ -165,7 +165,7 @@ function botListDemands(PDO $p,array $query): array {
     $params=[$after];$closed='';
     if(isset($query['terminees_depuis'])){$since=botTimestamp($query['terminees_depuis']);$closed=' OR (fini AND date_fin>=?::timestamptz)';$params[]=$since;}
     if(isset($query['include'])&&$query['include']!=='convois')throw new DomainException('include attendu : convois.',422);
-    $q=$p->prepare('SELECT id::text FROM demandes_convois WHERE NOT annulee AND id>? AND ((NOT fini'.$where.')'.$closed.') ORDER BY id LIMIT '.((int)$limit+1));$q->execute($params);$ids=$q->fetchAll(PDO::FETCH_COLUMN);$more=count($ids)>(int)$limit;$ids=array_slice($ids,0,(int)$limit);
+    $q=$p->prepare('SELECT id::text FROM demandes_convois WHERE NOT annulee AND id>? AND ((NOT fini'.$where.')'.$closed.') ORDER BY demandes_convois.id LIMIT '.((int)$limit+1));$q->execute($params);$ids=$q->fetchAll(PDO::FETCH_COLUMN);$more=count($ids)>(int)$limit;$ids=array_slice($ids,0,(int)$limit);
     $demands=array_map(fn($id)=>botDemand($p,$id),$ids);
     if(($query['include']??null)==='convois'){
         // All selected requests in one query; no HTTP request per player.

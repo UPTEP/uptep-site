@@ -19,3 +19,12 @@ document.querySelectorAll('[data-player-picker]').forEach(picker=>{
  if(id.value)status.textContent='Joueur associé : #'+id.value;else if(query.value.trim().length>=2)search();
 });
 document.querySelectorAll('.combat-page form[method="post"]').forEach(form=>form.addEventListener('submit',()=>{const button=form.querySelector('button[type="submit"]');if(button){button.disabled=true;button.textContent='Traitement en cours…';}}));
+
+const camp=document.getElementById('target-side');
+if(camp){
+ const selectCamp=()=>document.querySelectorAll('[data-combat-side]').forEach(panel=>{
+  panel.hidden=panel.dataset.combatSide!==camp.value;
+  panel.disabled=panel.hidden;
+ });
+ camp.addEventListener('change',selectCamp);selectCamp();
+}

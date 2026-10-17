@@ -135,7 +135,10 @@ function analyze(text, choice='auto') {
    const attack=army.reduce((n,c,j)=>n+c*K.UNITS[j].a,0);
    const hp=army.reduce((n,c,j)=>n+c*K.UNITS[j].hp,0);
    const factors=found.map(f=>1+.1*(i?f.dBou:f.aBou)+(i?(f.lieu==='dome'?.1+.05*f.niveau:f.lieu==='loge'?.3+.15*f.niveau:0):0));
-   return {army,arms,shield,dome:building('dome'),loge:building('loge'),attack_base:attack,attack_bonus:arms===null?null:attack*(1+.1*arms),hp_base:hp,hp_bonus:exact(factors)===null?null:hp*exact(factors),hp_min:factors.length?hp*factors.reduce((a,b)=>Math.min(a,b)):null,hp_max:factors.length?hp*factors.reduce((a,b)=>Math.max(a,b)):null};
+   let casualties=(i?r.att:r.def).reduce((sum,round)=>sum+round.kills,0);
+   const survivors_before_xp=army.map(n=>{const lost=Math.min(n,casualties);casualties-=lost;return n-lost;});
+   if(casualties>0)throw new Error('Pertes supérieures à l’armée initiale.');
+   return {army,survivors_before_xp,arms,shield,dome:building('dome'),loge:building('loge'),attack_base:attack,attack_bonus:arms===null?null:attack*(1+.1*arms),hp_base:hp,hp_bonus:exact(factors)===null?null:hp*exact(factors),hp_min:factors.length?hp*factors.reduce((a,b)=>Math.min(a,b)):null,hp_max:factors.length?hp*factors.reduce((a,b)=>Math.max(a,b)):null};
  });
  const date=(text.match(/\b(\d{2})[\/.-](\d{2})[\/.-](\d{4})\s+(?:à\s*)?(\d{2}):([0-5]\d)/)||[]);
  const names={attacker:null,defender:null};

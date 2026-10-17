@@ -14,6 +14,8 @@ try{
  if(!is_array($body) || !is_string($body['pseudo']??null) || !is_string($body['alliance']??null))throw new DomainException('Requête invalide.',400);
  $header=$_SERVER['HTTP_AUTHORIZATION']??'';$token=str_starts_with($header,'Bearer ')?substr($header,7):'';
  $actor=authorizeScript($token,$body['pseudo'],$body['alliance']);
+ // Compatibility with installed loaders: never remount an active page. Authorization remains checked.
+ if(is_string($body['revision']??null)&&preg_match('/\A[a-f0-9]{64}\z/',$body['revision'])){echo json_encode(['ok'=>true,'revision'=>$body['revision']],JSON_THROW_ON_ERROR);exit;}
  $q=db()->query("SELECT player_id,grade,sort_order FROM chaine_members WHERE server='s5' ORDER BY player_id");$assignments=[];foreach($q->fetchAll(PDO::FETCH_ASSOC) as $row)$assignments[(string)$row['player_id']]=$row;
  $players=[];foreach(chainePlayers() as $player){$saved=$assignments[(string)$player['player_id']]??[];$players[]=['player_id'=>(string)$player['player_id'],'pseudo'=>$player['pseudo'],'x'=>isset($player['x'])?(int)$player['x']:null,'y'=>isset($player['y'])?(int)$player['y']:null,'grade'=>$saved['grade']??null,'sort_order'=>isset($saved['sort_order'])?(int)$saved['sort_order']:null,'on_holiday'=>$player['on_holiday'],'is_banned'=>$player['is_banned']];}
  $q=db()->prepare("SELECT data->'research'->>'vitesse_attaque' AS speed,research_synced_at FROM user_stats WHERE user_id=?");$q->execute([(int)$actor['id']]);$research=$q->fetch(PDO::FETCH_ASSOC);

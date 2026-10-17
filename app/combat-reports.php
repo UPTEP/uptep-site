@@ -41,6 +41,7 @@ function combatSave(array $u, array $draft): int {
     if(!in_array($target,['attacker','defender'],true))throw new DomainException('Camp cible invalide.');
     $sides=[];
     foreach(['attacker','defender'] as $i=>$side){
+        if($side!==$target)continue;
         $s=$a['sides'][$i];$p=combatPlayer(post($side.'_id'),post($side.'_name'),$target===$side);
         $provenance=['computed'=>$s,'manual'=>[]];
         foreach(['arms','shield','dome','loge'] as $field){
@@ -60,7 +61,7 @@ function combatSave(array $u, array $draft): int {
         if($factor!==null) $s['hp_bonus']=$s['hp_base']*$factor;
         elseif(array_intersect_key($provenance['manual'],array_flip(['shield','dome','loge'])))$s['hp_bonus']=null;
         if($provenance['manual']){$s['hp_min']=null;$s['hp_max']=null;}
-        $sides[]=[$s,$p,$provenance];
+        $sides[$i]=[$s,$p,$provenance];
     }
     $db=db();$db->beginTransaction();
     try{
@@ -76,10 +77,70 @@ function combatSave(array $u, array $draft): int {
             $oid=(int)$insert->fetchColumn();$ids[]=$oid;
             foreach($a['units'] as $j=>$type)$unit->execute([$oid,$type['id'],$s['army'][$j]]);
         }
-        $q=$db->prepare('INSERT INTO combat_observation_candidates(attacker_observation_id,defender_observation_id,attacker_shield,defender_shield,location,building_level) SELECT ?,?,c."aBou",c."dBou",c.lieu,c.niveau FROM jsonb_to_recordset(?::jsonb) AS c("aBou" integer,"dBou" integer,lieu text,niveau integer)');
-        $q->execute([$ids[0],$ids[1],json_encode($a['candidates'],JSON_THROW_ON_ERROR)]);
+        $shield=$target==='attacker'?'aBou':'dBou';
+        $q=$db->prepare('INSERT INTO combat_observation_candidates(observation_id,shield,location,building_level) SELECT DISTINCT ?::bigint,c."'.$shield.'",c.lieu,CASE WHEN ?=\'defender\' AND c.lieu<>\'terrain\' THEN c.niveau ELSE NULL END FROM jsonb_to_recordset(?::jsonb) AS c("aBou" integer,"dBou" integer,lieu text,niveau integer)');
+        $q->execute([$ids[0],$target,json_encode($a['candidates'],JSON_THROW_ON_ERROR)]);
         $db->commit();return $id;
     }catch(Throwable $e){$db->rollBack();if($e instanceof PDOException && $e->getCode()==='23505')throw new DomainException('Ce rapport est déjà enregistré. Retrouve-le dans la liste.');throw $e;}
 }
 function combatNumber(mixed $n): string {return $n===null?'Inconnu':number_format((float)$n, is_numeric($n)&&floor((float)$n)!=(float)$n?2:0,',',' ');}
 function combatDisplayDate(string $date): string {return (new DateTimeImmutable($date))->setTimezone(new DateTimeZone('Europe/Paris'))->format('d/m/Y H:i');}
+
+// Each defensive life value uses one observation only, never levels from another RC.
+function combatLifeSql(): string {
+    return "'hp_terrain',CASE WHEN o.shield IS NOT NULL THEN o.hp_base*(1+0.1*o.shield) WHEN o.side='attacker' OR r.location='terrain' THEN o.hp_bonus END,
+    'hp_dome',CASE WHEN o.shield IS NOT NULL AND o.dome IS NOT NULL THEN o.hp_base*(1.1+0.1*o.shield+0.05*o.dome) WHEN o.side='defender' AND r.location='dome' THEN o.hp_bonus END,
+    'hp_loge',CASE WHEN o.shield IS NOT NULL AND o.loge IS NOT NULL THEN o.hp_base*(1.3+0.1*o.shield+0.15*o.loge) WHEN o.side='defender' AND r.location='loge' THEN o.hp_bonus END";
+}
+function combatLifeValues(array $o): array {
+    $base=(float)$o['hp_base'];$shield=$o['shield'];
+    return [
+        'hp_terrain'=>$shield!==null?$base*(1+.1*$shield):(($o['side']==='attacker'||($o['location']??null)==='terrain')?$o['hp_bonus']:null),
+        'hp_dome'=>$shield!==null&&$o['dome']!==null?$base*(1.1+.1*$shield+.05*$o['dome']):(($o['side']==='defender'&&($o['location']??null)==='dome')?$o['hp_bonus']:null),
+        'hp_loge'=>$shield!==null&&$o['loge']!==null?$base*(1.3+.1*$shield+.15*$o['loge']):(($o['side']==='defender'&&($o['location']??null)==='loge')?$o['hp_bonus']:null),
+    ];
+}
+
+const COMBAT_FIELDS=['arms'=>'Armes','shield'=>'Bouclier','dome'=>'Dôme','loge'=>'Loge','attack_base'=>'Attaque hors bonus','attack_bonus'=>'Attaque avec bonus','hp_base'=>'Vie hors bonus','hp_terrain'=>'Vie AB (terrain)','hp_dome'=>'Vie AB (dôme)','hp_loge'=>'Vie AB (loge)'];
+const COMBAT_UNITS=[1=>'Jeune Soldate Naine',2=>'Soldate Naine',3=>'Naine d’élite',4=>'Jeune Soldate',5=>'Soldate',6=>'Concierge',14=>'Concierge d’élite',7=>'Artilleuse',8=>'Artilleuse d’élite',9=>'Soldate d’élite',10=>'Tank',13=>'Tank d’élite',11=>'Tueuse',12=>'Tueuse d’élite'];
+// The summary uses the latest observed army and the latest known levels.
+// Historical observations and their original combat calculations remain unchanged.
+function combatCurrentStats(array $latest,array $known): array {
+    $level=fn(string $key)=>isset($known[$key])?(float)$known[$key]['value']:null;
+    $arms=$level('arms');$shield=$level('shield');$dome=$level('dome');$loge=$level('loge');
+    $hp=(float)$latest['hp_base'];$attack=(float)$latest['attack_base'];
+    $stats=[
+        'hp_base'=>[$hp,[]], 'attack_base'=>[$attack,[]],
+        'attack_bonus'=>[$arms===null?null:$attack*(1+.1*$arms),['arms']],
+        'hp_terrain'=>[$shield===null?null:$hp*(1+.1*$shield),['shield']],
+        'hp_dome'=>[$shield===null||$dome===null?null:$hp*(1.1+.1*$shield+.05*$dome),['shield','dome']],
+        'hp_loge'=>[$shield===null||$loge===null?null:$hp*(1.3+.1*$shield+.15*$loge),['shield','loge']],
+    ];
+    foreach($stats as $key=>[$value,$dependencies]){
+        unset($known[$key]);if($value===null)continue;
+        $sources=[];foreach($dependencies as $dependency)$sources[$dependency]=$known[$dependency];
+        $known[$key]=['value'=>$value,'observed_at'=>$latest['observed_at'],'report_id'=>$latest['report_id'],'manual'=>false,'levels'=>$sources];
+    }
+    return $known;
+}
+
+function combatProfile(string $player,int $page=1): ?array {
+    if(!ctype_digit($player)||strlen($player)>18)throw new DomainException('Identifiant joueur invalide.');
+    $q=db()->prepare('SELECT o.*,r.location FROM combat_observations o JOIN combat_reports r ON r.id=o.report_id WHERE o.player_id=? ORDER BY o.observed_at DESC,o.id DESC LIMIT 1');$q->execute([$player]);$latest=$q->fetch(PDO::FETCH_ASSOC);
+    if(!$latest)return null;
+    $q=db()->prepare("SELECT DISTINCT ON (v.key) v.key,v.value,o.observed_at,o.report_id,o.provenance FROM combat_observations o JOIN combat_reports r ON r.id=o.report_id CROSS JOIN LATERAL jsonb_each_text(jsonb_build_object('arms',o.arms,'shield',o.shield,'dome',o.dome,'loge',o.loge,'attack_base',o.attack_base,'attack_bonus',o.attack_bonus,'hp_base',o.hp_base,'hp_bonus',o.hp_bonus,".combatLifeSql().")) v WHERE o.player_id=? AND v.value IS NOT NULL ORDER BY v.key,o.observed_at DESC,o.id DESC");
+    $q->execute([$player]);$known=[];foreach($q as $r){$p=json_decode($r['provenance'],true);$r['manual']=array_key_exists($r['key'],$p['manual']??[]) || (in_array($r['key'],['hp_terrain','hp_dome','hp_loge'],true) && (bool)array_intersect_key($p['manual']??[],array_flip(['shield',match($r['key']){'hp_dome'=>'dome','hp_loge'=>'loge',default=>'shield'}])));unset($r['provenance']);$known[$r['key']]=$r;}
+    $q=db()->prepare('SELECT unit_id,quantity FROM combat_observation_units WHERE observation_id=?');$q->execute([$latest['id']]);$units=$q->fetchAll(PDO::FETCH_KEY_PAIR);
+    $q=db()->prepare('SELECT o.*,r.location FROM combat_observations o JOIN combat_reports r ON r.id=o.report_id WHERE player_id=? ORDER BY observed_at DESC,o.id DESC LIMIT 26 OFFSET '.((max(1,$page)-1)*25));$q->execute([$player]);$history=$q->fetchAll(PDO::FETCH_ASSOC);$more=count($history)>25;
+    return ['latest'=>$latest,'known'=>combatCurrentStats($latest,$known),'units'=>$units,'history'=>array_slice($history,0,25),'more'=>$more];
+}
+function combatTrackedPlayers(string $filter,int $page): array {
+    $q=db()->prepare("WITH matching AS (SELECT DISTINCT player_id FROM combat_observations WHERE player_name ILIKE ? ESCAPE '!' OR player_id::text=?), latest AS (SELECT DISTINCT ON (o.player_id) o.*,count(*) OVER(PARTITION BY o.player_id) AS observations FROM combat_observations o JOIN matching m ON m.player_id=o.player_id ORDER BY o.player_id,o.observed_at DESC,o.id DESC) SELECT * FROM latest ORDER BY lower(player_name),player_id LIMIT 26 OFFSET ".((max(1,$page)-1)*25));
+    $q->execute(['%'.str_replace(['!','%','_'],['!!','!%','!_'],mb_substr(trim($filter),0,255)).'%',trim($filter)]);$rows=$q->fetchAll(PDO::FETCH_ASSOC);
+    if(!$rows)return [];
+    $known=db()->prepare("SELECT DISTINCT ON(o.player_id,v.key) o.player_id,v.key,v.value,o.observed_at,o.report_id FROM combat_observations o JOIN combat_reports r ON r.id=o.report_id CROSS JOIN LATERAL jsonb_each_text(jsonb_build_object('arms',o.arms,'shield',o.shield,'hp_base',o.hp_base,'attack_base',o.attack_base,'hp_bonus',o.hp_bonus,'attack_bonus',o.attack_bonus,'dome',o.dome,'loge',o.loge,".combatLifeSql().")) v WHERE o.player_id IN (".implode(',',array_fill(0,count($rows),'?')).") AND v.value IS NOT NULL ORDER BY o.player_id,v.key,o.observed_at DESC,o.id DESC");
+    $known->execute(array_column($rows,'player_id'));$values=[];
+    foreach($known as $value)$values[$value['player_id']][$value['key']]=$value;
+    foreach($rows as &$row)$row['known']=combatCurrentStats($row,$values[$row['player_id']]??[]);unset($row);
+    return $rows;
+}

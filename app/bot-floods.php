@@ -28,6 +28,7 @@ function floodCreate(PDO $p,PDO $game,array $b): array {
  $hash=hash('sha256',floodJson($b));$p->beginTransaction();
  try{
   $actor=botActor($p,$game,$discord,false);
+  $q=$p->prepare('SELECT pg_advisory_xact_lock(hashtextextended(?,0))');$q->execute(['flood-sender:'.$actor['id']]);
   $q=$p->prepare('SELECT pg_advisory_xact_lock(hashtextextended(?,0))');$q->execute(['flood:'.$command]);
   $q=$p->prepare('SELECT payload_hash,response FROM bot_flood_batches WHERE commande_id=?');$q->execute([$command]);$old=$q->fetch(PDO::FETCH_ASSOC);
   if($old){if(!hash_equals($old['payload_hash'],$hash))throw new DomainException('Cette déclaration a déjà été utilisée avec un autre contenu.',409);$p->commit();return json_decode($old['response'],true,512,JSON_THROW_ON_ERROR);}

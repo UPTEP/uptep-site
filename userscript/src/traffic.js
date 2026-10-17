@@ -40,7 +40,7 @@ function mountTraffic(context,data,serverTime){
    groups.push({kind,headingText,list,empty,entries,label:directionLabel});
   }
  }
- make('p','Trajets déclarés · heures de Paris · actualisation 30 s',body).className='uptep-traffic-note';
+ make('p','Trajets déclarés · heures de Paris · actualisation au rechargement',body).className='uptep-traffic-note';
  let selected='flood';try{const saved=win.sessionStorage.getItem(storageKey+'tab');if(tabs.some(t=>t.kind===saved))selected=saved;}catch{}
  function select(kind){selected=kind;for(const tab of tabs){const active=tab.kind===kind;tab.button.setAttribute('aria-selected',String(active));tab.button.tabIndex=active?0:-1;tab.panel.hidden=!active;}try{win.sessionStorage.setItem(storageKey+'tab',kind);}catch{}}
  function clickTab(event){const tab=tabs.find(t=>t.button===event.target.closest('button'));if(tab)select(tab.kind);}

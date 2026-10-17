@@ -3,6 +3,7 @@ declare(strict_types=1);
 require '/home/uptep/private/app/bootstrap.php';
 require '/home/uptep/private/app/view.php';
 require '/home/uptep/private/app/web-convoys.php';
+require '/home/uptep/private/app/convoy-daily.php';
 $u=requireUser();$error='';$member=null;$confirmation=null;$data=[];
 $tabs=['tableau'=>'Demandes','nouvelle'=>'Nouvelle demande','livraisons'=>'Livraisons','mes-convois'=>'Mes convois'];
 $tab=is_string($_GET['vue']??null)?$_GET['vue']:'tableau';
@@ -36,6 +37,10 @@ try {
     elseif($tab==='mes-convois'){
         // Own history, including cancelled declarations. Never expose another player's history through this tab.
         $cursor=botNumber($after);$q=db()->prepare('SELECT c.*,d.pseudo_demandeur FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande WHERE c.idenvoyeur=? AND c.id>? ORDER BY c.id LIMIT 51');$q->execute([$member['player_id'],$cursor]);$rows=$q->fetchAll(PDO::FETCH_ASSOC);$more=count($rows)>50;$rows=array_slice($rows,0,50);$data=['lignes'=>$rows,'suite_apres'=>$more?(string)end($rows)['id']:null];
+    }elseif($tab==='statistiques'){
+        $query=['discord_id'=>$member['discord_id']];
+        foreach(['ressource','sens','joueur'] as $key)if(isset($_GET[$key]))$query[$key]=$_GET[$key];
+        $data=convoyDailyStatistics(db(),db(true),$query,$u);
     }elseif($tab!=='nouvelle'){
         $query=['discord_id'=>$member['discord_id'],'page'=>$page];
         if($tab!=='recap-demandes')foreach(['periode','debut','fin','joueur','etat','expediteur','destinataire','demande'] as $key)if(is_string($_GET[$key]??null)&&$_GET[$key]!=='')$query[$key]=$_GET[$key];
@@ -84,6 +89,8 @@ workspaceStart($u,'Demandes et convois'); ?>
 <?php elseif($tab==='livraisons'): ?><form class="convoy-filters" method="get"><input type="hidden" name="vue" value="livraisons"><label>Vitesse d’attaque<input type="number" name="vitesse" min="0" max="999" required value="<?= e((string)($data['vitesse']??'0')) ?>"></label><button class="save-user">Calculer les trajets</button></form><p>Demandes validées des autres membres, classées du plus proche au plus éloigné. Durées aller estimées.</p>
 <div class="users-panel users-scroll"><table class="users-table"><thead><tr><th>Demande</th><th>Pommes restantes</th><th>Matériaux restants</th><th>Distance</th><th>Trajet aller</th><th>Livraison</th></tr></thead><tbody><?php foreach($data['lignes']??[] as $r): ?><tr><td><a href="/convois.php?id=<?= e($r['id']) ?>">#<?= e($r['id'].' · '.$r['pseudo_demandeur']) ?></a></td><td><?= convoyAmount($r['nbpomme_restant']) ?></td><td><?= convoyAmount($r['nbmateriaux_restant']) ?></td><td><?= $r['distance']===null?'—':number_format($r['distance'],1,',',' ') ?></td><td><?= $r['seconds']===null?'Indisponible':e(intdiv($r['seconds'],3600).'h '.intdiv($r['seconds']%3600,60).'m '.$r['seconds']%60 .'s') ?></td><td><a href="https://s5.fourmizzz.fr/commerce.php?ID=<?= e($r['iddemandeur']) ?>" target="_blank" rel="noopener noreferrer">Commerce ↗</a></td></tr><?php endforeach; ?></tbody></table><?php if(empty($data['lignes'])): ?><p class="chaine-empty">Aucune demande à livrer.</p><?php endif; ?></div>
 <?php elseif($tab==='mes-convois'): ?><section class="users-panel convoy-card"><h2>Mes convois</h2><?php convoyTable($data['lignes']??[],$member); ?><?php if($data['suite_apres']??null)convoyLink(['apres'=>$data['suite_apres']],'Convois suivants'); ?></section>
+<?php elseif($tab==='statistiques'): ?>
+<?php if(!$error)require '/home/uptep/private/app/convoy-daily-view.php'; ?>
 <?php else: ?>
 <?php if($tab!=='recap-demandes'): ?><form method="get" class="convoy-filters"><input type="hidden" name="vue" value="<?= e($tab) ?>"><label>Période<select name="periode"><?php foreach(['7j'=>'7 derniers jours','30j'=>'30 derniers jours','personnalisee'=>'Dates personnalisées'] as $v=>$l): ?><option value="<?= e($v) ?>" <?= ($_GET['periode']??'7j')===$v?'selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select></label><label>Du (JJ-MM-AAAA)<input name="debut" value="<?= e(is_string($_GET['debut']??null)?$_GET['debut']:'') ?>" placeholder="01-10-2026"></label><label>Au (JJ-MM-AAAA)<input name="fin" value="<?= e(is_string($_GET['fin']??null)?$_GET['fin']:'') ?>" placeholder="14-10-2026"></label>
 <?php foreach($tab==='convois'?['expediteur'=>'Expéditeur','destinataire'=>'Destinataire','demande'=>'N° demande']:['joueur'=>'Pseudo du joueur'] as $key=>$label): ?><label><?= e($label) ?><input name="<?= e($key) ?>" value="<?= e(is_string($_GET[$key]??null)?$_GET[$key]:'') ?>"></label><?php endforeach; ?><?php if($tab==='demandes'): ?><label>État<select name="etat"><?php foreach(['toutes'=>'Tous','attente'=>'En attente','en_cours'=>'En cours','terminee'=>'Terminées','annulee'=>'Annulées'] as $v=>$l): ?><option value="<?= e($v) ?>" <?= ($_GET['etat']??'')===$v?'selected':'' ?>><?= e($l) ?></option><?php endforeach; ?></select></label><?php endif; ?><button class="save-user">Afficher</button></form><?php endif; ?>
