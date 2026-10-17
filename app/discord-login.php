@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/legal-acceptance.php';
 const DISCORD_LOGIN_USER = '1544667516364652659';
 const DISCORD_LOGIN_TEST_TARGET = '757857297903910954';
 function discordLoginTestAllowed(string $discord): bool {
@@ -82,7 +83,7 @@ function discordLoginLookup(PDO $p, string $hash, bool $lock = false): array {
     if ((string)$u['id'] !== (string)$token['user_id'] || (string)$u['session_version'] !== (string)$token['session_version'] || (string)$u['game_player_id'] !== (string)$token['player_id']) throw new DomainException('Le compte a changé. Relance /connexion sur Discord.', 403);
     return $u;
 }
-function discordLoginConsume(PDO $p, string $hash): array {
+function discordLoginConsume(PDO $p, string $hash, ?string $acceptedTermsVersion = null): array {
     $p->beginTransaction();
     try {
         $p->query("SELECT pg_advisory_xact_lock(721820282)");
@@ -93,10 +94,11 @@ function discordLoginConsume(PDO $p, string $hash): array {
         $u = discordLoginLookup($p, $hash, true);
         $test = $u['_login_test'];
         if ($u['id'] === null) {
+            if ($acceptedTermsVersion !== DISCORD_REGISTRATION_TERMS_VERSION) throw new DomainException('Accepte les CGU et confirme avoir pris connaissance de la confidentialité avant de créer ton compte.', 403);
             // Random, undisclosed password; no default password or forced password step.
             $passwordHash = password_hash(bin2hex(random_bytes(32)), PASSWORD_ARGON2ID);
-            $q = $p->prepare("INSERT INTO users (username, display_name, password_hash, role, status, must_change_password, is_chef, is_chaine, game_player_id, discord_login_id, password_setup_required, approved_at) VALUES (?, ?, ?, 'member', 'active', false, false, false, ?, ?, true, now()) RETURNING *");
-            $q->execute([$u['username'], $u['display_name'], $passwordHash, $u['game_player_id'], $u['discord_login_id']]);
+            $q = $p->prepare("INSERT INTO users (username, display_name, password_hash, role, status, must_change_password, is_chef, is_chaine, game_player_id, discord_login_id, password_setup_required, approved_at, terms_accepted_at, terms_version, privacy_notice_version) VALUES (?, ?, ?, 'member', 'active', false, false, false, ?, ?, true, now(), clock_timestamp(), ?, ?) RETURNING *");
+            $q->execute([$u['username'], $u['display_name'], $passwordHash, $u['game_player_id'], $u['discord_login_id'], DISCORD_REGISTRATION_TERMS_VERSION, DISCORD_REGISTRATION_TERMS_VERSION]);
             $u = $q->fetch(PDO::FETCH_ASSOC);
         }
         $q = $p->prepare('DELETE FROM discord_login_tokens WHERE token_hash = ? AND expires_at > clock_timestamp() RETURNING token_hash');

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/preview.php';
+require_once __DIR__.'/legal-acceptance.php';
 
 function config(): array {
     static $config;
@@ -22,7 +23,7 @@ function redirect(string $path): never { header('Location: '.$path, true, 303); 
 function csrf(): string { return $_SESSION['csrf'] ??= bin2hex(random_bytes(32)); }
 function validCsrf(): bool { return isset($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], post('csrf')); }
 function userRecord(int $id): ?array {
-    $q = db()->prepare('SELECT id, username, display_name, game_player_id, role, is_chef, is_chaine, script_enabled, status, session_version, must_change_password, password_setup_required FROM users WHERE id = ?');
+    $q = db()->prepare('SELECT id, username, display_name, game_player_id, role, is_chef, is_chaine, script_enabled, status, session_version, must_change_password, password_setup_required, terms_accepted_at, terms_version, privacy_notice_version FROM users WHERE id = ?');
     $q->execute([$id]); return $q->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 function authenticatedUser(): ?array {
@@ -101,6 +102,15 @@ if (PHP_SAPI !== 'cli') {
     session_cache_limiter('');
     session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
     session_start();
+    // Gate existing browser sessions before any page handler or mutation runs.
+    $legalPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+    if (!in_array($legalPath, ['/conditions.php', '/logout.php', '/discord-login.php', '/login.php'], true)) {
+        $legalUser = authenticatedUser();
+        if ($legalUser && legalAcceptanceRequired($legalUser)) {
+            unset($_SESSION['preview']);
+            redirect('/conditions.php');
+        }
+    }
     if (isset($_SESSION['preview'])) {
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
         $control = previewControlRequest($path, post('action'));

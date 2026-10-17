@@ -78,3 +78,9 @@
 .convoy-floating-head{position:fixed;top:0;z-index:30;overflow:hidden;pointer-events:none;background:#eaf0f2;box-shadow:0 3px 8px #153e5026}.convoy-floating-head[hidden]{display:none}.convoy-floating-head .users-table{table-layout:fixed;margin:0;border-collapse:collapse;max-width:none;min-width:0}.convoy-floating-head .users-table thead th{position:static;background:#eaf0f2;color:#345564;border-bottom:2px solid #aabec7}.convoy-page .users-table thead th{color:#345564;background:#eaf0f2}
 
 .legal-footer{padding:18px 24px;text-align:center;font-size:13px;line-height:1.8;color:#52666b}.legal-footer a,.auth-footer a{color:inherit}.auth-footer{flex-wrap:wrap;gap:8px}
+
+.sidebar-legal{flex-shrink:0;margin-top:18px;padding:14px 4px 0;border-top:1px solid #a5c8d333;text-align:center;font-size:11px;line-height:1.9;color:#bdcdd4}.sidebar-legal a{color:inherit;text-underline-offset:3px;white-space:nowrap}.sidebar-legal a:hover{color:#f6d793}@media(max-width:680px){.sidebar-legal{margin-top:8px;padding-top:8px;font-size:11px}}
+
+/* Compact desktop navigation keeps every admin entry on the same row. */
+@media(min-width:1451px){.dashboard-page .top-navigation{flex:1;padding-left:18px;gap:4px}.dashboard-page .top-navigation a{font-size:14px;gap:7px;padding:14px 12px}.dashboard-page .top-navigation .icon{width:19px;height:19px}.dashboard-page .nav-admin-badge{font-size:9px;padding:3px 4px}}
+@media(min-width:1451px) and (max-width:1650px){.dashboard-page .top-navigation{padding-left:12px;gap:3px}.dashboard-page .top-navigation a{font-size:13px;gap:6px;padding:13px 9px}}

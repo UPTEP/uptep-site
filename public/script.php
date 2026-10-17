@@ -13,15 +13,26 @@ if($_SERVER['REQUEST_METHOD']==='POST')try{
 catch(Throwable $e){error_log('UPTEP script install: '.$e->getMessage());http_response_code(503);$error='Installation momentanément indisponible.';}
 $ready=isset($_SESSION['script_install'])&&$_SESSION['script_install']['expires']>=time();
 workspaceStart($u,'UPTEP+'); ?>
-<div class="account-page"><h1>UPTEP+</h1><p class="admin-intro">Le compagnon de l’alliance sur Fourmizzz · Serveur 5</p>
+<link rel="stylesheet" href="/assets/script-install.css?v=2">
+<div class="script-setup"><div class="setup-heading"><h1>UPTEP+</h1><span class="setup-badge">Fourmizzz · S5</span></div><p class="admin-intro">Les outils de l’alliance, directement dans ton jeu.</p>
 <?php if($error): ?><div class="form-error" role="alert"><?= e($error) ?></div><?php endif; ?>
-<section class="users-panel"><div class="users-panel-heading"><h2>Installer le userscript</h2></div><div class="account-settings">
-<?php if(!$account['script_enabled']): ?><p>L’accès à UPTEP+ a été désactivé par un administrateur.</p>
-<?php elseif(!$player): ?><p><a href="/compte.php">Renseigne ton ID dans Mon compte</a>. Il doit correspondre à un joueur UPTEP présent dans le relevé du serveur 5.</p>
-<?php else: ?><p>Joueur associé : <strong><?= e($player['pseudo']) ?></strong> · ID <?= (int)$player['player_id'] ?></p>
-<p>Avant installation, consulte les <a href="/cgu.html">conditions d’utilisation</a> et les <a href="/confidentialite.html">données traitées</a>. Les collectes facultatives sont désactivées par défaut pour les nouveaux comptes.</p>
-<p>Installe un gestionnaire de userscripts comme Tampermonkey, Violentmonkey ou Greasemonkey, puis ajoute UPTEP+.</p>
-<?php if($ready): ?><p><a class="save-user script-install-link" href="/uptep.user.js">Installer UPTEP+</a></p><p class="field-hint">Lien valable 10 minutes. Le fichier contient ta clé personnelle : ne le partage pas.</p>
-<?php else: ?><form method="post" action="/script.php"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><button class="save-user" type="submit">Préparer mon installation</button></form><?php endif; ?>
-<p>Une seule installation par navigateur. Les fonctionnalités sont chargées depuis UPTEP et sont actualisées au prochain chargement de page.</p><p>Sur <a href="https://s5.fourmizzz.fr/" target="_blank" rel="noopener noreferrer">s5.fourmizzz.fr</a>, le menu <strong>UPTEP+</strong> apparaît à la suite des blocs de gauche lorsque ton accès est autorisé.</p>
-<?php endif; ?></div></section></div><?php workspaceEnd(); ?>
+<?php if(!$account['script_enabled']): ?>
+<section class="setup-notice"><strong>Accès désactivé</strong><p>Contacte un administrateur pour accéder à UPTEP+.</p></section>
+<?php elseif(!$player): ?>
+<section class="setup-notice"><strong>Associe ton joueur S5</strong><p>Ton ID doit correspondre à un membre UPTEP présent dans le relevé du jeu.</p><a href="/compte.php" class="save-user">Ouvrir mon compte</a></section>
+<?php else: ?>
+<div class="setup-player"><?= icon('shield') ?><span>Joueur associé <strong><?= e($player['pseudo']) ?></strong></span><span class="setup-player-id">ID <?= (int)$player['player_id'] ?></span></div>
+<section class="setup-panel" aria-labelledby="setup-title"><div class="setup-panel-heading"><h2 id="setup-title">Prêt à installer UPTEP+ ?</h2><span class="setup-badge">1 installation par navigateur</span></div>
+<ol class="setup-steps">
+<li><span class="setup-number">1</span><div><h3>Ajoute un gestionnaire</h3><p>Choisis une seule extension pour ton navigateur.</p><div class="setup-browsers"><section class="setup-browser" aria-label="Extensions Chrome"><h4>Chrome</h4><div class="setup-extension-links"><a href="https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank" rel="noopener noreferrer" aria-label="Installer Tampermonkey pour Chrome (nouvel onglet)">Tampermonkey <span aria-hidden="true">↗</span></a><a href="https://chromewebstore.google.com/detail/violent-monkey/jinjaccalgkegednnccohejagnlnfdag" target="_blank" rel="noopener noreferrer" aria-label="Installer Violentmonkey pour Chrome (nouvel onglet)">Violentmonkey <span aria-hidden="true">↗</span></a></div></section><section class="setup-browser" aria-label="Extensions Firefox"><h4>Firefox</h4><div class="setup-extension-links"><a href="https://addons.mozilla.org/fr/firefox/addon/tampermonkey/" target="_blank" rel="noopener noreferrer" aria-label="Installer Tampermonkey pour Firefox (nouvel onglet)">Tampermonkey <span aria-hidden="true">↗</span></a><a href="https://addons.mozilla.org/fr/firefox/addon/violentmonkey/" target="_blank" rel="noopener noreferrer" aria-label="Installer Violentmonkey pour Firefox (nouvel onglet)">Violentmonkey <span aria-hidden="true">↗</span></a><a href="https://addons.mozilla.org/fr/firefox/addon/greasemonkey/" target="_blank" rel="noopener noreferrer" aria-label="Installer Greasemonkey pour Firefox (nouvel onglet)">Greasemonkey <span aria-hidden="true">↗</span></a></div></section></div></div></li>
+<li class="setup-step-main"><span class="setup-number">2</span><div><h3>Installe UPTEP+</h3><p>Prépare ton lien, puis confirme l’installation dans ton extension.</p>
+<?php if($ready): ?><a class="save-user script-install-link setup-action" href="/uptep.user.js"><?= icon('arrow') ?> Installer UPTEP+</a><p class="setup-key-note"><?= icon('lock') ?> Lien valable 10 min · Clé personnelle, ne pas partager.</p>
+<?php else: ?><form method="post" action="/script.php"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><button class="save-user setup-action" type="submit"><?= icon('arrow') ?> Préparer mon installation</button></form><?php endif; ?>
+</div></li>
+<li><span class="setup-number">3</span><div><h3>Retrouve tes outils en jeu</h3><p>Le menu <strong>UPTEP+</strong> apparaît sous les blocs de gauche.</p><a class="setup-game-link" href="https://s5.fourmizzz.fr/" target="_blank" rel="noopener noreferrer">Ouvrir Fourmizzz S5 <?= icon('arrow') ?></a></div></li>
+</ol>
+</section>
+<div class="setup-reassurance"><span><?= icon('lock') ?> Collectes facultatives à activer</span><span><?= icon('arrow') ?> Fonctions actualisées au chargement</span></div>
+<details class="setup-details"><summary>Paramètres et informations utiles</summary><p>Pour les nouveaux comptes, les collectes de ressources, d’armée, de bâtiments et de laboratoire sont désactivées par défaut. Tes choix existants sont conservés lors d’une réinstallation.</p><p>Les fonctionnalités sont chargées depuis UPTEP à chaque chargement de page. Une seule installation suffit par navigateur.</p></details>
+<nav class="setup-legal" aria-label="Informations avant installation"><span>Avant installation :</span> <a href="/cgu.html">Conditions d’utilisation</a><span aria-hidden="true">·</span><a href="/confidentialite.html">Données et confidentialité</a></nav>
+<?php endif; ?></div><?php workspaceEnd(); ?>
