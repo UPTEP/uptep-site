@@ -1,5 +1,39 @@
+function convoyAutoBadge(doc){const badge=doc.createElement('span');badge.textContent='Auto production';badge.title='Le demandeur produit lui-même ses ressources. Confirme avant de lui envoyer un convoi.';badge.style.cssText='display:inline-block;vertical-align:middle;margin-left:7px;padding:2px 7px;border:1px solid #928443;border-radius:10px;background:#eee0a0;color:#5b4d19;font:11px/1.4 Verdana,sans-serif;';return badge;}
 // Read semantic lines rather than layout classes: standard/C+ pages can use
 // strong/span, nested markup, images or plain resource labels, and table rows.
+// All projected deductions are display-only. The persisted remainder is untouched.
+function convoyColonyCapacity(value){
+ const number=v=>typeof v==='string'&&/^(0|[1-9][0-9]{0,18})$/.test(v)&&BigInt(v)<=9223372036854775807n?BigInt(v):null;
+ if(typeof value==='string')return number(value);
+ if(!value||typeof value!=='object'||!Array.isArray(value.gains))return null;
+ let capacity=number(value.own);if(capacity===null)return null;
+ const transfer=t=>{const terrain=number(t?.terrain);return terrain===null||!Number.isInteger(t?.percent)||t.percent<0||t.percent>100?null:terrain*BigInt(t.percent)/100n;};
+ if(value.loss!==null&&value.loss!==undefined){const loss=transfer(value.loss);if(loss===null||loss>capacity)return null;capacity-=loss;}
+ for(const t of value.gains){const gain=transfer(t);if(gain===null)return null;capacity+=gain;}
+ return capacity;
+}
+function convoyProductionEstimate(d){
+ const integer=v=>typeof v==='string'&&/^(0|[1-9][0-9]{0,18})$/.test(v)&&BigInt(v)<=9223372036854775807n?BigInt(v):null;
+ const tdc=integer(d.production?.tdc),capacity=d.production?.colonies_included?convoyColonyCapacity(d.production.capacity_per_cycle):tdc,apples=integer(d.nbpomme_restant),wood=integer(d.nbmateriaux_restant);
+ if(tdc===null||capacity===null||apples===null||wood===null)return {tdc,cycles:null,reason:'Données de capacité manquantes'};
+ let harvested=0n;const projection=d.production?.projection;
+ if(projection){
+  if(projection.history_complete!==true||!Array.isArray(projection.segments))return {tdc,cycles:null,reason:'Historique de TdC incomplet depuis le point de départ'};
+  for(const segment of projection.segments){const cycles=integer(segment.cycles),rate=convoyColonyCapacity(segment.capacity_per_cycle);if(cycles===null||rate===null)return {tdc,cycles:null,reason:'Historique de capacité illisible'};harvested+=cycles*rate;}
+ }
+ const remaining=apples+wood>harvested?apples+wood-harvested:0n;
+ if(remaining>0n&&capacity===0n)return {tdc,cycles:null,reason:'Capacité de récolte nulle'};
+ const cycles=remaining===0n?0n:(remaining+capacity-1n)/capacity;
+ let finish_at=null,minutes=cycles*30n;
+ if(projection&&cycles>0n){const anchor=Date.parse(projection.anchor_at),at=Date.parse(projection.calculated_at);const elapsed=integer(projection.elapsed_cycles);
+  if(!Number.isFinite(anchor)||!Number.isFinite(at)||elapsed===null)return {tdc,cycles:null,reason:'Date de calcul indisponible'};
+  const finish=anchor+Number(elapsed+cycles)*1800000;
+  if(Number.isFinite(finish)&&Math.abs(finish)<=8640000000000000){finish_at=finish;minutes=BigInt(Math.max(0,Math.ceil((finish-at)/60000)));}
+ }
+ return {tdc,cycles,minutes,harvested,remaining,finish_at,capacity};
+}
+function convoyProductionMinutes(minutes){const days=minutes/1440n,hours=minutes/60n%24n,rest=minutes%60n;return [days?days.toLocaleString('fr-FR')+' j':'',hours?hours+' h':'',rest?rest+' min':''].filter(Boolean).join(' ')||'0 min';}
+function convoyProductionDuration(cycles){return convoyProductionMinutes(cycles*30n);}
 function readCommerceConvoys(doc,baseUrl,now) {
  const root=doc.getElementById('centre');if(!root)return [];
  const lines=[];let line={text:'',links:[]};
@@ -71,7 +105,7 @@ function convoyNativeForm(doc,win,pseudo,order){
 function mountConvoys(context,auth,serverTime,travelData=null){
  const {document:doc,window:win}=context;if(win.location.pathname.toLowerCase()!=='/commerce.php'||!auth)return ()=>{};
  const root=doc.getElementById('centre');if(!root)return ()=>{};
- const key='uptep-convoys-s5:'+context.pseudo,pending=new Set(),controllers=new Set();let stopped=false,busy=false,reloading=false,transportDoc=doc;
+ const key='uptep-convoys-s5:'+context.pseudo,pending=new Set(),controllers=new Set(),estimateRows=new Map();let projectionRefreshAt=0,projectionRefreshing=false,projectionGeneration=0;let stopped=false,busy=false,reloading=false,transportDoc=doc;
  const base=Date.parse(serverTime)||Date.now(),started=win.performance.now(),now=()=>base+win.performance.now()-started,iso=()=>new Date(now()).toISOString().replace(/\.\d{3}Z$/,'Z');
  const el=(tag,text)=>{const n=doc.createElement(tag);if(text!==undefined)n.textContent=text;return n;},fmt=n=>new Intl.NumberFormat('fr-FR').format(BigInt(n));
  const icon=kind=>{const image=el('img');image.src='/images/icone/'+({apples:'icone_pomme.png',wood:'icone_bois.png',workers:'icone_ouvriere.png'}[kind]);image.alt='';image.setAttribute('aria-hidden','true');image.width=kind==='workers'?25:20;image.style.cssText='height:auto;vertical-align:middle;margin-right:5px;';return image;};
@@ -89,23 +123,23 @@ function mountConvoys(context,auth,serverTime,travelData=null){
  }
  list.before(tabs);addTab('current','Demandes en cours',list);addTab('pending','En attente de validation',waiting,loadPending);addTab('create','Faire une demande',createPanel);
  function showTab(id,force=false){if((busy&&!force)||!panels[id]||tabButtons[id].hidden)return;activeTab=id;for(const key of Object.keys(panels)){panels[key].hidden=key!==id;tabButtons[key].setAttribute('aria-selected',String(key===id));tabButtons[key].tabIndex=key===id?0:-1;tabButtons[key].style.background=key===id?'#525543':'#d7c384';tabButtons[key].style.color=key===id?'#d3d9b8':'#302b18';}refresh.hidden=id==='create';if(tabLoads[id])Promise.resolve(tabLoads[id]()).catch(e=>{if(!stopped)status.textContent=e.message;});}
- async function loadPending(){const version=++pendingVersion;waiting.textContent='Chargement…';const data=await api({action:'convoy-pending'});if(stopped||version!==pendingVersion)return;management?.acceptPermissions(data.permissions);waiting.replaceChildren();for(const d of data.demands){const row=el('article');row.style.cssText='padding:10px 0;border-bottom:1px solid #b39b61;';const heading=el('h3',`#${d.id} · ${d.target||d.pseudo_demandeur} · ${d.objet||'Demande'}${d.niveau?' niveau '+d.niveau:''}`);heading.style.cssText='margin:0 0 6px;font-size:15px;line-height:1.35;';row.append(heading);const amounts=el('p');amounts.style.cssText='margin:0;font-size:13px;';amounts.append(icon('apples'),doc.createTextNode(fmt(d.nbpomme_restant)+' pommes · '),icon('wood'),doc.createTextNode(fmt(d.nbmateriaux_restant)+' matériaux'));const meta=el('div');meta.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:5px 14px;margin-bottom:5px;';const badge=el('span','À valider');badge.title='En attente de validation — envoi indisponible.';badge.style.cssText='padding:3px 8px;border:1px solid #887749;border-radius:10px;background:#eee0ad;font-size:11px;line-height:1.3;';meta.append(amounts,badge);row.append(meta);management?.decorate(row,d);waiting.append(row);}if(!data.demands.length)waiting.append(el('p','Aucune demande en attente de validation.'));}
+ async function loadPending(){const version=++pendingVersion;waiting.textContent='Chargement…';const data=await api({action:'convoy-pending'});if(stopped||version!==pendingVersion)return;management?.acceptPermissions(data.permissions);waiting.replaceChildren();for(const d of data.demands){const row=el('article');row.style.cssText='padding:10px 0;border-bottom:1px solid #b39b61;';const heading=el('h3',`#${d.id} · ${d.target||d.pseudo_demandeur} · ${d.objet||'Demande'}${d.niveau?' niveau '+d.niveau:''}`);heading.style.cssText='margin:0 0 6px;font-size:15px;line-height:1.35;';if(d.auto_production)heading.append(convoyAutoBadge(doc));row.append(heading);const amounts=el('p');amounts.style.cssText='margin:0;font-size:13px;';amounts.append(icon('apples'),doc.createTextNode(fmt(d.nbpomme_restant)+' pommes · '),icon('wood'),doc.createTextNode(fmt(d.nbmateriaux_restant)+' matériaux'));const meta=el('div');meta.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:5px 14px;margin-bottom:5px;';const badge=el('span','À valider');badge.title='En attente de validation — envoi indisponible.';badge.style.cssText='padding:3px 8px;border:1px solid #887749;border-radius:10px;background:#eee0ad;font-size:11px;line-height:1.3;';meta.append(amounts,badge);row.append(meta);management?.decorate(row,d);waiting.append(row);}if(!data.demands.length)waiting.append(el('p','Aucune demande en attente de validation.'));}
  if(typeof mountConvoyManagement==='function')management=mountConvoyManagement(context,{api,exclusive,addTab,status,box,tabs,refreshCurrent:async()=>{await load();if(activeTab==='pending')await loadPending();}});
  const requestForm=el('form'),requestFields={},requestNotice=el('p');requestForm.id='uptep-convoy-request-form';requestNotice.setAttribute('role','status');
  createPanel.append(el('p','Crée une demande pour '+context.pseudo+'. Elle apparaîtra en attente de validation.'),requestForm,requestNotice);
- for(const [name,label,type,value] of [['apples','Pommes','text','0'],['wood','Matériaux','text','0'],['object','Construction ou recherche','text',''],['level','Niveau','number','1'],['wanted_date','Date souhaitée (facultative)','date','']]){
-  const wrap=el('label',label+' '),input=el('input');input.name=name;input.type=type;input.defaultValue=value;input.value=value;input.required=name!=='wanted_date';wrap.style.cssText='display:block;margin:9px 0;';input.style.cssText='display:block;box-sizing:border-box;width:100%;max-width:340px;padding:5px;margin-top:4px;';
-  if(name==='apples'||name==='wood'){input.inputMode='decimal';wrap.prepend(icon(name));}if(name==='object')input.maxLength=160;if(name==='level'){input.min='1';input.max='999';}wrap.append(input);requestForm.append(wrap);requestFields[name]=input;
+ for(const [name,label,type,value] of [['apples','Pommes','text','0'],['wood','Matériaux','text','0'],['object','Construction ou recherche','text',''],['level','Niveau','number','1'],['wanted_date','Date souhaitée (facultative)','date',''],['auto_production','Auto production','checkbox','']]){
+  const wrap=el('label',label+' '),input=el('input');input.name=name;input.type=type;input.defaultValue=value;input.value=value;input.required=!['wanted_date','auto_production'].includes(name);wrap.style.cssText='display:block;margin:9px 0;';input.style.cssText='display:block;box-sizing:border-box;width:100%;max-width:340px;padding:5px;margin-top:4px;';
+  if(name==='apples'||name==='wood'){input.inputMode='decimal';wrap.prepend(icon(name));}if(type==='checkbox'){input.style.cssText='width:auto;margin:0 6px 0 0;vertical-align:middle;accent-color:#525543;';wrap.style.cssText='display:flex;align-items:center;gap:6px;margin:9px 0;';}if(name==='object')input.maxLength=160;if(name==='level'){input.min='1';input.max='999';}wrap.append(input);requestForm.append(wrap);requestFields[name]=input;
  }
  const createButton=el('button','Créer la demande');createButton.type='submit';createButton.dataset.uptepPrimary='1';requestForm.append(createButton);
  const requestKey=key+':new-demand';
- function restoreRequest(){const raw=win.localStorage.getItem(requestKey);if(!raw)return null;const job=JSON.parse(raw);if(!job||job.action!=='convoy-create'||!job.request_key)throw Error('Demande à vérifier sur UPTEP avant une nouvelle création.');for(const [name,input] of Object.entries(requestFields)){input.value=job[name]??'';input.readOnly=true;}createButton.textContent='Réessayer la création';requestNotice.textContent='Une création attend sa confirmation. Réessaie : la même demande ne sera pas créée deux fois.';return job;}
+ function restoreRequest(){const raw=win.localStorage.getItem(requestKey);if(!raw)return null;const job=JSON.parse(raw);if(!job||job.action!=='convoy-create'||!job.request_key)throw Error('Demande à vérifier sur UPTEP avant une nouvelle création.');for(const [name,input] of Object.entries(requestFields)){if(input.type==='checkbox'){input.checked=job[name]===true;input.disabled=true;input.dataset.unavailable='1';}else input.value=job[name]??'';input.readOnly=true;}createButton.textContent='Réessayer la création';requestNotice.textContent='Une création attend sa confirmation. Réessaie : la même demande ne sera pas créée deux fois.';return job;}
  try{restoreRequest();}catch(e){requestNotice.textContent=e.message;}
  requestForm.addEventListener('submit',event=>{event.preventDefault();exclusive(async()=>{
-  let job=restoreRequest();if(!job){job={action:'convoy-create',request_key:win.crypto.randomUUID(),confirmed:true,apples:convoyInputNumber(requestFields.apples.value),wood:convoyInputNumber(requestFields.wood.value),object:requestFields.object.value.trim(),level:requestFields.level.value,wanted_date:requestFields.wanted_date.value||null};if(BigInt(job.apples)+BigInt(job.wood)===0n)throw Error('Renseigne au moins une quantité positive.');if(!job.object||!/^[1-9][0-9]{0,2}$/.test(job.level))throw Error('Renseigne la construction ou recherche et un niveau de 1 à 999.');win.localStorage.setItem(requestKey,JSON.stringify(job));}
+  let job=restoreRequest();if(!job){job={action:'convoy-create',request_key:win.crypto.randomUUID(),confirmed:true,apples:convoyInputNumber(requestFields.apples.value),wood:convoyInputNumber(requestFields.wood.value),object:requestFields.object.value.trim(),level:requestFields.level.value,wanted_date:requestFields.wanted_date.value||null,auto_production:requestFields.auto_production.checked};if(BigInt(job.apples)+BigInt(job.wood)===0n)throw Error('Renseigne au moins une quantité positive.');if(!job.object||!/^[1-9][0-9]{0,2}$/.test(job.level))throw Error('Renseigne la construction ou recherche et un niveau de 1 à 999.');win.localStorage.setItem(requestKey,JSON.stringify(job));}
   requestNotice.textContent='Création de la demande…';
-  try{const result=await api(job);win.localStorage.removeItem(requestKey);requestForm.reset();for(const input of Object.values(requestFields))input.readOnly=false;createButton.textContent='Créer la demande';requestNotice.textContent='✓ Demande #'+result.demand_id+' créée, en attente de validation.';await loadPending();}
-  catch(e){if(e.status===400||e.status===422){win.localStorage.removeItem(requestKey);for(const input of Object.values(requestFields))input.readOnly=false;createButton.textContent='Créer la demande';}else restoreRequest();requestNotice.textContent=e.message;throw e;}
+  try{const result=await api(job);win.localStorage.removeItem(requestKey);requestForm.reset();for(const input of Object.values(requestFields)){input.readOnly=false;delete input.dataset.unavailable;input.disabled=false;}createButton.textContent='Créer la demande';requestNotice.textContent='✓ Demande #'+result.demand_id+' créée, en attente de validation.';await loadPending();}
+  catch(e){if(e.status===400||e.status===422){win.localStorage.removeItem(requestKey);for(const input of Object.values(requestFields)){input.readOnly=false;delete input.dataset.unavailable;input.disabled=false;}createButton.textContent='Créer la demande';}else restoreRequest();requestNotice.textContent=e.message;throw e;}
  });});
  showTab('current');
  const native=doc.querySelector('[name=pseudo_convoi]')?.closest('table.simulateur');if(native){
@@ -117,14 +151,30 @@ function mountConvoys(context,auth,serverTime,travelData=null){
  function read(){const raw=win.localStorage.getItem(key);if(!raw)return null;let value;try{value=JSON.parse(raw);}catch{throw Error('Suivi local illisible. Vérifie tes convois avant toute nouvelle tentative.');}if(!value||!['sending','uncertain','game-sent','done'].includes(value.state)||!value.order)throw Error('Suivi local invalide.');return value;}
  function save(record){win.localStorage.setItem(key,JSON.stringify(record));}
  function lock(value){busy=value;box.setAttribute('aria-busy',String(value));for(const node of box.querySelectorAll('input,button'))node.disabled=value||node.dataset.unavailable==='1';}
- async function exclusive(fn){if(busy||reloading)return;if(!win.navigator.locks){status.textContent='Utilise la page HTTPS dans un navigateur prenant en charge le verrouillage des envois.';return;}lock(true);try{await win.navigator.locks.request(key,{ifAvailable:true},async held=>{if(!held)throw Error('Un envoi est en cours dans un autre onglet.');alive();await fn();});}catch(e){if(!stopped)status.textContent=e.message;}finally{if(!stopped&&!reloading){lock(false);showRecovery();}}}
+ async function exclusive(fn){if(busy||reloading)return;if(!win.navigator.locks){status.textContent='Utilise la page HTTPS dans un navigateur prenant en charge le verrouillage des envois.';return;}lock(true);try{let failure;
+   const run=async held=>{try{if(!held)throw Error('Un envoi est en cours dans un autre onglet.');alive();await fn();}catch(e){failure=e;}};
+   let callback=run;
+   // Firefox requires an exported callback and a page-owned Promise here.
+   // Keep errors in the userscript realm; release the lock only after all work settles.
+   if(typeof exportFunction==='function'&&win.wrappedJSObject){
+    const pageWindow=win.wrappedJSObject;
+    callback=exportFunction(held=>new pageWindow.Promise(exportFunction(resolve=>{run(held).then(()=>{resolve();});},pageWindow)),pageWindow);
+   }
+   await win.navigator.locks.request(key,{ifAvailable:true},callback);if(failure)throw failure;}catch(e){if(!stopped)status.textContent=e.message;}finally{if(!stopped&&!reloading){lock(false);showRecovery();}}}
+
  function api(payload){return new Promise((resolve,reject)=>{
   if(stopped)return reject(Error('Module rechargé.'));const frame=el('iframe');frame.hidden=true;frame.title='Convois UPTEP';frame.referrerPolicy='no-referrer';frame.src='https://uptep.top/portal.php?bridge=convoys';const requestId=win.crypto.randomUUID();let timer;
   const cancel=()=>finish(Error('Module rechargé.'));function finish(error,result){win.clearTimeout(timer);win.removeEventListener('message',receive);frame.remove();pending.delete(cancel);error?reject(error):resolve(result);}
-  function receive(event){if(event.origin!=='https://uptep.top'||event.source!==frame.contentWindow)return;if(event.data?.type==='uptep-ready')frame.contentWindow.postMessage({type:'uptep-auth',token:auth.token,pseudo:context.pseudo,convoy:{...payload,requestId}},'https://uptep.top');if(event.data?.type==='uptep-convoy-result'&&event.data.requestId===requestId)finish(event.data.ok?null:Object.assign(Error(event.data.error||'UPTEP indisponible.'),{status:event.data.status||0}),event.data.result);}
+  function receive(event){if(event.origin!=='https://uptep.top'||event.source!==frame.contentWindow)return;if(event.data?.type==='uptep-ready')frame.contentWindow.postMessage({type:'uptep-auth',token:auth.token,pseudo:context.pseudo,convoy:{...payload,requestId}},'https://uptep.top');if(event.data?.type==='uptep-convoy-result'&&event.data.requestId===requestId){if(!event.data.ok)return finish(Object.assign(Error(event.data.error||'UPTEP indisponible.'),{status:event.data.status||0}));
+   // Firefox/Violentmonkey must resolve a value created in this userscript realm.
+   // Parse before removing the frame; never hand an external object to Promise.resolve.
+   let result;try{const serialized=typeof event.data.result_json==='string'?event.data.result_json:JSON.stringify(event.data.result);result=JSON.parse(serialized);}catch{return finish(Error('Réponse UPTEP illisible. Réessaie la même opération.'));}finish(null,result);
+  }}
   pending.add(cancel);win.addEventListener('message',receive);timer=win.setTimeout(()=>finish(Error('UPTEP ne répond pas.')),20000);doc.body.append(frame);
  });}
- async function game(params){alive();const controller=new win.AbortController();controllers.add(controller);const timer=win.setTimeout(()=>controller.abort(),20000);try{const r=await win.fetch('/commerce.php',{method:params?'POST':'GET',credentials:'same-origin',cache:'no-store',...(params?{headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params.toString()}:{}),signal:controller.signal});if(!r.ok||new URL(r.url).origin!==win.location.origin)throw Error('Réponse du jeu indisponible.');return new win.DOMParser().parseFromString(await r.text(),'text/html');}finally{win.clearTimeout(timer);controllers.delete(controller);}}
+ async function game(params){alive();const controller=new win.AbortController();controllers.add(controller);const timer=win.setTimeout(()=>controller.abort(),20000);try{const r=await win.fetch(new URL('/commerce.php',win.location.href).href,{method:params?'POST':'GET',credentials:'same-origin',cache:'no-store',...(params?{headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params.toString()}:{}),signal:controller.signal});if(!r.ok||new URL(r.url).origin!==win.location.origin)throw Error('Réponse du jeu indisponible.');return await r.text();}finally{win.clearTimeout(timer);controllers.delete(controller);}}
+ // Keep Documents out of async return values: Firefox probes their protected `then` property.
+ function gameDocument(text){return new win.DOMParser().parseFromString(text,'text/html');}
  function findSent(html,record){return readCommerceConvoys(html,win.location.href,now()).filter(r=>!record.before.includes(r.game_id)&&r.target===record.order.target&&r.apples===record.order.apples&&r.wood===record.order.wood);}
  async function declare(record){
   if(record.state!=='game-sent')throw Error('Envoi du jeu non confirmé.');status.textContent='Convoi envoyé dans le jeu. Enregistrement sur UPTEP…';
@@ -133,11 +183,13 @@ function mountConvoys(context,auth,serverTime,travelData=null){
  }
  async function send(order){await exclusive(async()=>{
   const existing=read();if(existing&&existing.state!=='done')throw Error('Un envoi précédent doit être vérifié ou déclaré avant de continuer.');
-  status.textContent='Vérification de la demande, des ressources et des ouvrières…';await api({action:'convoy-check',...order});alive();
-  const before=await game();transportDoc=before;const params=convoyNativeForm(before,win,context.pseudo,order);alive();
+  status.textContent='Vérification de la demande, des ressources et des ouvrières…';const readiness=await api({action:'convoy-check',...order});alive();
+  if(readiness.auto_production&&!win.confirm('Cette demande est en auto production. Souhaites-tu quand même envoyer ce convoi à '+order.target+' ?')){status.textContent='Envoi annulé. Aucune ressource envoyée.';return;}
+  const excess=readiness.overage;if(excess&&(BigInt(excess.pommes)>0n||BigInt(excess.materiaux)>0n)&&!win.confirm('Attention, le montant envoyé dépasse le restant demandé de '+fmt(excess.pommes)+' pommes et '+fmt(excess.materiaux)+' matériaux. Confirmer cet envoi ?')){status.textContent='Envoi annulé. Tu peux modifier les quantités.';return;}
+  const before=gameDocument(await game());transportDoc=before;const params=convoyNativeForm(before,win,context.pseudo,order);alive();
   const record={state:'sending',at:iso(),order,before:readCommerceConvoys(before,win.location.href,now()).map(r=>r.game_id)};save(record);
   try{
-   status.textContent='Envoi du convoi dans Fourmizzz…';const response=await game(params),matches=findSent(response,record);
+   status.textContent='Envoi du convoi dans Fourmizzz…';const response=gameDocument(await game(params)),matches=findSent(response,record);
    if(matches.length!==1){record.state='uncertain';save(record);throw Error('Le jeu n’a pas confirmé un convoi unique. Vérifie l’envoi ci-dessous ; aucun renvoi automatique.');}
    const {anchor,...sent}=matches[0];record.sent=sent;record.state='game-sent';save(record);transportDoc=response;await declare(record);
   }catch(e){if(record.state==='sending'){record.state='uncertain';save(record);}throw Error(e.message+(record.state==='game-sent'?' Le convoi est déjà parti : utilise « Réessayer la déclaration UPTEP ».':''));}
@@ -147,23 +199,38 @@ function mountConvoys(context,auth,serverTime,travelData=null){
   recovery.append(el('p',`Envoi à suivre : ${record.order.target} · ${fmt(record.order.apples)} pommes / ${fmt(record.order.wood)} matériaux · demande #${record.order.demand_id}.`));
   const retry=el('button',record.state==='game-sent'?'Réessayer la déclaration UPTEP':'Vérifier si le convoi est parti');retry.type='button';retry.addEventListener('click',()=>exclusive(async()=>{
    record=read();if(!record||record.state==='done')return;
-   if(record.state!=='game-sent'){const html=await game(),matches=findSent(html,record);if(matches.length!==1)throw Error('Impossible d’identifier un seul nouveau convoi. Vérifie les convois dans le jeu et sur UPTEP. Aucun nouvel envoi effectué.');const {anchor,...sent}=matches[0];record.sent=sent;record.state='game-sent';save(record);}
+   if(record.state!=='game-sent'){const html=gameDocument(await game()),matches=findSent(html,record);if(matches.length!==1)throw Error('Impossible d’identifier un seul nouveau convoi. Vérifie les convois dans le jeu et sur UPTEP. Aucun nouvel envoi effectué.');const {anchor,...sent}=matches[0];record.sent=sent;record.state='game-sent';save(record);}
    await declare(record);
   }));recovery.append(retry);
   if(record.state!=='game-sent'){const reset=el('button','J’ai vérifié : aucun convoi n’est parti');reset.type='button';reset.addEventListener('click',()=>exclusive(async()=>{const latest=read();if(!latest||latest.state==='done'||latest.state==='game-sent')throw Error('L’état a changé, recharge la page.');if(win.confirm('Après vérification dans le jeu : confirmes-tu qu’aucun convoi n’est parti ? Cette action autorise un nouvel envoi.')){win.localStorage.removeItem(key);status.textContent='Tu peux préparer un nouvel envoi.';}}));recovery.append(doc.createTextNode(' '),reset);}
  }
- async function load(){const result=await api({action:'convoy-demands'});if(stopped)return;management?.acceptPermissions(result.permissions);list.replaceChildren();for(const d of result.demands){
+ async function load(){const generation=++projectionGeneration;const result=await api({action:'convoy-demands'});if(stopped||generation!==projectionGeneration)return;management?.acceptPermissions(result.permissions);list.replaceChildren();estimateRows.clear();projectionRefreshAt=Date.now();for(const d of result.demands){
   const form=el('form'),heading=el('h3',`#${d.id} · ${d.target||d.pseudo_demandeur} · ${d.objet||'Demande'}${d.niveau?' niveau '+d.niveau:''}`);form.style.cssText='padding:10px 0;border-top:1px solid #b39b61;';heading.style.cssText='margin:0 0 6px;font-size:15px;line-height:1.35;';
-  const metadata=el('div');metadata.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:4px 20px;margin:0 0 7px;';const remaining=el('p','Restant : ');remaining.style.margin='0';remaining.append(icon('apples'),doc.createTextNode(fmt(d.nbpomme_restant)+' pommes · '),icon('wood'),doc.createTextNode(fmt(d.nbmateriaux_restant)+' matériaux'));metadata.append(remaining);form.append(heading,metadata);
+  const metadata=el('div');metadata.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:4px 20px;margin:0 0 7px;';const remaining=el('p','Restant : ');remaining.style.margin='0';remaining.append(icon('apples'),doc.createTextNode(fmt(d.nbpomme_restant)+' pommes · '),icon('wood'),doc.createTextNode(fmt(d.nbmateriaux_restant)+' matériaux'));metadata.append(remaining);if(d.auto_production)heading.append(convoyAutoBadge(doc));form.append(heading,metadata);
   const players=travelData?.players||[],origin=players.find(p=>String(p.player_id)===String(travelData?.self)),target=players.find(p=>String(p.player_id)===String(d.iddemandeur))||players.find(p=>p.pseudo===d.target);
   const travel=typeof chaineTravel==='function'?chaineTravel(origin,target,travelData?.attack_speed):{seconds:null,distance:null};
   const travelLine=el('p');travelLine.className='uptep-convoy-travel';travelLine.style.cssText='display:inline-block;margin:0;padding:3px 8px;border:1px solid #887749;border-radius:10px;background:#525543;color:#fff3d3;font-size:12px;line-height:1.3;';
   if(travel.seconds!==null){travelLine.textContent='Trajet : '+chaineTravelDuration(travel.seconds);travelLine.title='Vitesse d’attaque '+travelData.attack_speed+(travelData.research_synced_at?' · niveau relevé le '+new Date(travelData.research_synced_at).toLocaleString('fr-FR',{timeZone:'Europe/Paris'}):'')+' · calcul à partir des coordonnées connues.';}
   else travelLine.textContent=travel.distance===null?'Temps de trajet indisponible : coordonnées du joueur manquantes.':'Temps de trajet indisponible : synchronise ton laboratoire ou renseigne ta vitesse d’attaque dans Mes stats.';
   metadata.append(travelLine);
+  const tdcBadge=el('span'),productionBadge=el('span');tdcBadge.className='uptep-convoy-tdc';productionBadge.className='uptep-convoy-production';
+  for(const badge of [tdcBadge,productionBadge])badge.style.cssText='display:inline-block;padding:3px 8px;border:1px solid #a48f54;border-radius:10px;background:#ffffff25;font-size:11px;line-height:1.3;';
+  const observed=value=>value?new Date(value+(String(value).includes('T')||/[+Z]/.test(value)?'':'Z')).toLocaleString('fr-FR',{timeZone:'Europe/Paris'}):'date inconnue';
+  function updateProduction(updated){
+   const estimate=convoyProductionEstimate(updated),p=updated.production,projection=p?.projection;
+   remaining.replaceChildren(doc.createTextNode('Restant : '),icon('apples'),doc.createTextNode(fmt(updated.nbpomme_restant)+' pommes · '),icon('wood'),doc.createTextNode(fmt(updated.nbmateriaux_restant)+' matériaux'));
+   tdcBadge.textContent=estimate.tdc===null?'TdC : inconnu':'TdC : '+fmt(estimate.tdc)+' cm²';tdcBadge.title='Dernier TdC connu · relevé du '+observed(p?.tdc_at)+'.';
+   productionBadge.textContent=estimate.cycles===null?'Production : estimation indisponible':estimate.cycles===0n?'Production théorique suffisante':'Estimation : '+estimate.cycles.toLocaleString('fr-FR')+' cycle'+(estimate.cycles===1n?'':'s')+' · ≈ '+convoyProductionMinutes(estimate.minutes)+' (théorique)';
+   if(p?.capacity_per_cycle?.assumed_rates||projection?.assumed_rates)productionBadge.textContent+=' · étable inconnue';
+   if(estimate.finish_at!==null&&estimate.finish_at!==undefined)productionBadge.textContent+=' · fin vers '+observed(new Date(estimate.finish_at).toISOString());
+   const baseline=projection?(projection.anchor_kind==='adjustment'?'Depuis l’ajustement du ':'Depuis la validation du ')+observed(projection.anchor_at)+'. Calcul au '+observed(projection.calculated_at)+', dernier export TdC : '+observed(projection.last_export_at)+'. ':'';
+   productionBadge.title=(estimate.reason?estimate.reason+'. ':'')+baseline+'1 cycle = 30 min. '+(projection?'Production théorique écoulée : '+fmt(estimate.harvested??0n)+' ressources. Les convois sont déjà comptés dans le restant déclaré. ':'')+'Aucune modification du restant réel ni clôture automatique. Chaque demande est estimée séparément avec toute la capacité de récolte et une répartition ajustable entre ressources. Hors champignonnière, consommation, dépenses et entrepôts. Le TdC est supposé constant entre deux exports. '+'Base : TdC entièrement exploité (1 ressource par cm² par cycle de 30 min). Colonies internes UPTEP uniquement : le colonisé cède 20 % + 1 % par niveau d’étable du colonisateur, qui reçoit la même quantité. '+(estimate.capacity!==undefined?'Récolte nette estimée : '+fmt(estimate.capacity)+' par cycle. ':'')+(p?.capacity_per_cycle?.assumed_rates||projection?.assumed_rates?'Étable inconnue sur certaines périodes : hypothèse de 20 %, estimation approximative.':'');
+  }
+  updateProduction(d);estimateRows.set(String(d.id),{form,update:updateProduction});metadata.append(tdcBadge,productionBadge);
+
   const controls=el('div');controls.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;';form.append(controls);
   const inputs={};for(const [key,label] of [['apples','Pommes'],['wood','Matériaux']]){const wrap=el('label',label+' '),input=el('input');input.name=key;input.type='text';input.inputMode='decimal';input.value='0';input.required=true;input.style.cssText='box-sizing:border-box;width:110px;max-width:100%;margin:0;';wrap.style.cssText='display:inline-flex;align-items:center;gap:4px;';wrap.prepend(icon(key));wrap.append(input);controls.append(wrap);inputs[key]=input;}
-  const button=el('button','Envoyer');button.type='submit';button.dataset.uptepPrimary='1';button.disabled=d.self||!d.target||busy;if(d.self||!d.target)button.dataset.unavailable='1';controls.append(button);if(d.self)controls.append(el('small',' Ta propre demande.'));if(!d.target)controls.append(el('small',' Joueur absent du dernier relevé S5.'));
+  const button=el('button','Envoyer');button.type='submit';button.dataset.uptepPrimary='1';button.disabled=d.self||!d.target||busy;if(d.self||!d.target)button.dataset.unavailable='1';controls.append(button);management?.decorate(controls,d,{validation:false});if(d.self)controls.append(el('small',' Ta propre demande.'));if(!d.target)controls.append(el('small',' Joueur absent du dernier relevé S5.'));
   const workforce=el('p'),workerText=el('span');workforce.append(icon('workers'),workerText);workforce.className='uptep-convoy-workers';workforce.style.cssText='margin:6px 0 0;font-size:12px;line-height:1.4;';workforce.setAttribute('aria-live','polite');form.append(workforce);
   function updateWorkforce(){
    try{
@@ -175,6 +242,14 @@ function mountConvoys(context,auth,serverTime,travelData=null){
   for(const input of Object.values(inputs)){input.addEventListener('input',updateWorkforce);input.addEventListener('change',updateWorkforce);}updateWorkforce();
   form.addEventListener('submit',event=>{event.preventDefault();try{const order={demand_id:String(d.id),target:d.target,apples:convoyInputNumber(inputs.apples.value),wood:convoyInputNumber(inputs.wood.value)};if(BigInt(order.apples)+BigInt(order.wood)===0n)throw Error('Renseigne une quantité à envoyer.');send(order);}catch(e){status.textContent=e.message;}});list.append(form);
  }if(!result.demands.length)list.append(el('p','Aucune demande validée en cours.'));}
+ // Refresh hourly without replacing forms, amounts being typed or the open editor.
+ async function refreshProjections(){
+  if(stopped||busy||projectionRefreshing||Date.now()-projectionRefreshAt<3600000)return;projectionRefreshing=true;const generation=projectionGeneration;
+  try{const result=await api({action:'convoy-demands'});if(stopped||generation!==projectionGeneration)return;const available=new Set();for(const d of result.demands){available.add(String(d.id));estimateRows.get(String(d.id))?.update(d);}for(const [id,view] of estimateRows)if(!available.has(id)){view.form.remove();estimateRows.delete(id);}projectionRefreshAt=Date.now();}
+  catch{if(!stopped)for(const view of estimateRows.values()){const badge=view.form.querySelector('.uptep-convoy-production');if(badge&&!badge.textContent.includes('à actualiser'))badge.textContent+=' · à actualiser';}}
+  finally{projectionRefreshing=false;}
+ }
+ const projectionTimer=win.setInterval(refreshProjections,3600000);win.addEventListener('focus',refreshProjections);
  refresh.addEventListener('click',()=>exclusive(async()=>{await load();if(activeTab==='pending')await loadPending();else if(!['current','create'].includes(activeTab))await management?.refresh(activeTab);}));showRecovery();load().catch(e=>{if(!stopped)status.textContent=e.message;});
- return ()=>{stopped=true;management?.cleanup();for(const cancel of [...pending])cancel();for(const controller of controllers)controller.abort();box.remove();};
+ return ()=>{stopped=true;win.clearInterval(projectionTimer);win.removeEventListener('focus',refreshProjections);management?.cleanup();for(const cancel of [...pending])cancel();for(const controller of controllers)controller.abort();box.remove();};
 }

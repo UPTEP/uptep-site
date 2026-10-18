@@ -15,7 +15,7 @@ function icon(string $name): string {
     return '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'.($paths[$name] ?? '').'</svg>';
 }
 function head(string $title, string $class): void { ?>
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#153e50"><title><?= e($title) ?> · UPTEP</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/fonts.css"><link rel="stylesheet" href="/assets/site.css?v=23"><script src="/assets/site.js?v=6" defer></script></head><body class="<?= e($class) ?>">
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#153e50"><title><?= e($title) ?> · UPTEP</title><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/fonts.css"><link rel="stylesheet" href="/assets/site.css?v=24"><script src="/assets/site.js?v=6" defer></script></head><body class="<?= e($class) ?>">
 <?php }
 function previewBanner(array $u): void { ?>
 <?php if (isset($u['_preview'])): ?>

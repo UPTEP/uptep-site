@@ -133,3 +133,26 @@ L’onglet Statistiques du site propose les sélections pommes/matériaux et env
 Le TdC moyen est la moyenne arithmétique des relevés FZZZ disponibles par jour, avec nombre de relevés affiché, et NULL en leur absence. Les timestamps d’export sans fuseau suivent la convention UTC de l’observatoire, puis sont regroupés en jours de Paris. Seul le dernier export d’une version est retenu pour ne pas compter les réimports. Le contrôle des droits existant des rapports du site est réutilisé. Le bot conserve ses statistiques et sa pagination. Déployer `app/convoy-daily.php`, `app/convoy-daily-view.php`, `public/convois.php` et `public/assets/convoy-daily.css` ; aucune migration nécessaire. Test PostgreSQL : `php tests/convoy-daily.php` avec une connexion locale à uptep autorisant CREATE SCHEMA ; tous les objets et données du test sont temporaires dans une transaction annulée à la fin.
 
 La première ligne « Total » additionne les joueurs affichés après filtrage : TdC moyens quotidiens (avec couverture des relevés), nombre de convois et quantités. Le bilan additionne les totaux hebdomadaires une seule fois par joueur et recalcule la moyenne sur sept jours avant arrondi. Les agrégats utilisent PostgreSQL numeric, y compris au-delà de bigint ; un TdC absent reste inconnu et les sommes partielles sont signalées.
+
+
+### Auto production des demandes de convois
+
+Appliquer `app/convoy-auto-production.sql` avant de déployer les services mis à jour. Migration additive, relançable : les demandes existantes portent `auto_production=false`. La case est disponible à la création, lors de la modification d’une demande en attente et dans l’ajustement d’une demande validée, pour son auteur ou un responsable selon les droits existants. Un changement d’option seule conserve les quantités et ne crée pas de faux ajustement de ressources ; le reçu de commande garde l’auteur et le contenu de l’opération.
+
+Le site, UPTEP+ et le bot affichent l’indicateur. Le bot conserve les cinq champs de création/modification et propose ensuite une modale de choix Auto production avant la confirmation finale ; les ajustements intègrent directement la case. Les déclarations manuelles nécessitent une confirmation explicite lorsque l’option est active. Le service vérifie cette confirmation sous verrou, y compris si l’option a changé depuis l’aperçu. Le bot sait présenter une nouvelle confirmation pour un envoi simple ou le reste d’un lot partiellement déclaré. Les reprises déjà enregistrées conservent leurs reçus.
+
+Le userscript relit l’option via `convoy-check` et demande confirmation **avant** le POST du jeu. Une annulation de l’alerte n’envoie rien. La déclaration d’un convoi déjà parti et ses reprises restent possibles si l’option a changé ; aucun second envoi de ressources n’est effectué. Les montants restants suivent la comptabilité habituelle, sans déduction automatique liée à la production personnelle.
+
+Validation : `php tests/convoy-auto-production.php` (schéma temporaire), les suites existantes bot/convois/livraisons et les tests navigateur du userscript. Aucun convoi réel ni message Discord de test n’est nécessaire.
+
+### Dépassement des demandes de convois
+
+Appliquer `app/convoy-overage.sql` avant le code. Tout dépassement du restant, même une seule unité et sans plafond de tolérance, est proposé après avertissement indiquant séparément les pommes et matériaux en trop. Le site et le bot demandent une confirmation explicite ; le userscript avertit avant le POST Fourmizzz. Une baisse concurrente du restant qui augmente le dépassement nécessite une nouvelle confirmation. Le montant réellement envoyé est conservé pour les statistiques ; le restant est borné à zéro et le surplus est conservé séparément, sans limite bigint cumulée, pour recalculer correctement les annulations. Les ajustements de production ne sont pas effacés. Les lignes supplémentaires d’un lot confirmé peuvent être enregistrées après le solde automatique, sans rouvrir la demande. Les demandes annulées ou closes manuellement restent fermées. Les reprises d’un envoi déjà parti n’effectuent aucun renvoi de ressources.
+
+Vérification dédiée : `tests/convoy-overage.php` dans un schéma PostgreSQL temporaire, en complément de `tests/run-bot-convoys.py` et des scénarios Chromium de `tests/script-convoys-browser.cjs`.
+
+### Cadre chef sur les profils membres
+
+Appliquer `app/member-report.sql` avant de publier les fichiers PHP : nouvelles dates d’usage sur `users`, table `member_stat_history` et trigger transactionnel sur `user_stats`. Le cadre est réservé au droit exact `users.is_chef` et aux profils des membres S5 encore présents chez UPTEP. Les clés, mots de passe, emails et identifiants Discord ne font pas partie de sa réponse. Les nouvelles dates d’utilisation commencent à la mise en place ; une clé générée n’est pas une preuve d’installation du script. Les relevés, activités déclarées et variations de stocks sont présentés avec leur couverture et leurs limites, sans production fictive ni classement automatique des membres.
+
+Validation : `tests/member-report.php` dans un schéma jetable PostgreSQL ; `tests/member-activity.php` avec tables temporaires ; `tests/member-report-browser.cjs` avec transport entièrement simulé et fixture produite par le test PHP.

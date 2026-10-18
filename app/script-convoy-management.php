@@ -8,7 +8,7 @@ function scriptConvoyManagement(PDO $p,PDO $game,array $member,array $body):arra
     $fields=[
         'convoy-list'=>['scope','after','state','player_id'],
         'convoy-detail'=>['demand_id','after'],
-        'convoy-manage'=>['demand_id','convoy_id','operation','request_key','confirmed','apples','wood','object','level','wanted_date','version','expected_apples','expected_wood'],
+        'convoy-manage'=>['demand_id','convoy_id','operation','request_key','confirmed','apples','wood','object','level','wanted_date','version','expected_apples','expected_wood','auto_production'],
     ][$action];
     if(array_diff(array_keys($body),array_merge(['action','pseudo','alliance'],$fields)))throw new DomainException('Champ inconnu.',422);
     $permissions=['is_chaine'=>(bool)$member['is_chaine'],'player_id'=>(string)$member['id']];
@@ -57,5 +57,6 @@ function scriptConvoyManagement(PDO $p,PDO $game,array $member,array $body):arra
     if(in_array($operation,['validation','modification'],true))$payload['version_attendue']=$body['version']??null;
     if($operation==='modification')$payload+=['nbpomme'=>botNumber($body['apples']??null),'nbmateriaux'=>botNumber($body['wood']??null),'objet'=>$body['object']??'','niveau'=>$body['level']??'','date_souhaitee'=>$body['wanted_date']??null];
     if($operation==='ajustement')$payload+=['nbpomme_restant'=>botNumber($body['apples']??null),'nbmateriaux_restant'=>botNumber($body['wood']??null),'nbpomme_attendu'=>botNumber($body['expected_apples']??null),'nbmateriaux_attendu'=>botNumber($body['expected_wood']??null)];
+    if(array_key_exists('auto_production',$body)&&in_array($operation,['modification','ajustement'],true)){$payload['auto_production']=$body['auto_production'];$payload['version_attendue']=$body['version']??null;}
     return botConvoyAction($p,$game,$operation,$id,$payload,'scriptConvoyEvent',true)[1];
 }

@@ -8,6 +8,7 @@ try{
  INSERT INTO chaine_members VALUES('s5',1,123);
  INSERT INTO players VALUES('s5',1,'Origin','UPTEP',true,0,0),('s5',2,'Far','UPTEP',true,30,40),('s5',3,'Near','UPTEP',true,3,4);
  INSERT INTO demandes_convois VALUES(1,2,'Far',100,200,true,false,false),(2,3,'Near',10,20,true,false,false),(3,1,'Self',1,1,true,false,false),(4,2,'Unvalidated',1,1,false,false,false),(5,2,'Finished',1,1,true,true,false),(6,2,'Cancelled',1,1,true,false,true),(7,4,'Missing',1,1,true,false,false);");
+ $p->exec('ALTER TABLE demandes_convois ADD COLUMN auto_production boolean NOT NULL DEFAULT false');
  $r=botDeliveries($p,$p,['discord_id'=>'123','vitesse'=>'0']);check(array_column($r['lignes'],'id')===['2','1','7'],'eligible requests sorted; missing last');check($r['lignes'][0]['distance']===5.0,'Euclidean distance');check($r['lignes'][0]['seconds']===(int)round(86400*(1-exp(-5/350))*7.375),'formula');
  check(botDeliveryTravel(['x'=>0,'y'=>0],['x'=>0,'y'=>0],0)['seconds']===0,'zero coordinate valid');check(botDeliveryTravel(null,['x'=>0,'y'=>0],0)['distance']===null,'missing origin');
  foreach(['-1','1.5','1000'] as $v){try{botDeliveries($p,$p,['discord_id'=>'123','vitesse'=>$v]);throw new RuntimeException('invalid accepted');}catch(DomainException $e){check($e->getCode()===422,'invalid speed');}}

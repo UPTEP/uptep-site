@@ -38,7 +38,8 @@ function convoyPrepare(array $m): array {
     if(in_array($action,['demande','modification'],true)){
         $body['objet']=trim(post('objet'));$body['niveau']=post('niveau');$body['date_souhaitee']=post('date_souhaitee')?:null;
     }
-    if(in_array($action,['validation','modification'],true))$body['version_attendue']=post('version');
+    if(in_array($action,['demande','modification','ajustement'],true))$body['auto_production']=post('auto_production')==='1';
+    if(in_array($action,['validation','modification','ajustement'],true))$body['version_attendue']=post('version');
     if($action==='ajustement'){
         $body+=['nbpomme_restant'=>convoyQuantity(post('pommes')),'nbmateriaux_restant'=>convoyQuantity(post('materiaux')),'nbpomme_attendu'=>post('pommes_attendu'),'nbmateriaux_attendu'=>post('materiaux_attendu')];
     }
@@ -52,7 +53,8 @@ function convoyPrepare(array $m): array {
         }
         $body['date_convoi']=$now->format('c');$body['date_arrivee']=$now->modify('+'.convoyDuration($duration).' seconds')->format('c');
     }
-    return ['action'=>$action,'id'=>$id,'body'=>$body,'expires'=>time()+3600];
+    $excess=$action==='convoi'?botConvoyOverage(botDemand(db(),$id),$body['nbpomme'],$body['nbmateriaux']):null;
+    return ['overage'=>$excess,'action'=>$action,'id'=>$id,'body'=>$body,'auto_warning'=>$action==='convoi'&&(bool)botDemand(db(),$id)['auto_production'],'expires'=>time()+3600];
 }
 function convoyEvent(PDO $p,string $kind,array $payload): void {
     $q=$p->prepare('INSERT INTO convoy_web_events(kind,payload) VALUES(?,?::jsonb)');$q->execute([$kind,json_encode($payload,JSON_THROW_ON_ERROR)]);
@@ -61,3 +63,5 @@ function convoyDate(?string $raw): string {
     return $raw?(new DateTimeImmutable($raw))->setTimezone(new DateTimeZone('Europe/Paris'))->format('d/m/Y H:i'):'—';
 }
 function convoyAmount(mixed $n): string {return preg_replace('/(?<=\d)(?=(?:\d{3})+$)/u',' ',(string)$n);}
+
+function convoyAutoBadge(array $d): void {if($d['auto_production']??false)echo '<span class="convoy-auto-badge">Auto production</span>';}

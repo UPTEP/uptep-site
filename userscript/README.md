@@ -118,3 +118,65 @@ Le détail et les formulaires de gestion s’ouvrent dans une modale native : sy
 Les actions de responsable sont regroupées dans « Consulter / Historique », selon le droit chaîne du compte. L’onglet séparé « Gestion chaîne » est retiré.
 
 Dans « Consulter / Historique », les filtres État et Joueur se combinent côté serveur avant pagination. Le sélecteur contient les membres S5 actuels UPTEP ayant au moins une demande, tous états et pages confondus, triés par pseudo. « Tous les joueurs » retire le filtre personnel.
+
+La case « Auto production » est partagée avec le site et Discord. Un badge identifie les demandes concernées ; le dernier état serveur déclenche un avertissement avant l’envoi dans le jeu. Annuler cette confirmation ne transmet aucune ressource. Une reprise après envoi ne redemande pas d’envoyer le convoi.
+
+Tout dépassement du restant déclenche une alerte avant l’envoi, avec les quantités excédentaires par ressource. Annuler laisse les champs modifiables et n’envoie rien ; confirmer permet l’envoi réel, dont les quantités sont conservées sur UPTEP. L’alerte Auto production se cumule si nécessaire. Une reprise de déclaration ne renvoie pas les ressources et ne redemande pas la confirmation d’un envoi déjà parti.
+
+### Profils joueurs
+
+L’option **Profils joueurs enrichis**, dans Paramètres → Profils joueurs, est activée par défaut pour les comptes existants et les nouvelles inscriptions. Sur `Membre.php`, le bloc natif « Profil », s’il existe, devient repliable et fermé par défaut. « Informations » et « Action » restent visibles. Un second bloc, **Statistiques UPTEP+ · pseudo**, est fermé par défaut et charge à sa première ouverture la même fiche que la page Statistiques UPTEP+ : indicateurs, graphiques, événements et relevés. L’identifiant du joueur provient du lien de convoi natif ; le compte utilisé pour l’accès reste celui du visiteur. Une fiche absente ne doit pas être remplacée par un pseudo approchant. Désactiver l’option et recharger le jeu rétablit l’affichage natif. Migration : `app/player-profile-settings.sql`, idempotente et respectant les choix existants.
+
+### Suivi alliance réservé aux chefs
+
+Sur les profils des membres actuels UPTEP, les comptes avec `users.is_chef=true`, actifs et autorisés à utiliser le script, voient un cadre **Suivi alliance · accès chef**, fermé par défaut. Le serveur relit ce droit et l’appartenance actuelle à UPTEP du visiteur et de la cible à chaque chargement ; les rôles administrateur et chaîne ne le remplacent pas. Fermer le cadre supprime son iframe et ses données ; le rouvrir recharge le rapport et les droits. L’option Profils joueurs enrichis contrôle son affichage. Aucune donnée du rapport d’un autre joueur n’est injectée dans le runtime.
+
+Le cadre affiche les relevés connus (constructions, technologies, armée, ouvrières, ressources) avec leurs dates et les choix de collecte, l’inscription et l’état du compte, les clés générées et l’utilisation réellement observée du script. `last_site_seen_at` et `last_script_seen_at` sont alimentés à partir de l’installation de cette fonction, au plus une écriture toutes les cinq minutes par compte et par canal. Une clé générée ne prouve pas l’installation ; une date inconnue ne prouve pas l’inactivité. Les visites en mode aperçu ne modifient pas ces dates.
+
+Les fenêtres 7/30/90 jours et tout l’historique résument demandes, auto production, ajustements manuels, convois réellement déclarés (annulations exclues), flux envoyés/reçus, moyennes par jour couvert et floods déclarés. Ces données ne donnent pas une note de participation ni une mesure exhaustive des mouvements du jeu. Les reductions de demandes peuvent être des corrections et ne sont pas assimilées à de la production vérifiée.
+
+Migration : `app/member-report.sql`. Un trigger conserve atomiquement les changements de `user_stats` dans `member_stat_history`, ainsi que les observations horaires d’économie, y compris sans variation. La migration crée un état initial à sa date d’exécution sans inventer de passé. Les évolutions utilisent les valeurs connues ; la variation moyenne de stock est explicitement séparée de la production réelle, impossible à déduire sans l’ensemble des dépenses, échanges et chasses.
+
+Compatibilité Firefox/Violentmonkey : les requêtes du jeu renvoient uniquement du texte dans leurs promesses ; le HTML est analysé ensuite, de façon synchrone. Les résultats du pont UPTEP sont transmis aussi en JSON texte et relus dans le contexte du userscript avant résolution de la promesse. Cela évite l’accès interdit à `then` sur les objets externes, notamment les documents HTML. Une reprise après un envoi déjà effectué vérifie le convoi ou réessaie seulement son enregistrement ; elle n’envoie pas de ressources supplémentaires.
+
+Le verrou inter-onglets utilise, sous Firefox, un callback exporté et une promesse du contexte de la page. Le verrou reste détenu jusqu’à la fin du traitement, y compris en cas d’erreur ; la protection contre les doubles envois est conservée.
+
+### Demandes depuis Construction
+
+Avec l’option **Demandes de ressources et convois**, chaque bâtiment dont le niveau et le coût natifs sont reconnus propose un bouton sous ses coûts. La confirmation indique le niveau suivant et le coût total en nourriture et matériaux (sans déduire le stock). Les prévisions cumulées Optizzz sont ignorées. La case Auto production est décochée par défaut. Confirmer crée une demande classique en attente de validation, avec les mêmes droits et notifications que Commerce et Discord ; aucune construction ni livraison n’est lancée.
+
+La clé de création est conservée localement avant la requête. Une erreur réseau, une fermeture ou un rechargement permet de reprendre la même demande avec les mêmes quantités et la même clé. Après confirmation, le bouton affiche la demande créée pour éviter une nouvelle création accidentelle du même niveau. Le verrou par bâtiment protège aussi les créations simultanées entre onglets. Un niveau en cours ou un prix illisible ne produit aucun bouton.
+
+Validation : `tests/script-construction-demands-browser.cjs` couvre les deux HTML fournis, la modale mobile, les deux ressources, l’auto-production, l’annulation, les reprises après erreur/rechargement, le double clic, l’identité, le runtime assemblé et la désactivation de l’option.
+
+Les confirmations locales de Construction sont vérifiées auprès du serveur au chargement, avant ouverture et création, au retour sur la fenêtre et toutes les 30 secondes. Une demande annulée, terminée ou supprimée libère le bouton pour une nouvelle demande. Une erreur réseau conserve la confirmation et interdit de supposer une annulation ; une création dont le résultat est encore inconnu conserve sa clé de reprise.
+
+### Demandes depuis Laboratoire
+
+La même option **Demandes de ressources et convois** ajoute le bouton sous les coûts natifs de chaque recherche sur `laboratoire.php`. La confirmation reprend le niveau suivant, la nourriture et les matériaux affichés ; le coût en ouvrières n’est pas converti en ressources. Les tableaux et conseils Optizzz sont ignorés. La création en attente de validation, Auto production, la fermeture après succès, les reprises sans doublon et la synchronisation des annulations sont communs à Construction. Les clés locales des recherches sont séparées de celles des bâtiments.
+
+Tests Laboratoire : `UPTEP_DEMAND_PAGE=laboratory node tests/script-construction-demands-browser.cjs` (avec le module Playwright configuré). Les deux HTML fournis servent de fixtures.
+
+Dans Commerce, les demandes en cours proposent aussi **Consulter / Gérer**, avec la même modale que les demandes en attente. Les actions restent conditionnées aux droits existants ; une modification recharge directement les montants de l’onglet courant. Le bouton de validation reste réservé aux demandes en attente.
+
+### TdC et projection des demandes en cours
+
+Toutes les demandes en cours de Commerce affichent le dernier TdC connu, les cycles encore nécessaires, la durée et la date de fin théoriques. Le point de départ est la validation actuelle ; un ajustement manuel postérieur devient le nouveau point de départ. Une suspension puis revalidation repart de la nouvelle validation.
+
+L’API utilise les exports TdC historiques : chaque cm² produit théoriquement une ressource par cycle, puis les transferts de colonisation internes UPTEP sont appliqués. Les ouvrières enregistrées en base ne sont ni consultées ni utilisées. Un cycle complet de 30 minutes est compté à partir de ce point de départ. Une observation s’applique au cycle à son instant ou aux suivants, sans réécrire le passé. Le dernier TdC est conservé entre deux exports ; les importations répétées d’une même version sont dédupliquées. Sans ancien TdC couvrant un cycle, l’estimation est indisponible. Le TdC est supposé entièrement exploité, ce que précise l’aide du badge. Les ressources historiques sont calculées en BigInt dans le userscript.
+
+Restant projeté = max(0, nourriture restante déclarée + matériaux restants déclarés − production théorique depuis le point de départ). Les convois sont déjà inclus dans le restant déclaré et ne sont jamais déduits une seconde fois. Une actualisation manuelle du restant réinitialise uniquement la projection temporelle. Une production théorique suffisante ne change ni les quantités réelles ni l’état de la demande. Aucun stock, armée ou historique brut d’un autre joueur n’est transmis.
+
+Le scénario consacre toute la capacité à chaque demande séparément, avec répartition ajustable entre nourriture et matériaux. Champignonnière, consommation, dépenses et saturation des entrepôts sont exclus. Il ne s’agit pas d’une production réelle mesurée ni d’une échéance garantie. Les dates de référence, la production théorique et les limites figurent dans l’aide du badge.
+
+La lecture des données et le calcul sont refaits au chargement, à l’actualisation manuelle, après gestion et automatiquement chaque heure sur la page ouverte. Au retour sur la fenêtre, une vérification a lieu si la dernière lecture date d’au moins une heure. Le rafraîchissement horaire préserve les quantités en cours de saisie. Il utilise les exports existants en base, sans nouvelle collecte à la charge du joueur ni nouvelle tâche planifiée. Le site et Discord gardent leur affichage actuel.
+
+### Colonies internes dans la projection
+
+Chaque export reconstitue les liens `master_player_id` et l’appartenance à l’alliance à cette date. Un transfert n’est appliqué que lorsque le colonisé et son colonisateur appartiennent tous deux à UPTEP. Les relations avec l’extérieur ne modifient ni le débit du colonisé ni le crédit du colonisateur dans cette estimation.
+
+Le taux est 20 % + 1 point par niveau d’étable à pucerons du **colonisateur**, plafonné à 100 %. Le prélèvement est calculé sur le rendement TdC propre de la colonie, arrondi à l’entier inférieur ; exactement la même quantité est retirée à la colonie et ajoutée au colonisateur. Les gains de plusieurs colonies s’additionnent. Les gains ne sont pas réimposés en cascade. Les ouvrières restent exclues de la référence de production.
+
+La capacité future utilise les liens actuels et les derniers niveaux d’étable connus. Les cycles passés utilisent les liens historiques et les niveaux observés à chaque période, sans antidater une construction connue seulement plus tard. Faute de niveau connu sur une période, le taux de base de 20 % est utilisé et signalé par « étable inconnue » et dans l’aide du badge. Un niveau connu à zéro est distinct d’un niveau inconnu.
+
+L’API transmet des expressions compactes (rendement propre, prélèvement et gains) ; les montants et les pourcentages sont évalués en BigInt dans le userscript pour conserver les grands nombres exacts. Le restant réel et la clôture des demandes ne sont jamais modifiés.

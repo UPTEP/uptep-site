@@ -17,3 +17,11 @@ function playerEvents(array $rows): array {
  }
  return array_reverse($events);
 }
+
+/** Resolve all colonizers in one read, including players absent from the latest export. */
+function playerEventIdentities(PDO $p,array $events): array {
+ $ids=[];foreach($events as $event)if($event['type']==='colonization')foreach(['before','after'] as $key){$id=$event[$key]??null;if($id!==null)$ids[(string)$id]=(string)$id;}
+ if(!$ids)return [];
+ $q=$p->prepare("SELECT player_id::text,pseudo,alliance_tag FROM players WHERE server='s5' AND player_id IN (".implode(',',array_fill(0,count($ids),'?')).')');$q->execute(array_values($ids));
+ $players=[];foreach($q->fetchAll(PDO::FETCH_ASSOC) as $player)$players[$player['player_id']]=['pseudo'=>$player['pseudo'],'alliance_tag'=>$player['alliance_tag']];return $players;
+}

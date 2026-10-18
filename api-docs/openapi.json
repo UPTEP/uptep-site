@@ -3934,6 +3934,10 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$",
             "description": "Empreinte opaque version_modification retournée avec la demande ; renvoyer la valeur lue avant ouverture du formulaire."
+          },
+          "auto_production": {
+            "type": "boolean",
+            "description": "Le demandeur prévoit de produire lui-même les ressources. Les convois restent possibles après avertissement explicite."
           }
         },
         "required": [
@@ -4089,6 +4093,11 @@
           "date_souhaitee": {
             "type": "string",
             "format": "date"
+          },
+          "auto_production": {
+            "type": "boolean",
+            "description": "Le demandeur prévoit de produire lui-même les ressources. Les convois restent possibles après avertissement explicite.",
+            "default": false
           }
         },
         "required": [
@@ -4133,6 +4142,27 @@
             "type": "string",
             "format": "date-time",
             "description": "Facultative, ISO 8601 avec secondes et fuseau. Une date future est autorisée."
+          },
+          "auto_production_confirmed": {
+            "type": "boolean",
+            "description": "true uniquement après présentation et confirmation explicite de l’avertissement Auto production. Obligatoire si la demande courante est en auto production ; sinon HTTP 409 sans écriture. Réutiliser le même contenu lors des reprises."
+          },
+          "overage_confirmed": {
+            "type": "object",
+            "description": "Dépassement maximal explicitement confirmé après affichage de l’alerte : pommes et matériaux au-delà du restant. HTTP 409 sans écriture si le dépassement courant est supérieur. Tous les montants sont permis, le restant est borné à zéro et le surplus est conservé pour les annulations. Une demande soldée automatiquement peut recevoir les lignes supplémentaires confirmées d’un lot. Reprises avec une commande et un contenu identiques.",
+            "properties": {
+              "pommes": {
+                "$ref": "#/components/schemas/Quantite"
+              },
+              "materiaux": {
+                "$ref": "#/components/schemas/Quantite"
+              }
+            },
+            "required": [
+              "pommes",
+              "materiaux"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -4246,6 +4276,15 @@
           },
           "nbmateriaux_attendu": {
             "$ref": "#/components/schemas/Quantite"
+          },
+          "auto_production": {
+            "type": "boolean",
+            "description": "Le demandeur prévoit de produire lui-même les ressources. Les convois restent possibles après avertissement explicite."
+          },
+          "version_attendue": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Version de la demande relue à l’ouverture du formulaire ; obligatoire lorsque auto_production est transmis. Un changement de cette option seule est autorisé sans modifier les quantités."
           }
         },
         "required": [
@@ -4350,6 +4389,10 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$",
             "description": "Empreinte opaque version_modification retournée avec la demande ; renvoyer la valeur lue avant ouverture du formulaire."
+          },
+          "auto_production": {
+            "type": "boolean",
+            "description": "Le demandeur prévoit de produire lui-même les ressources. Les convois restent possibles après avertissement explicite."
           }
         },
         "required": [

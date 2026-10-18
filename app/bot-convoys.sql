@@ -2,6 +2,9 @@ BEGIN;
 CREATE TABLE demandes_convois (
  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
  serveur varchar(16) NOT NULL DEFAULT 's5',
+ auto_production boolean NOT NULL DEFAULT false,
+ surplus_pommes numeric NOT NULL DEFAULT 0 CHECK(surplus_pommes>=0),
+ surplus_materiaux numeric NOT NULL DEFAULT 0 CHECK(surplus_materiaux>=0),
  iddemandeur bigint NOT NULL CHECK(iddemandeur>0), pseudo_demandeur text NOT NULL, discord_demandeur bigint NOT NULL,
  nbpomme_original bigint NOT NULL CHECK(nbpomme_original>=0), nbpomme_restant bigint NOT NULL,
  nbmateriaux_original bigint NOT NULL CHECK(nbmateriaux_original>=0), nbmateriaux_restant bigint NOT NULL,

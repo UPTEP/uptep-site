@@ -24,6 +24,7 @@ function observatory(array $body): array {
  if(!$alliance&&$id!==null){$q=$p->prepare("SELECT * FROM players WHERE server='s5' AND player_id=?");$q->execute([$id]);}
  else{$q=$p->prepare("SELECT * FROM $kind WHERE server='s5' AND public.fzzz_normalize($column)=public.fzzz_normalize(?) ORDER BY is_present DESC LIMIT 1");$q->execute([$term]);}
  $entity=$q->fetch(PDO::FETCH_ASSOC)?:null;
+ if(!$entity&&($body['exact_match']??false)===true)return ['entity'=>null,'candidates'=>[]];
  if(!$entity){$result=observatory(['action'=>'suggest','kind'=>$kind,'q'=>$term]);if(count($result['suggestions'])===1)return observatory(['action'=>'stats','kind'=>$kind,'q'=>$result['suggestions'][0]['value']]);return ['entity'=>null,'candidates'=>$result['suggestions']];}
  $metrics=$alliance?['total_field'=>['Terrain de chasse','', '#4f6536'],'total_building_score'=>['Bâtiments','points','#985e29'],'total_technology_score'=>['Technologie','points','#7e503a'],'total_trophy_score'=>['Trophées','points','#8c7934'],'players_count'=>['Membres','joueurs','#655975']]:['field'=>['Terrain de chasse','','#4f6536'],'building_score'=>['Bâtiments','points','#985e29'],'technology_score'=>['Technologie','points','#7e503a'],'trophy_score'=>['Trophées','points','#8c7934']];
  $idColumn=$alliance?'tag':'player_id';
@@ -32,5 +33,5 @@ function observatory(array $body): array {
  $fields=$alliance?['tag','name','players_count','is_present','export_version','diplomacy']:['player_id','pseudo','alliance_tag','grade','x','y','is_present','on_holiday','is_banned','master_player_id','export_version'];$clean=[];foreach(array_unique(array_merge($fields,array_keys($metrics))) as $field)$clean[$field]=isset($metrics[$field])&&$entity[$field]!==null?(string)$entity[$field]:$entity[$field];
  if($alliance)$clean['diplomacy']=json_decode($entity['diplomacy']??'{}',true)?:[];
  $details=$alliance?allianceDetails($p,$entity['tag'],array_reverse($rows)):[];
- return $details+['entity'=>$clean,'kind'=>$kind,'metrics'=>$metrics,'history'=>$history,'truncated'=>$truncated,'events'=>$events];
+ return $details+['entity'=>$clean,'kind'=>$kind,'metrics'=>$metrics,'history'=>$history,'truncated'=>$truncated,'events'=>$events,'related_players'=>$alliance?[]:playerEventIdentities($p,$events)];
 }

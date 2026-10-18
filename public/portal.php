@@ -2,7 +2,7 @@
 header('Cache-Control: no-store, private');
 header('Content-Type: text/html; charset=utf-8');
 ?>
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>UPTEP+ · Statistiques</title><link rel="stylesheet" href="/assets/portal.css?v=12"><script src="/assets/portal-charts.js?v=1" defer></script><script src="/assets/portal-map.js?v=1" defer></script><script src="/assets/portal-alliance.js?v=2" defer></script><script src="/assets/portal.js?v=15" defer></script></head><body>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>UPTEP+ · Statistiques</title><link rel="stylesheet" href="/assets/portal.css?v=15"><script src="/assets/portal-charts.js?v=2" defer></script><script src="/assets/portal-map.js?v=1" defer></script><script src="/assets/portal-alliance.js?v=2" defer></script><script src="/assets/member-report.js?v=1" defer></script><script src="/assets/portal.js?v=19" defer></script></head><body>
 <header class="portal-header"><nav class="portal-menu" aria-label="Rubriques UPTEP+"><button type="button" aria-current="page" id="menu-statistics"><svg class="menu-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2 14h5v8H2zm7-6h5v14H9zm7-6h5v20h-5z"/></svg><span>Statistiques</span></button><button type="button" id="menu-settings"><span aria-hidden="true">⚙</span><span>Paramètres</span></button></nav></header>
 <div class="portal-shell"><main>
 <h1>Statistiques</h1><p class="intro">Les joueurs et les alliances, au fil des relevés.</p>

@@ -16,13 +16,35 @@ $p->exec("CREATE TABLE chaine_members(server text,player_id bigint,iddiscord big
 INSERT INTO chaine_members VALUES('s5',1,101),('s5',2,102),('s5',3,103);
 INSERT INTO players VALUES('s5',1,'Target','UPTEP',true),('s5',2,'Sender','UPTEP',true),('s5',3,'Validator','UPTEP',true);
 INSERT INTO users VALUES(1,1,101,'active',true,false,false),(2,2,102,'active',true,false,false),(3,3,103,'active',true,true,false)");
+$p->exec("ALTER TABLE players ADD COLUMN master_player_id bigint,ADD COLUMN field bigint DEFAULT 100,ADD COLUMN imported_at timestamp DEFAULT now();CREATE TABLE user_stats(user_id bigint,data jsonb,workers_synced_at timestamptz);INSERT INTO user_stats VALUES(1,'{\"workers\":{\"total\":\"80\"}}',now())");
+$p->exec("CREATE TABLE historique_exports(id bigint,server text,export_type text,export_version text,exported_at timestamp);CREATE TABLE historique_players(export_id bigint,player_id bigint,field bigint,master_player_id bigint,alliance_tag text DEFAULT 'UPTEP');CREATE TABLE member_stat_history(id bigint,user_id bigint,stat_group text,data jsonb,observed_at timestamptz);INSERT INTO historique_exports VALUES(1,'s5','players','seed',now()-interval '1 day');INSERT INTO historique_players(export_id,player_id,field) VALUES(1,1,100),(1,2,100),(1,3,100)");
 $u=['id'=>2,'game_player_id'=>2];$ids=[];
 foreach([1,2,3] as $i){$d=botConvoyAction($p,$p,'demande',null,['commande_id'=>'create'.$i,'discord_id'=>'101','nbpomme'=>'100','nbmateriaux'=>'100'])[1]['demande'];$ids[]=$d['id'];botConvoyAction($p,$p,'validation',$d['id'],['commande_id'=>'validate'.$i,'discord_id'=>'103']);}
 check(count(scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['demands'])===3,'all ongoing demands');
+$production=scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['demands'][0]['production'];
+check($production['tdc']==='100'&&$production['capacity_per_cycle']['own']==='100'&&!isset($production['workers_known']),'production capacity uses terrain only');
+check($production['projection']['anchor_kind']==='validation'&&$production['projection']['history_complete'],'projection based on validation and historical seed');
+$anchorTest=['iddemandeur'=>'1','date_validation'=>gmdate('c',time()-7200),'adjusted_at'=>gmdate('c',time()-3600)];
+$projection=scriptConvoyProjection($p,$p,$anchorTest,gmdate('c'));
+check($projection['anchor_kind']==='adjustment'&&$projection['elapsed_cycles']==='2','latest manual adjustment becomes baseline');
+check($projection['segments'][0]['cycles']==='2'&&$projection['segments'][0]['capacity_per_cycle']['own']==='100','complete cycles use observed terrain');
+
+$p->exec("UPDATE user_stats SET data='{\"workers\":{\"total\":\"0\"}}'");check(scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['demands'][0]['production']['capacity_per_cycle']['own']==='100','zero workers ignored');
+$p->exec("DELETE FROM user_stats");check(scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['demands'][0]['production']['capacity_per_cycle']['own']==='100','missing workers ignored');
+$p->exec("UPDATE players SET field=0 WHERE player_id=1");check(scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['demands'][0]['production']['tdc']==='0','zero terrain preserved');
+$p->exec("UPDATE players SET field=100 WHERE player_id=1");
+$p->exec("INSERT INTO user_stats VALUES(2,'{\"buildings\":{\"etable_pucerons\":\"2\"}}',now());UPDATE players SET master_player_id=2 WHERE player_id=1");
+$colony=scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['demands'][0]['production']['capacity_per_cycle'];check($colony['loss']['percent']===22&&!$colony['assumed_rates'],'current internal colony uses master level');
+$p->exec("UPDATE players SET alliance_tag='OTHER' WHERE player_id=2");
+// Pure helper confirms that a foreign master does not tax the internal estimate.
+$colony=scriptConvoyColonyCapacity('1',['1'=>['field'=>'100','master_player_id'=>'2','alliance_tag'=>'UPTEP'],'2'=>['field'=>'100','alliance_tag'=>'OTHER']],['2'=>'2']);check($colony['loss']===null,'foreign master ignored');
+$p->exec("UPDATE players SET alliance_tag='UPTEP',master_player_id=NULL;DELETE FROM user_stats");
+
+
 $order=['target'=>'Target','apples'=>'10','wood'=>'20','demand_id'=>$ids[0]];
 check(scriptConvoys($p,$p,$u,['action'=>'convoy-check']+$order)['ready'],'preflight');
 check((int)$p->query('SELECT count(*) FROM convois_effectues')->fetchColumn()===0,'preflight does not declare');
-rejects(fn()=>scriptConvoys($p,$p,$u,['action'=>'convoy-check']+array_replace($order,['apples'=>'101'])),422);
+check(scriptConvoys($p,$p,$u,['action'=>'convoy-check']+array_replace($order,['apples'=>'101']))['overage']===['pommes'=>'1','materiaux'=>'0'],'preflight reports excess for confirmation');
 rejects(fn()=>scriptConvoys($p,$p,$u,['action'=>'convoy-check']+array_replace($order,['target'=>'Other'])),409);
 $body=['action'=>'convoy-declare','game_id'=>'8102','arrival'=>gmdate('Y-m-d\TH:i:s\Z',time()+3600),'sent_at'=>gmdate('Y-m-d\TH:i:s\Z'),'confirmed'=>true]+$order;
 rejects(fn()=>scriptConvoys($p,$p,$u,array_replace($body,['confirmed'=>false])),422);

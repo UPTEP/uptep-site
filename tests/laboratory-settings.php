@@ -13,7 +13,8 @@ INSERT INTO users VALUES(1,123,'active',true,false)");
 $p->exec('INSERT INTO script_settings(user_id) VALUES(1)');
 foreach(['economy','army','research','buildings'] as $key)check(scriptSettings(1)['preferences'][$key]===true,'Existing choice preserved: '.$key);
 $s=scriptSettings(1);check($s['preferences']['laboratory']===true,'Legacy settings get default');check(count($s['preferences'])===count(SCRIPT_OPTIONS),'All options exposed');
-$prefs=$s['preferences'];$prefs['laboratory']=false;
+check($s['preferences']['playerProfile']===true,'Legacy profile enhancement defaults on');
+$prefs=$s['preferences'];$prefs['playerProfile']=false;$prefs['laboratory']=false;
 $prefs['traffic']=false;
 $prefs['multiflood']=false;$prefs['convoys']=false;$prefs['floodDeclarations']=false;
 $s=scriptSettingsAction(['id'=>1,'game_player_id'=>123],['action'=>'save-settings','preferences'=>$prefs,'version'=>$s['version']]);check($s['preferences']['laboratory']===false,'Disabled choice persists');
@@ -22,8 +23,14 @@ check(scriptSettings(1)['preferences']['multiflood']===false,'Multiflood opt-out
 $p->exec(file_get_contents(__DIR__.'/laboratory-settings.sql'));$p->exec(file_get_contents(__DIR__.'/laboratory-settings.sql'));
 check(scriptSettings(1)['preferences']['laboratory']===false,'Idempotent migration preserves disabled choice');
 check(scriptSettings(2)['preferences']['laboratory']===true,'New user defaults');
+check(scriptSettings(1)['preferences']['playerProfile']===false,'Profile opt-out persists');
+check(scriptSettings(2)['preferences']['playerProfile']===true,'New registration profile option defaults on');
 check(scriptSettings(2)['preferences']['traffic']===true,'Traffic defaults on for new users');
 check(scriptSettings(2)['preferences']['multiflood']===true,'Multiflood defaults on for new users');
 foreach(['convoys','floodDeclarations'] as $key){check(scriptSettings(1)['preferences'][$key]===false,'Opt-out persists: '.$key);check(scriptSettings(2)['preferences'][$key]===true,'Default on: '.$key);}
 foreach(['economy','army','research','buildings'] as $key)check(scriptSettings(2)['preferences'][$key]===false,'New collection defaults off: '.$key);
+$p->exec(file_get_contents(__DIR__.'/player-profile-settings.sql'));$p->exec(file_get_contents(__DIR__.'/player-profile-settings.sql'));
+check(scriptSettings(1)['preferences']['playerProfile']===false,'Profile migration preserves explicit opt-out');
+$p->exec('INSERT INTO script_settings(user_id) VALUES(3)');
+check($p->query("SELECT preferences->'playerProfile' FROM script_settings WHERE user_id=3")->fetchColumn()==='true','Database default enables profile for new rows');
 echo "OK: legacy/new preferences, persistent opt-out and idempotent migration (TEMP tables only)\n";

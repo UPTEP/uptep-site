@@ -20,6 +20,7 @@ function authorizeScript(string $token,string $pseudo,string $alliance): array {
  $q=db()->prepare("SELECT u.id,u.game_player_id FROM script_tokens t JOIN users u ON u.id=t.user_id WHERE t.token_hash=? AND u.status='active' AND u.script_enabled=true AND u.must_change_password=false AND u.game_player_id=t.player_id");$q->execute([hash('sha256',$token)]);$u=$q->fetch(PDO::FETCH_ASSOC);
  $player=$u?scriptPlayer((int)$u['game_player_id']):null;
  if(!$player || $player['pseudo']!==$pseudo)throw new DomainException('Accès UPTEP+ refusé.',403);
+ db()->prepare("UPDATE users SET last_script_seen_at=now() WHERE id=? AND (last_script_seen_at IS NULL OR last_script_seen_at<now()-interval '5 minutes')")->execute([$u['id']]);
  return $u;
 }
 function setScriptAccess(array $actor,int $target,int $version,bool $enabled): void {

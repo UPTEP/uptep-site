@@ -1,0 +1,19 @@
+L’estimation de production des demandes de convois — UPTEP+
+
+Une estimation est affichée sur toutes les demandes en cours dans le userscript, y compris celles qui ne sont pas marquées « Auto production ». Elle donne les cycles encore nécessaires, une durée et une date de fin théoriques. Elle ne modifie jamais le restant réel et ne clôture aucune demande automatiquement.
+
+Le calcul part de l’heure de validation de la demande. Si le joueur ou un responsable ajuste ensuite les quantités restantes, cette nouvelle valeur et sa date deviennent le point de départ du calcul : la production déjà prise en compte dans l’ajustement ne sera pas déduite une deuxième fois.
+
+Un cycle correspond à 30 minutes. La base est le terrain de chasse : chaque cm² est supposé produire une ressource par cycle. Le nombre d’ouvrières enregistré en BDD n’est pas utilisé. Les cycles complets écoulés sont reconstitués avec l’historique des exports Fourmizzz ; le TdC est supposé constant entre deux exports. Si l’historique nécessaire manque, le script n’invente pas la production passée.
+
+Les colonies sont intégrées uniquement lorsque le colonisé et son colonisateur appartiennent tous deux à UPTEP à la période considérée. Le taux est de 20 % + 1 point par niveau d’étable à pucerons du colonisateur, avec un maximum de 100 %. Cette part du rendement TdC propre de la colonie est retirée au colonisé et la même quantité est ajoutée au colonisateur. Les montants prélevés sont arrondis à l’entier inférieur. Les gains de plusieurs colonies s’additionnent ; ils ne sont pas réimposés en cascade. Les colonies extérieures à UPTEP sont entièrement ignorées dans cette estimation, dans les deux sens.
+
+Exemple : une colonie avec 100 000 cm² de TdC, dont le colonisateur possède une étable niveau 2, cède théoriquement 22 000 ressources par cycle. Elle en conserve 78 000, et son colonisateur reçoit 22 000 ressources supplémentaires. Si le niveau d’étable est inconnu, le calcul utilise provisoirement 20 % et affiche « étable inconnue ». Le résultat est alors signalé comme approximatif. Un niveau connu à zéro donne exactement 20 %.
+
+Le restant projeté est la somme de la nourriture et des matériaux encore déclarés dans la demande, moins la production théorique accumulée depuis le point de départ, avec un minimum de zéro. Les convois déclarés sont déjà déduits du restant officiel, même s’ils voyagent encore : le calcul ne les déduit pas une seconde fois.
+
+Les cycles encore nécessaires sont arrondis au supérieur à partir de ce restant projeté et de la capacité nette actuelle, après transferts de colonisation internes. La date de fin estimée tient compte de la position dans le cycle en cours. Quand le besoin paraît couvert, le badge indique « Production théorique suffisante » ; le joueur ou un responsable doit toujours vérifier et terminer ou ajuster la demande lui-même.
+
+Le script vérifie les données au chargement, lors d’une actualisation, après une opération de gestion, puis automatiquement chaque heure tant que la page est ouverte. Il exploite les exports déjà importés en base. Les quantités en cours de saisie pour envoyer un convoi sont conservées. Le survol du badge donne les dates de référence et les hypothèses.
+
+Cette indication reste une estimation : elle suppose un TdC entièrement exploité et une répartition adaptable entre nourriture et matériaux. Elle ignore les dépenses du joueur, la consommation, la champignonnière, les stocks déjà disponibles et la saturation des entrepôts. Chaque demande est calculée séparément comme si toute la production lui était consacrée ; plusieurs demandes simultanées ne peuvent donc pas toutes disposer de la même production en pratique.

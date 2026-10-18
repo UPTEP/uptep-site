@@ -35,3 +35,13 @@
 .settings-page .script-option strong{font-size:13px;margin-bottom:3px}
 .settings-page .script-option small{font-size:12px}
 @media(max-width:700px){#settings-options{grid-template-columns:minmax(0,1fr)}}
+
+/* The embedded player card shares the complete statistics renderer. */
+.player-profile-mode .portal-header,.player-profile-mode main>h1,.player-profile-mode .intro,.player-profile-mode .tabs,.player-profile-mode #search-form,.player-profile-mode footer{display:none}
+.player-profile-mode main{padding:12px;background:#d7c384}.player-profile-mode{background:#d7c384}.player-profile-mode .entity-heading{margin:0 0 12px}.player-profile-mode .entity-heading h2{font-size:17px;margin:0}.player-profile-mode .metric-grid{gap:8px}.player-profile-mode .metric-card{padding:10px}.player-profile-mode .metric-card strong{font-size:21px;margin:6px 0}
+
+/* Show a single hover marker and keep the tooltip beside the pointer. */
+.chart-tooltip{left:0;right:auto;z-index:3;max-width:calc(100% - 8px);overflow-wrap:anywhere;box-shadow:0 2px 6px #302b1825}
+.chart-focus:focus-visible{outline:2px solid #676b51;outline-offset:3px}
+
+.member-report-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}.member-report-heading h2{margin:0}.member-report-heading p{margin:6px 0}.member-report select{padding:6px;border:1px solid #887749;max-width:100%}.member-report-section{border:1px solid #887749;background:#d7c384;margin:12px 0;padding:10px}.member-report-section>summary{font-weight:700;cursor:pointer;padding:4px 0}.member-report-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin:12px 0}.member-report .metric-card{overflow-wrap:anywhere}.member-report .metric-card strong{font-size:17px}.member-report-properties{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px 12px;font-size:12px}.member-report-properties dt,.member-report-properties dd{margin:0;padding:4px 0;border-bottom:1px solid #b39b6155;overflow-wrap:anywhere}.member-report-properties dt{color:#625333}.member-report-group{margin:10px 0;border-top:1px solid #b39b61;padding-top:8px}.member-report-group>summary{cursor:pointer;font-weight:700;font-size:12px}.member-report .history-note{font-size:11px;line-height:1.6}.member-report .table-scroll{max-height:400px}.member-report .muted{font-size:12px}@media(max-width:500px){.member-report-metrics{grid-template-columns:1fr}.member-report-properties{gap:3px 8px}.member-report-section{padding:8px}}

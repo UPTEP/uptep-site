@@ -35,6 +35,7 @@ function authenticatedUser(): ?array {
     if (!$u || $u['status'] !== 'active' || (int)$u['session_version'] !== ($_SESSION['version'] ?? 0)) {
         $_SESSION = []; session_regenerate_id(true); return null;
     }
+    if(!isset($_SESSION['preview']))db()->prepare("UPDATE users SET last_site_seen_at=now() WHERE id=? AND (last_site_seen_at IS NULL OR last_site_seen_at<now()-interval '5 minutes')")->execute([$u['id']]);
     $_SESSION['last_active'] = time();
     if (time() - ($_SESSION['rotated_at'] ?? 0) > 900) { session_regenerate_id(true); $_SESSION['rotated_at'] = time(); }
     return $u;
@@ -58,7 +59,7 @@ function requireUser(bool $allowPasswordChange = false): array {
 function signIn(array $u): void {
     session_regenerate_id(true);
     $_SESSION = ['user_id' => (int)$u['id'], 'version' => (int)$u['session_version'], 'signed_in' => time(), 'last_active' => time(), 'rotated_at' => time(), 'csrf' => bin2hex(random_bytes(32))];
-    db()->prepare('UPDATE users SET last_login_at = now() WHERE id = ?')->execute([$u['id']]);
+    db()->prepare('UPDATE users SET last_login_at = now(),last_site_seen_at=now() WHERE id = ?')->execute([$u['id']]);
 }
 function consumeAttempt(string $key, int $limit): bool {
     if (random_int(1, 100) === 1) db()->exec("DELETE FROM login_limits WHERE started_at < now() - interval '1 day'");

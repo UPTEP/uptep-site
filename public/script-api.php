@@ -6,6 +6,7 @@ require '/home/uptep/private/app/userscript.php';
 require '/home/uptep/private/app/chaine.php';
 require '/home/uptep/private/app/script-settings.php';
 require '/home/uptep/private/app/script-traffic.php';
+require '/home/uptep/private/app/member-report.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, private');
 try{
@@ -28,6 +29,7 @@ try{
  $lab=loadStats((int)$actor['id']);
  $labData=$prefs['laboratory']?['data'=>array_intersect_key($lab['data'],array_flip(['buildings','research','army'])),'synced'=>array_intersect_key($lab['synced'],array_flip(['buildings','research','army']))]:null;
  $code='const uptepLaboratoryData='.json_encode($labData,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR).';'.$code;
+ $code='const uptepMemberReportAccess='.json_encode(memberReportAllowed(db(),$actor)).';'.$code;
  $code='const uptepHourlyDue='.json_encode($prefs['economy']&&hourlyCollectionDue((int)$actor['id'])).';const uptepPreferences='.json_encode($prefs,JSON_THROW_ON_ERROR).';'.$chainCode.$code;
  // The current time seeds local countdowns but must not change the revision every poll.
  $revision=hash('sha256',$code);$out=['ok'=>true,'revision'=>$revision];if(($body['revision']??'')!==$revision)$out['code']='const uptepTrafficServerTime='.json_encode(gmdate('Y-m-d\TH:i:s\Z')).';const uptepPortalAuth='.json_encode(['token'=>$token,'pseudo'=>$body['pseudo']],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR).';'.$code;
