@@ -5,6 +5,7 @@ file_put_contents($adminFixture,"ADMIN_DISCORD_IDS=102\n");
 define('UPTEP_BOT_ENV_FILE',$adminFixture);
 register_shutdown_function(static function()use($adminFixture){unlink($adminFixture);});
 require dirname(__DIR__).'/app/script-convoys.php';
+require dirname(__DIR__).'/app/bot-production.php';
 function check(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);}
 function rejects(callable $fn,int $code):void{try{$fn();}catch(DomainException $e){check($e->getCode()===$code,$e->getMessage());return;}throw new RuntimeException('Expected rejection');}
 $p=new PDO('pgsql:dbname=uptep',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
@@ -24,6 +25,9 @@ check(count(scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['demands'])===3
 $production=scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['demands'][0]['production'];
 check($production['tdc']==='100'&&$production['capacity_per_cycle']['own']==='100'&&!isset($production['workers_known']),'production capacity uses terrain only');
 check($production['projection']['anchor_kind']==='validation'&&$production['projection']['history_complete'],'projection based on validation and historical seed');
+$botProduction=botProductionDemands($p,$p,[['id'=>$ids[0]]])[0]['production'];check($botProduction['capacity_per_cycle']===$production['capacity_per_cycle'],'bot and userscript use identical current capacity');check($botProduction['projection']['anchor_at']===$production['projection']['anchor_at']&&$botProduction['projection']['segments']===$production['projection']['segments'],'bot and userscript use identical historical baseline and cycles');
+check(botProductionQuery(['estimation'=>'1','etat'=>'en_cours'])===[['etat'=>'en_cours'],true],'opt-in estimation parameter');check(botProductionQuery(['etat'=>'attente'])===[['etat'=>'attente'],false],'ordinary API queries unchanged');rejects(fn()=>botProductionQuery(['estimation'=>'0']),422);
+
 $anchorTest=['iddemandeur'=>'1','date_validation'=>gmdate('c',time()-7200),'adjusted_at'=>gmdate('c',time()-3600)];
 $projection=scriptConvoyProjection($p,$p,$anchorTest,gmdate('c'));
 check($projection['anchor_kind']==='adjustment'&&$projection['elapsed_cycles']==='2','latest manual adjustment becomes baseline');
@@ -67,7 +71,7 @@ $past=array_replace($body,['game_id'=>'1001','arrival'=>gmdate('Y-m-d\TH:i:s\Z',
 $new=['action'=>'convoy-create','request_key'=>'11111111-1111-4111-8111-111111111111','confirmed'=>true,'apples'=>'1000','wood'=>'2500','object'=>'Étable à pucerons','level'=>'12','wanted_date'=>null];
 rejects(fn()=>scriptConvoys($p,$p,$u,array_replace($new,['confirmed'=>false])),422);
 rejects(fn()=>scriptConvoys($p,$p,$u,array_replace($new,['discord_id'=>'101'])),422);
-$created=scriptConvoys($p,$p,$u,$new);check($created['state']==='attente','new request awaits approval');
+$created=scriptConvoys($p,$p,$u,$new);check($created['state']==='attente','new request awaits approval');check(!isset(botProductionDemands($p,$p,[['id'=>$created['demand_id']]])[0]['production']),'pending bot demand has no production estimate');
 check(scriptConvoys($p,$p,$u,$new)===$created,'creation replay');
 rejects(fn()=>scriptConvoys($p,$p,$u,array_replace($new,['wood'=>'2501'])),409);
 $pending=scriptConvoys($p,$p,$u,['action'=>'convoy-pending'])['demands'];check(count($pending)===1&&$pending[0]['id']===$created['demand_id']&&$pending[0]['self'],'pending list identity and state');

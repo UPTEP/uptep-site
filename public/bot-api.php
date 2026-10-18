@@ -95,7 +95,7 @@ try {
         if($method!=='GET'){header('Allow: GET');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
         if(!in_array('demandes:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
         define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/bot-convoys.php';require '/home/uptep/private/app/bot-deliveries.php';
-        botReply(200,botDeliveries(db(),db(true),$_GET));
+        require '/home/uptep/private/app/bot-production.php';[$query,$estimate]=botProductionQuery($_GET);$result=botDeliveries(db(),db(true),$query);if($estimate)$result['lignes']=botProductionDemands(db(),db(true),$result['lignes']);botReply(200,$result);
     }
     if($path==='/api/bot/v1/notifications-web'){
         if(!in_array('convois:read',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
@@ -125,7 +125,7 @@ try {
         require '/home/uptep/private/app/bootstrap.php';
         require '/home/uptep/private/app/bot-convoys.php';
         require '/home/uptep/private/app/bot-reports.php';
-        botReply(200,botReports(db(),db(true),$reportKind,$_GET,$id));
+        require '/home/uptep/private/app/bot-production.php';[$query,$estimate]=botProductionQuery($_GET);$result=botReports(db(),db(true),$reportKind,$query,$id);if($estimate&&$reportKind==='demandes'){if($id!==null)$result['demande']=botProductionDemands(db(),db(true),[$result['demande']])[0];else $result['lignes']=botProductionDemands(db(),db(true),$result['lignes']);}botReply(200,$result);
     }
     if($path==='/api/bot/v1/demandes'){$allowed=['GET','POST'];$action=$method==='GET'?'lecture':'demande';}
     elseif($path==='/api/bot/v1/convois'){$allowed=['GET'];$action='convois_annulables';}
@@ -145,7 +145,7 @@ try {
     if($action==='convois_annulables')botReply(200,botCancelableConvoys(db(),db(true),$_GET));
     if($action==='membre')botReply(200,botMember(db(),db(true),$id));
     if($action==='lecture_convois')botReply(200,botListConvoys(db(),$id,$_GET));
-    if($action==='lecture')botReply(200,botListDemands(db(),$_GET));
+    if($action==='lecture'){require '/home/uptep/private/app/bot-production.php';[$query,$estimate]=botProductionQuery($_GET);$result=botListDemands(db(),$query);if($estimate)$result['demandes']=botProductionDemands(db(),db(true),$result['demandes']);botReply(200,$result);}
     if(strtolower(trim(explode(';',$_SERVER['CONTENT_TYPE']??'')[0]))!=='application/json')botReply(415,['ok'=>false,'error'=>'application_json_required']);
     $raw=file_get_contents('php://input');
     $body=json_decode($raw,true,16,JSON_THROW_ON_ERROR);

@@ -302,6 +302,18 @@
               "format": "date-time"
             },
             "description": "Inclure aussi les demandes terminées depuis cette date. Les demandes annulées sont exclues."
+          },
+          {
+            "name": "estimation",
+            "in": "query",
+            "required": false,
+            "description": "Ajouter les données de projection théorique aux demandes validées et en cours, avec le même calcul historique que le userscript. Lecture seule ; aucun changement du restant réel.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            }
           }
         ],
         "operationId": "get__demandes"
@@ -2092,6 +2104,18 @@
               ]
             },
             "description": "Filtre facultatif."
+          },
+          {
+            "name": "estimation",
+            "in": "query",
+            "required": false,
+            "description": "Ajouter les données de projection théorique aux demandes validées et en cours, avec le même calcul historique que le userscript. Lecture seule ; aucun changement du restant réel.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            }
           }
         ]
       }
@@ -2719,6 +2743,18 @@
               "default": 1
             },
             "description": "Page de 8 résultats."
+          },
+          {
+            "name": "estimation",
+            "in": "query",
+            "required": false,
+            "description": "Ajouter les données de projection théorique aux demandes validées et en cours, avec le même calcul historique que le userscript. Lecture seule ; aucun changement du restant réel.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            }
           }
         ]
       }
@@ -3395,6 +3431,18 @@
               "type": "integer",
               "minimum": 1,
               "default": 1
+            }
+          },
+          {
+            "name": "estimation",
+            "in": "query",
+            "required": false,
+            "description": "Ajouter les données de projection théorique aux demandes validées et en cours, avec le même calcul historique que le userscript. Lecture seule ; aucun changement du restant réel.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
             }
           }
         ],
