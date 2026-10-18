@@ -49,10 +49,10 @@ function scriptConvoys(PDO $p,PDO $game,array $actor,array $body):array {
     }
     if(in_array($action,['convoy-demands','convoy-pending'],true)){
         $validation=$action==='convoy-pending'?'NOT valide':'valide';
-        $rows=$p->query("SELECT id::text,iddemandeur::text,pseudo_demandeur,objet,niveau,auto_production,nbpomme_restant::text,nbmateriaux_restant::text,date_validation,(SELECT max(date_ajustement) FROM demandes_ajustements a WHERE a.iddemande=demandes_convois.id) AS adjusted_at FROM demandes_convois WHERE ".$validation." AND NOT fini AND NOT annulee ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+        $rows=$p->query("SELECT id::text,iddemandeur::text,pseudo_demandeur,objet,niveau,auto_production,nbpomme_restant::text,nbmateriaux_restant::text,date_demande,date_validation,(SELECT max(date_ajustement) FROM demandes_ajustements a WHERE a.iddemande=demandes_convois.id) AS adjusted_at FROM demandes_convois WHERE ".$validation." AND NOT fini AND NOT annulee ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
         $projectionNow=gmdate('c');$colonyPlayers=[];$colonyLevels=[];if($action==='convoy-demands'){$colonyLevels=scriptConvoyCurrentColonyLevels($p);foreach($game->query("SELECT player_id::text,field::text,master_player_id::text,alliance_tag FROM players WHERE server='s5' AND is_present AND upper(alliance_tag)='UPTEP'")->fetchAll(PDO::FETCH_ASSOC) as $cp)$colonyPlayers[$cp['player_id']]=$cp;}
         $q=$game->prepare("SELECT pseudo,field::text,imported_at,alliance_tag FROM players WHERE server='s5' AND player_id=? AND is_present");$production=[];
-        foreach($rows as &$row){$id=(string)$row['iddemandeur'];$q->execute([$id]);$player=$q->fetch(PDO::FETCH_ASSOC)?:[];$row['target']=$player['pseudo']??null;$row['self']=$id===(string)$member['id'];
+        foreach($rows as &$row){$row['date_demande']=(new DateTimeImmutable($row['date_demande']))->format('c');$id=(string)$row['iddemandeur'];$q->execute([$id]);$player=$q->fetch(PDO::FETCH_ASSOC)?:[];$row['target']=$player['pseudo']??null;$row['self']=$id===(string)$member['id'];
             if($action==='convoy-demands'){$production[$id]??=scriptConvoyProduction($player);$row['production']=$production[$id];$cp=$colonyPlayers;if(!isset($cp[$id]))$cp[$id]=$player;$row['production']['capacity_per_cycle']=scriptConvoyColonyCapacity($id,$cp,$colonyLevels);$row['production']['colonies_included']=true;$row['production']['projection']=scriptConvoyProjection($p,$game,$row,$projectionNow);}
         }unset($row);
         return ['demands'=>$rows,'permissions'=>['is_chaine'=>$member['is_chaine'],'player_id'=>(string)$member['id']]];
@@ -60,6 +60,7 @@ function scriptConvoys(PDO $p,PDO $game,array $actor,array $body):array {
     if($action==='convoy-check'){
         $d=botDemand($p,botNumber($body['demand_id']??null,true));$apple=botNumber($body['apples']??null);$wood=botNumber($body['wood']??null);
         if(!$d['valide']||$d['fini']||$d['annulee']||(string)$d['iddemandeur']===(string)$member['id'])throw new DomainException('Cette demande ne peut plus recevoir ce convoi.',409);
+        if($d['auto_production'])throw new DomainException('Envoi désactivé : cette demande est en auto production.',409);
         if($apple==='0'&&$wood==='0')throw new DomainException('Quantités nulles.',422);
         $q=$game->prepare("SELECT pseudo FROM players WHERE server='s5' AND player_id=? AND is_present");$q->execute([$d['iddemandeur']]);$target=$q->fetchColumn();
         if(!$target||$target!==($body['target']??null))throw new DomainException('Le destinataire a changé. Actualise les demandes.',409);

@@ -42,7 +42,7 @@ try{
  check(botListDemands($p,['include'=>'convois'])['demandes'][1]['auto_production'],'bot listing carries flag');
  $u=['id'=>2,'game_player_id'=>2];$owner=['id'=>1,'game_player_id'=>1];
  $order=['demand_id'=>$d['id'],'target'=>'Owner','apples'=>'1','wood'=>'2'];
- check(scriptConvoys($p,$p,$u,['action'=>'convoy-check']+$order)['auto_production'],'preflight returns current auto status');
+ rejects(fn()=>scriptConvoys($p,$p,$u,['action'=>'convoy-check']+$order),409);
  check(scriptConvoys($p,$p,$u,['action'=>'convoy-demands'])['demands'][0]['auto_production'],'script list badge data');
  // Registration and recovery of an already-sent game convoy remain possible.
  $declare=['action'=>'convoy-declare','game_id'=>'9876','arrival'=>gmdate('Y-m-d\TH:i:s\Z',time()+3600),'sent_at'=>gmdate('Y-m-d\TH:i:s\Z'),'confirmed'=>true]+$order;
