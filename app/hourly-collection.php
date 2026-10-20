@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 function hourlyCollectionDue(int $id): bool {
- $q=db()->prepare("SELECT resources_synced_at IS NULL OR resources_synced_at<=now()-interval '1 hour' FROM user_stats WHERE user_id=?");$q->execute([$id]);$r=$q->fetch(PDO::FETCH_NUM);return !$r||(bool)$r[0];
+ $q=db()->prepare("SELECT resources_synced_at IS NULL OR resources_synced_at<=now()-interval '5 minutes' FROM user_stats WHERE user_id=?");$q->execute([$id]);$r=$q->fetch(PDO::FETCH_NUM);return !$r||(bool)$r[0];
 }
 /** Called inside the authorized settings transaction, with its preferences row locked. */
 function saveHourlyCollection(int $id,array $body): bool {
