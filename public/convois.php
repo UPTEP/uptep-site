@@ -4,6 +4,7 @@ require '/home/uptep/private/app/bootstrap.php';
 require '/home/uptep/private/app/view.php';
 require '/home/uptep/private/app/web-convoys.php';
 require '/home/uptep/private/app/convoy-daily.php';
+require '/home/uptep/private/app/convoy-consumption.php';
 $u=requireUser();$error='';$member=null;$confirmation=null;$data=[];
 $tabs=['tableau'=>'Demandes','nouvelle'=>'Nouvelle demande','livraisons'=>'Livraisons','mes-convois'=>'Mes convois'];
 $tab=is_string($_GET['vue']??null)?$_GET['vue']:'tableau';
@@ -52,6 +53,9 @@ try {
         $query=['discord_id'=>$member['discord_id']];
         foreach(['ressource','sens','joueur'] as $key)if(isset($_GET[$key]))$query[$key]=$_GET[$key];
         $data=convoyDailyStatistics(db(),db(true),$query,$u);
+        // Consumption chart: independent of the 7-day filters; a bad date range only affects this block.
+        try{[$consoFrom,$consoEnd]=convoyConsumptionRange($_GET);$data['consumption']=convoyConsumptionData(db(),db(true),$consoFrom,$consoEnd);}
+        catch(DomainException $ex){$data['consumption_error']=$ex->getMessage();}
     }elseif($tab!=='nouvelle'){
         $query=['discord_id'=>$member['discord_id'],'page'=>$page];
         if($tab!=='recap-demandes')foreach(['periode','debut','fin','joueur','etat','expediteur','destinataire','demande'] as $key)if(is_string($_GET[$key]??null)&&$_GET[$key]!=='')$query[$key]=$_GET[$key];

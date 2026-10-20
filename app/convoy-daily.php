@@ -65,6 +65,24 @@ function convoyDailyData(PDO $p,PDO $game,array $query,?DateTimeImmutable $now=n
     }
     return ['totals'=>convoyDailyTotals($p,array_values($rows),$days),'rows'=>array_values($rows),'days'=>$days,'resource'=>$resource,'direction'=>$direction,'player'=>$player,'start'=>$start->format('d/m/Y'),'end'=>$today->format('d/m/Y')];
 }
+/** Theoretical production per day: one resource per cm² of hunting ground per 30-minute cycle, i.e. 48 cycles. */
+function convoyProduction(?string $tdc): ?string { return $tdc===null||!is_numeric($tdc)?null:(string)round((float)$tdc*48); }
+/** Mean of the daily TdC values that have at least one export. */
+function convoyTdcAverage(array $days): ?string {
+    $values=[];foreach($days as $d)if(isset($d['tdc'])&&is_numeric($d['tdc']))$values[]=(float)$d['tdc'];
+    return $values?(string)round(array_sum($values)/count($values),2):null;
+}
+/** Compact figure (3 significant digits, k/M/G/T/P) whose exact value is shown on hover. Returns escaped HTML. */
+function convoyStatCompact(?string $value): string {
+    $exact=convoyStatNumber($value);
+    if($value===null||!is_numeric($value)||(float)$value<1000)return e($exact);
+    $n=(float)$value;$units=['','k','M','G','T','P'];$scale=min(5,(int)floor(log10($n)/3));
+    $v=round($n/(1000**$scale),max(0,3-strlen((string)(int)($n/(1000**$scale)))));
+    if($v>=1000&&$scale<5){$scale++;$v=round($n/(1000**$scale),2);}
+    $text=number_format($v,max(0,3-strlen((string)(int)$v)),',','');
+    if(str_contains($text,','))$text=rtrim(rtrim($text,'0'),',');
+    return '<span class="daily-compact" title="'.e($exact).'">'.e($text.$units[$scale]).'</span>';
+}
 function convoyStatNumber(?string $value): string {
     if($value===null)return '—';
     [$whole,$fraction]=array_pad(explode('.',$value,2),2,'');
