@@ -108,7 +108,7 @@ function consumptionBar(float $a,float $b,float $y,float $h,string $fill,bool $r
 /** Server-rendered SVG: presentation attributes only, so it renders under the site's strict CSP. */
 function convoyConsumptionSvg(array $data):string{
     $rows=$data['rows'];if(!$rows)return '';
-    $W=1100;$labelRight=196;$x0=212;$x1=$W-70;$rowH=30;$barH=18;$top=8;
+    $W=1100;$labelRight=196;$x0=212;$x1=$W-70;$rowH=26;$barH=16;$top=8;
     $maxIn=max(1,max(array_column($rows,'in')));$maxOut=max(0,max(array_column($rows,'out')));
     $raw=($maxIn+$maxOut)/1000/6;$mag=10**floor(log10(max($raw,1)));$step=$mag*(($raw/$mag)<=1.5?1:(($raw/$mag)<=3?2:(($raw/$mag)<=7?5:10)));
     $lo=-ceil($maxOut/1000/$step)*$step;$hi=ceil($maxIn/1000/$step)*$step;

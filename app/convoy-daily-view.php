@@ -1,5 +1,5 @@
 <?php declare(strict_types=1); ?>
-<link rel="stylesheet" href="/assets/convoy-daily.css?v=5">
+<link rel="stylesheet" href="/assets/convoy-daily.css?v=6">
 <?php $c=$data['consumption']??null;$cIn=fn($k)=>is_string($_GET[$k]??null)?$_GET[$k]:''; ?>
 <section class="conso" aria-labelledby="conso-title">
 <form method="get" class="convoy-filters"><input type="hidden" name="vue" value="statistiques"><?php foreach(['ressource','sens','joueur'] as $k)if($cIn($k)!==''):?><input type="hidden" name="<?=e($k)?>" value="<?=e($cIn($k))?>"><?php endif;?>

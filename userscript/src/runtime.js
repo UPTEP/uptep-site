@@ -1,7 +1,7 @@
 const doc=context.document,win=context.window;
 const preferences=typeof uptepPreferences==='undefined'?{}:uptepPreferences;
-const collectionGroup=win.location.pathname.toLowerCase()==='/construction.php'?'buildings':win.location.pathname.toLowerCase()==='/laboratoire.php'?'research':null;
-let collection=collectionGroup&&preferences[collectionGroup]?readGameLevels(doc,win.location.pathname):null;
+const collectionGroup={'/construction.php':'buildings','/laboratoire.php':'research','/acquerirterrain.php':'hunts','/ressources.php':'hunts'}[win.location.pathname.toLowerCase()]||null;
+let collection=collectionGroup&&preferences[collectionGroup]?(collectionGroup==='hunts'?readGameHunts(doc,win):readGameLevels(doc,win.location.pathname)):null;
 const portalPath='/alliance.php?uptep=1';
 const entry=doc.createElement('li');entry.id='uptep-plus-alliance-entry';
 const entryLink=doc.createElement('a');entryLink.className='boutonHome';entryLink.href=portalPath;
@@ -15,8 +15,9 @@ function receivePortal(event){
  if(event.origin!=='https://uptep.top'||event.source!==frame.contentWindow)return;
  if(event.data?.type==='uptep-ready')sendAuth();
  if(event.data?.type==='uptep-collection-result'&&collection&&event.data.requestId===collection.requestId){
+ if(huntBadges){win.clearTimeout(huntTimeout);huntBadges.set(event.data.ok?'ok':'error',event.data.error);}
  if(collection.group==='army'){win.clearTimeout(armyTimeout);armyButton.disabled=false;armyButton.removeAttribute('aria-busy');armyStatus.textContent=event.data.ok?'✓ Armée synchronisée — totaux des trois emplacements enregistrés.':'Échec : '+String(event.data.error||'synchronisation indisponible');return;}
-collectionStatus.textContent=event.data.ok?'✓ '+(collection.group==='buildings'?'Bâtiments':'Laboratoire')+' synchronisé'+(collection.group==='buildings'?'s':''):'Collecte : '+String(event.data.error||'indisponible');}
+collectionStatus.textContent=event.data.ok?(collection.group.startsWith('hunts')?'✓ Chasses synchronisées ('+collection.values.length+')':'✓ '+(collection.group==='buildings'?'Bâtiments':'Laboratoire')+' synchronisé'+(collection.group==='buildings'?'s':'')):'Collecte : '+String(event.data.error||'indisponible');}
  if(event.data?.type==='uptep-height'&&Number.isFinite(event.data.height))frame.style.height=Math.min(20000,Math.max(500,event.data.height))+'px';
 }
 frame.addEventListener('load',sendAuth);win.addEventListener('message',receivePortal);
@@ -69,7 +70,11 @@ function position(){
  if(panel.style.top!==top)panel.style.top=top;
 }
 const collectionStatus=doc.createElement('div');collectionStatus.className='uptep-collection-status';collectionStatus.style.cssText='font-size:11px;padding:6px;color:#e5edce;';
-if(collectionGroup&&preferences[collectionGroup]){collectionStatus.textContent=collection?'Synchronisation des niveaux…':'Niveaux non reconnus : aucune donnée envoyée.';content.append(collectionStatus);}
+// Ressources.php without any hunt shown stays silent: there is simply nothing to record.
+if(collectionGroup&&preferences[collectionGroup]&&(collection||win.location.pathname.toLowerCase()!=='/ressources.php')){collectionStatus.textContent=collectionGroup==='hunts'?(collection?'Synchronisation des chasses…':'Chasses non reconnues : aucune donnée envoyée.'):(collection?'Synchronisation des niveaux…':'Niveaux non reconnus : aucune donnée envoyée.');content.append(collectionStatus);}
+// Hunt pages: badges next to each hunt, also when the collection is off (read locally, nothing sent).
+const huntBadges=collectionGroup==='hunts'?mountHuntBadges(doc,preferences.hunts?collection:readGameHunts(doc,win),!!preferences.hunts):null;
+const huntTimeout=huntBadges&&collection?win.setTimeout(()=>huntBadges.set('error','UPTEP ne répond pas, recharge la page'),25000):null;
 if(collection){frame.src='https://uptep.top/portal.php?bridge=1';portal.hidden=true;doc.body.append(portal);}
 let armyTimeout=null;const armyTools=doc.createElement('div'),armyButton=doc.createElement('button'),armyStatus=doc.createElement('span');
 if(win.location.pathname.toLowerCase()==='/armee.php'){
@@ -92,4 +97,4 @@ const cleanupMemberReport=preferences.playerProfile===false||typeof uptepMemberR
 position();
 const timer=win.setInterval(position,1000);
 win.addEventListener('resize',position);
-return ()=>{cleanupMemberReport();cleanupPlayerProfile();cleanupFloodDeclarations();cleanupConstructionDemands();cleanupConvoys();cleanupMultiflood();cleanupTraffic();cleanupLaboratory();cleanupHourly();win.clearTimeout(armyTimeout);armyTools.remove();cleanupClock();cleanupChaine();win.removeEventListener('message',receivePortal);frame.removeEventListener('load',sendAuth);win.clearInterval(timer);win.removeEventListener('resize',position);panel.remove();entry.remove();portal.remove();for(const [element,[value,priority]] of savedDisplay){if(value)element.style.setProperty('display',value,priority);else element.style.removeProperty('display');}savedDisplay.clear();if(centrePadding){const [element,value,priority]=centrePadding;if(value)element.style.setProperty('padding-top',value,priority);else element.style.removeProperty('padding-top');}};
+return ()=>{win.clearTimeout(huntTimeout);huntBadges?.remove();cleanupMemberReport();cleanupPlayerProfile();cleanupFloodDeclarations();cleanupConstructionDemands();cleanupConvoys();cleanupMultiflood();cleanupTraffic();cleanupLaboratory();cleanupHourly();win.clearTimeout(armyTimeout);armyTools.remove();cleanupClock();cleanupChaine();win.removeEventListener('message',receivePortal);frame.removeEventListener('load',sendAuth);win.clearInterval(timer);win.removeEventListener('resize',position);panel.remove();entry.remove();portal.remove();for(const [element,[value,priority]] of savedDisplay){if(value)element.style.setProperty('display',value,priority);else element.style.removeProperty('display');}savedDisplay.clear();if(centrePadding){const [element,value,priority]=centrePadding;if(value)element.style.setProperty('padding-top',value,priority);else element.style.removeProperty('padding-top');}};

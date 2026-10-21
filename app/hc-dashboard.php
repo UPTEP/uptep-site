@@ -46,7 +46,7 @@ function hcSection(string $title,string $body,string $note=''):string{
 
 /** Loads everything that is not already in the dashboard rows, once for all members. */
 function hcDetailSources(array $ids):array{
-    $out=['game'=>[],'users'=>[],'tokens'=>[],'stats'=>[],'convoys_out'=>[],'convoys_in'=>[],'floods_out'=>[],'floods_in'=>[]];
+    $out=['game'=>[],'users'=>[],'tokens'=>[],'stats'=>[],'convoys_out'=>[],'convoys_in'=>[],'floods_out'=>[],'floods_in'=>[],'hunts'=>[],'hunts_sync'=>[]];
     $q=db(true)->prepare("SELECT player_id,x,y,field,grade,building_score,technology_score,trophy_score,on_holiday,is_banned,export_version FROM players WHERE server=? AND upper(alliance_tag)='UPTEP' AND is_present=true");
     $q->execute([CHAINE_SERVER]);
     foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r)$out['game'][(string)$r['player_id']]=$r;
@@ -62,6 +62,9 @@ function hcDetailSources(array $ids):array{
         $out['convoys_out'][(string)$r['idenvoyeur']][]=$r;
         $out['convoys_in'][(string)$r['iddemandeur']][]=$r;
     }
+    // Hunts in progress read by UPTEP+ (opt-in), and each player's last hunt collection.
+    foreach(db()->query("SELECT player_id::text,area::text,arrival_at FROM script_hunts WHERE cancelled_at IS NULL AND arrival_at>now() ORDER BY arrival_at,id") as $r)$out['hunts'][$r['player_id']][]=$r;
+    foreach(db()->query("SELECT u.game_player_id::text AS player_id,max(s.hunts_synced_at) AS synced,bool_or(coalesce((s.preferences->>'hunts')::boolean,false)) AS enabled FROM users u JOIN script_settings s ON s.user_id=u.id WHERE u.status='active' AND u.game_player_id IS NOT NULL GROUP BY u.game_player_id") as $r)$out['hunts_sync'][$r['player_id']]=$r;
     // Floods still on their way, indexed by sender and by target (both are game player ids).
     $q=db()->query("SELECT sender_id,sender_pseudo,target_id,target_pseudo,location,troops,arrival_at FROM floods WHERE arrival_at>now() ORDER BY arrival_at,id");
     foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){
@@ -131,6 +134,16 @@ function hcDetailHtml(array $row,array $src,?array $chain):string{
         $body='<table class="hc-detail-table"><thead><tr><th scope="col">'.e($who).'</th><th scope="col">Nourriture</th><th scope="col">Matériaux</th><th scope="col">Parti le (heure de Paris)</th><th scope="col">Arrive le (heure de Paris)</th></tr></thead><tbody>';
         foreach($list as $c)$body.='<tr><td>'.e((string)($key==='convoys_out'?$c['pseudo_demandeur']:$c['pseudo_envoyeur'])).'</td><td>'.e(hcGroup((string)$c['nbpomme'])).'</td><td>'.e(hcGroup((string)$c['nbmateriaux'])).'</td><td>'.e(hcDate($c['date_convoi'])).'</td><td>'.e(hcDate($c['date_arrivee'])).'</td></tr>';
         $html.=hcSection($heading,$body.'</tbody></table>',(string)count($list));
+    }
+    // Hunts in progress (UPTEP+ collection on the hunting page)
+    $hunts=$src['hunts'][$id]??[];$sync=$src['hunts_sync'][$id]??null;
+    $note=!$sync||!$sync['enabled']?'Collecte des chasses désactivée':($sync['synced']?'Relevé du '.hcDate($sync['synced']):'Aucun relevé pour le moment');
+    if(!$hunts)$html.=hcSection('Chasses en cours','<p class="hc-detail-empty">Aucune chasse en cours enregistrée.</p>',$note);
+    else{
+        $total=array_sum(array_map(static fn($h)=>(int)$h['area'],$hunts));
+        $body='<table class="hc-detail-table"><thead><tr><th scope="col">Surface</th><th scope="col">Arrive le (heure de Paris)</th></tr></thead><tbody>';
+        foreach($hunts as $h)$body.='<tr><td>'.e(hcGroup($h['area'])).' cm²</td><td>'.e(hcDate($h['arrival_at'])).'</td></tr>';
+        $html.=hcSection('Chasses en cours',$body.'</tbody></table><p class="hc-detail-note">Total : '.e(hcGroup((string)$total)).' cm² à venir.</p>',count($hunts).' · '.$note);
     }
     // Floods in progress, sent and received
     foreach(['floods_out'=>['Floods envoyés en cours','Cible'],'floods_in'=>['Floods reçus en cours','Attaquant']] as $key=>[$heading,$who]){
