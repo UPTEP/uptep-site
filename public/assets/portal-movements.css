@@ -36,3 +36,5 @@
 .pm-empty,.pm-error{margin:10px 0}.pm-error{color:#8a2a1a;font-weight:bold}
 .pm-note{margin:10px 0 0;font-size:11px;color:#625333}
 @media(max-width:600px){.pm-nav{grid-template-columns:auto 1fr auto}.pm-step{font-size:0;padding:6px 10px}.pm-step::first-letter{font-size:14px}}
+.pm-earlier{display:block;width:100%;margin:0 0 8px;padding:6px 10px;border:1px dashed #887749;background:#e2d29e;color:#302b18;font:bold 12px Verdana,sans-serif;text-align:left;cursor:pointer}
+.pm-earlier:hover{background:#eadcae}.pm-earlier:focus-visible{outline:2px solid #254e59;outline-offset:2px}

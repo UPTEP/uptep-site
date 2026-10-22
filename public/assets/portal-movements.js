@@ -7,11 +7,20 @@ window.uptepMovements=(()=>{
  const paris=(ts,opts)=>new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',...opts}).format(new Date(ts*1000));
  const TYPES={flood:['Floods','Flood'],convoy:['Convois','Convoi'],hunt:['Chasses','Chasse']};
  const left=seconds=>{if(seconds<=0)return 'arrivé';const d=Math.floor(seconds/86400),h=Math.floor(seconds%86400/3600),m=Math.floor(seconds%3600/60);return d?`dans ${d} j ${h} h`:h?`dans ${h} h ${String(m).padStart(2,'0')}`:`dans ${m} min`;};
- let api=null,root=null,data=null,clock=null,version=0;
+ let api=null,root=null,data=null,clock=null,version=0,showEarlier=false;
+ // Keep a tooltip inside the frame: shift it left when it would pass the right edge, and show it above
+ // the item when there is no room below (the in-game page is an iframe that clips what overflows).
+ function fitTip(item,tip){
+  tip.style.left='';tip.style.top='';tip.style.bottom='';
+  const box=tip.getBoundingClientRect(),width=document.documentElement.clientWidth,height=document.documentElement.clientHeight;
+  if(box.right>width-6)tip.style.left=Math.min(0,width-6-box.right)+'px';
+  if(box.bottom>height-6&&item.getBoundingClientRect().top>box.height+12){tip.style.top='auto';tip.style.bottom='calc(100% + 5px)';}
+ }
+
  const shown=new Set(Object.keys(TYPES));let onlyMe=false;
  async function load(day){
   const turn=++version;root.setAttribute('aria-busy','true');
-  try{const result=await api({action:'movements',...(day?{day}:{})});if(turn!==version)return;data=result;render();}
+  try{const result=await api({action:'movements',...(day?{day}:{})});if(turn!==version)return;if(result.day!==data?.day)showEarlier=false;data=result;render();}
   catch(e){if(turn===version){root.replaceChildren(el('p','pm-error',e.message||'Mouvements indisponibles.'));}}
   finally{if(turn===version)root.removeAttribute('aria-busy');}
  }
@@ -34,6 +43,8 @@ window.uptepMovements=(()=>{
   const filters=el('div','pm-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','Filtrer les mouvements');
   for(const [type,[plural]] of Object.entries(TYPES)){const b=el('button','pm-filter');b.type='button';b.setAttribute('aria-pressed',String(shown.has(type)));b.append(el('span','pm-dot is-'+type),document.createTextNode(plural+' '),el('span','pm-count',String(counts[type])));b.addEventListener('click',()=>{shown.has(type)?shown.delete(type):shown.add(type);render();});filters.append(b);}
   const me=el('button','pm-filter pm-me','Seulement moi');me.type='button';me.setAttribute('aria-pressed',String(onlyMe));me.addEventListener('click',()=>{onlyMe=!onlyMe;render();});filters.append(me);
+  // Today: hours already past are folded behind a button.
+  const currentHour=isToday?parseInt(paris(data.now,{hour:'2-digit',hourCycle:'h23'}),10):-1;let folded=0,foldedHours=0;
   const list=el('ol','pm-hours');let visible=0,n=0;
   for(const hour of [...hours.keys()].sort((a,b)=>a-b)){
    const items=el('div','pm-items');
@@ -49,17 +60,22 @@ window.uptepMovements=(()=>{
     if(e.count>1)row(e.type==='flood'?'Floods identiques':e.type==='hunt'?'Chasses identiques':'Convois identiques',String(e.count)+(e.type==='hunt'?' · '+fmt(e.amount*e.count)+' cm² au total':''));
     for(const [k,v] of e.details)row(k,v);
     chip.append(tip);items.append(chip);
+    for(const type of ['mouseenter','focus'])chip.addEventListener(type,()=>fitTip(chip,tip));
    }
    if(!items.childElementCount)continue;
+   if(hour<currentHour){folded+=items.childElementCount;foldedHours++;if(!showEarlier){visible-=items.childElementCount;continue;}}
    const li=el('li','pm-hour');li.append(el('span','pm-hour-label',String(hour).padStart(2,'0')+' h'),items);list.append(li);
   }
   const body=[nav,el('h2','pm-title',data.label),filters];
+  if(folded){const toggle=el('button','pm-earlier',showEarlier?`Masquer les heures précédentes (${folded} mouvement${folded>1?'s':''})`:`Afficher les heures précédentes · ${foldedHours} heure${foldedHours>1?'s':''}, ${folded} mouvement${folded>1?'s':''}`);toggle.type='button';toggle.setAttribute('aria-expanded',String(showEarlier));toggle.addEventListener('click',()=>{showEarlier=!showEarlier;render();});body.push(toggle);}
   if(!data.events.length)body.push(el('p','pm-empty',data.day<data.today?'Aucune arrivée enregistrée ce jour-là.':'Aucune arrivée prévue ce jour-là pour le moment.'));
-  else if(!visible)body.push(el('p','pm-empty','Aucun mouvement pour ces filtres.'));
+  else if(!visible)body.push(el('p','pm-empty',folded&&!showEarlier?'Plus aucune arrivée prévue pour le reste de la journée.':'Aucun mouvement pour ces filtres.'));
   else body.push(list);
   body.push(el('p','pm-note','Floods et convois déclarés, chasses relevées par UPTEP+ ou déclarées sur Discord. Heures de Paris ; ce ne sont pas des confirmations du jeu.'));
   root.replaceChildren(...body);
-  clearInterval(clock);clock=setInterval(()=>{const now=Date.now()/1000-offset;for(const node of root.querySelectorAll('.pm-left'))node.textContent=left(Number(node.dataset.at)-now);if(isToday)for(const chip of root.querySelectorAll('.pm-item'))chip.classList.toggle('is-past',Number(chip.dataset.at)<=now);},30000);
+  clearInterval(clock);clock=setInterval(()=>{const now=Date.now()/1000-offset;for(const node of root.querySelectorAll('.pm-left'))node.textContent=left(Number(node.dataset.at)-now);if(isToday)for(const chip of root.querySelectorAll('.pm-item'))chip.classList.toggle('is-past',Number(chip.dataset.at)<=now);
+   // A new hour starts: the hour just ended joins the folded ones.
+   if(isToday&&parseInt(paris(now,{hour:'2-digit',hourCycle:'h23'}),10)!==currentHour){data.now=Math.floor(now);render();}},30000);
  }
  return {start(apiFn,container){api=apiFn;root=container;load(null);}};
 })();

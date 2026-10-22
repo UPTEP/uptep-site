@@ -29,7 +29,7 @@ function movementsLeft(int $seconds): string {
 $dayLink=static fn(DateTimeImmutable $d)=>'/mouvements.php'.($d==$today?'':'?jour='.$d->format('Y-m-d'));
 workspaceStart($u,'Mouvements');
 ?>
-<link rel="stylesheet" href="/assets/mouvements.css?v=6"><script src="/assets/mouvements.js?v=3" defer></script>
+<link rel="stylesheet" href="/assets/mouvements.css?v=7"><script src="/assets/mouvements.js?v=6" defer></script>
 <div class="moves-page" data-me="<?= e($me??'') ?>" data-today="<?= $day==$today?'1':'0' ?>">
 <h1>Mouvements</h1>
 <p class="admin-intro">Les arrivées de la journée pour l’alliance : floods, convois et chasses, heure par heure (heure de Paris). Survole ou touche un élément pour le détail.</p>
@@ -47,9 +47,10 @@ workspaceStart($u,'Mouvements');
 <span class="sr-only" data-moves-status aria-live="polite"></span>
 </div>
 <?php if(!$hours): ?><p class="moves-empty"><?= $day<$today?'Aucune arrivée enregistrée ce jour-là.':'Aucune arrivée prévue ce jour-là pour le moment.' ?></p><?php else: ?>
+<button type="button" class="moves-earlier" data-moves-earlier hidden aria-expanded="false"></button>
 <ol class="moves-hours">
 <?php $n=0; foreach($hours as $hour=>$list): ?>
-<li class="moves-hour"><span class="moves-hour-label"><?= sprintf('%02d h',$hour) ?></span><div class="moves-items">
+<li class="moves-hour" data-hour="<?= (int)$hour ?>"><span class="moves-hour-label"><?= sprintf('%02d h',$hour) ?></span><div class="moves-items">
 <?php foreach($list as $ev): $n++; $tip='moves-tip-'.$n; ?>
 <div class="moves-item is-<?= e($ev['type']) ?><?= $day==$today&&$ev['at']<=$now->getTimestamp()?' is-past':'' ?>" tabindex="0" data-type="<?= e($ev['type']) ?>" data-at="<?= (int)$ev['at'] ?>" data-players="<?= e(implode(',',$ev['players'])) ?>" aria-describedby="<?= e($tip) ?>">
 <span class="moves-dot is-<?= e($ev['type']) ?>" aria-hidden="true"></span><span class="moves-time"><?= e($ev['local']->format('H:i')) ?></span><span class="moves-label"><?= e($ev['label']) ?><?php if($ev['type']==='convoy'): ?> · <?= e(movementsFormat($ev['amount'])) ?><?php endif; ?></span><?php if($ev['count']>1): ?><span class="moves-times">×<?= (int)$ev['count'] ?></span><?php endif; ?>

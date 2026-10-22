@@ -42,3 +42,5 @@
 .moves-nav-today{background:#153e50;border-color:#153e50;color:#fff}
 .moves-day-title{margin:0 0 10px;font-size:20px;color:#153e50}
 @media(max-width:700px){.moves-nav{display:grid;grid-template-columns:auto 1fr auto;padding:8px}.moves-nav-step{padding:7px 9px;font-size:18px}.moves-nav-step span{display:none}.moves-nav-form{gap:6px}}
+.moves-earlier{display:block;width:100%;margin:0 0 8px;padding:7px 12px;border:1px dashed #b9c6cb;border-radius:7px;background:#f6f8f7;color:#153e50;font:inherit;font-size:13px;font-weight:700;text-align:left;cursor:pointer}
+.moves-earlier:hover{background:#eef3f5}.moves-earlier:focus-visible{outline:2px solid #254e59;outline-offset:2px}
