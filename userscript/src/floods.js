@@ -33,7 +33,7 @@ function mountFloodDeclarations(context,auth,serverTime){
  });}
  const good=[];
  for(const e of entries){
-  const wrap=doc.createElement('span'),badge=doc.createElement('span'),button=doc.createElement('button');wrap.dataset.uptepFloodUi='1';wrap.style.cssText='display:inline-flex;align-items:center;gap:6px;margin-left:8px;font:11px Verdana;';badge.setAttribute('role','status');badge.style.cssText='padding:3px 5px;background:#e9dfba;border:1px solid #887749;color:#302b18;';button.type='button';button.style.cssText='background:#525543;color:#d3d9b8;border:1px solid #887749;padding:4px 7px;cursor:pointer;';wrap.append(badge,button);e.node.after(wrap);nodes.push(wrap);e.badge=badge;e.button=button;
+  const wrap=doc.createElement('span'),badge=doc.createElement('span'),button=doc.createElement('button');wrap.dataset.uptepFloodUi='1';if(e.game_id)wrap.dataset.uptepFloodGame=e.game_id;wrap.style.cssText='display:inline-flex;align-items:center;gap:6px;margin-left:8px;font:11px Verdana;';badge.setAttribute('role','status');badge.style.cssText='padding:3px 5px;background:#e9dfba;border:1px solid #887749;color:#302b18;';button.type='button';button.style.cssText='background:#525543;color:#d3d9b8;border:1px solid #887749;padding:4px 7px;cursor:pointer;';wrap.append(badge,button);e.node.after(wrap);nodes.push(wrap);e.wrap=wrap;e.badge=badge;e.button=button;
   if(e.error){badge.textContent='À vérifier : relevé non reconnu';badge.title=e.error;button.hidden=true;continue;}
   e.payload={captured_at:e.captured_at,floods:[{game_id:e.game_id,...e.flood}]};good.push(e);
   badge.title=e.warnings.join('\n');badge.textContent='Vérification UPTEP…';button.textContent='Déclarer';button.disabled=true;
@@ -55,5 +55,38 @@ function mountFloodDeclarations(context,auth,serverTime){
   else{e.badge.textContent=e.warnings.length?'Non déclaré · relevé à vérifier':'Non déclaré';e.button.textContent='Déclarer le flood';}
  }
  async function checkAll(){for(let i=0;i<good.length&&!stopped;i+=20){const group=good.slice(i,i+20);try{const result=await api({action:'flood-check',captured_at:group[0].captured_at,floods:group.map(e=>e.payload.floods[0])});for(const e of group){const r=result.floods.find(r=>r.game_id===e.game_id);if(!r)throw Error('Réponse UPTEP incomplète.');render(e,r);}}catch(error){for(const e of group)if(!stopped){e.badge.textContent='Vérification indisponible';e.badge.title=error.message;e.button.disabled=false;e.button.textContent='Vérifier / réessayer';}}}}
- checkAll();return ()=>{stopped=true;for(const cancel of [...jobs])cancel();for(const node of nodes)node.remove();};
+ // The Optizzz extension hides the game's attack lines (and the badges placed after them) and shows its
+ // own rows instead. Move each badge into the matching Optizzz row: same target and place, arrival within
+ // 90 seconds. Rows are matched again whenever Optizzz redraws them; without Optizzz nothing moves.
+ const placeKey=v=>/^terrain/i.test(v||'')?'T':/^d/i.test(v||'')?'D':/^loge/i.test(v||'')?'L':'';
+ const normTroops=v=>String(v||'').normalize('NFC').toLowerCase().replace(/[\s\u00a0\u202f.]+/g,'');
+ const rowSeconds=text=>{let s=0,found=false;for(const m of String(text||'').matchAll(/(\d+)\s*([jhms])/gi)){s+=Number(m[1])*{j:86400,h:3600,m:60,s:1}[m[2].toLowerCase()];found=true;}return found?s:null;};
+ function placeInOptizzz(){
+  const rows=[...doc.querySelectorAll('.optizzz-on-way-row')];if(!rows.length)return;
+  const now=Date.now(),used=new Set();
+  const info=rows.map(row=>{let pseudo=null;const link=row.querySelector('.optizzz-on-way-to a[href*="Membre.php"]');try{pseudo=new URL(link.getAttribute('href'),'https://s5.fourmizzz.fr/').searchParams.get('Pseudo');}catch{}
+   const seconds=rowSeconds(row.querySelector('.optizzz-on-way-left')?.textContent);
+   const troops=normTroops((row.querySelector('.optizzz-attacks-troops')?.getAttribute('title')||'').replace(/^\s*Troupes en attaques?\s*:\s*/i,''));
+   return {troops,pseudo:pseudo?.normalize('NFC')??null,place:placeKey(row.querySelector('.optizzz-attacks-place')?.textContent.trim()),arrival:seconds===null?null:now+seconds*1000,cell:row.querySelector('.optizzz-on-way-actions')||row};});
+  for(const e of entries){
+   if(!e.flood||!e.wrap)continue;const target=Date.parse(e.flood.arrival_at),place=placeKey(e.flood.location),troops=normTroops(e.flood.troops);let best=null;
+   // Identical attacks (same target and time) are told apart by their troops when both sides show them.
+   for(const r of info){if(used.has(r)||r.arrival===null||r.pseudo!==e.flood.pseudo.normalize('NFC')||(r.place&&r.place!==place))continue;const gap=Math.abs(r.arrival-target);if(gap>90000)continue;
+    const score=(troops&&r.troops&&troops!==r.troops?1:0)*1e9+gap;if(!best||score<best.score)best={r,score};}
+   if(!best)continue;used.add(best.r);if(e.wrap.parentNode!==best.r.cell){e.wrap.style.marginLeft='6px';best.r.cell.append(e.wrap);}
+  }
+ }
+ let observer=null;
+ if(typeof win.MutationObserver==='function'){
+  let queued=false;
+  observer=new win.MutationObserver(records=>{
+   if(queued||stopped)return;
+   // Ignore the moves of our own badges, otherwise each placement would trigger the next one.
+   if(records.every(r=>[...r.addedNodes,...r.removedNodes].every(n=>n.nodeType===1&&n.dataset?.uptepFloodUi)))return;
+   queued=true;win.setTimeout(()=>{queued=false;if(!stopped)placeInOptizzz();},50);
+  });
+  observer.observe(doc.getElementById('centre')||doc.body,{childList:true,subtree:true});
+ }
+ placeInOptizzz();
+ checkAll();return ()=>{stopped=true;observer?.disconnect();for(const cancel of [...jobs])cancel();for(const node of nodes)node.remove();};
 }
