@@ -47,7 +47,7 @@ function convoyPrepare(array $m): array {
         $now=new DateTimeImmutable('now',new DateTimeZone('UTC'));$duration=post('duree');
         if(post('rapport')!==''){
             $d=botDemand(db(),$id);$report=preg_replace('/\s+/u',' ',str_replace('**','',trim(post('rapport'))));
-            if(!preg_match('/\A(?:-\s*)?Vous allez livrer (\d[\d ]*)(?: nourritures?)? et (\d[\d ]*)(?: mat[eé]riaux?)? [àa] (.+?) dans ((?:\d+\s*[jHhms]\s*)+)(?:\s*-\s*Retour le [^-]+)?(?:\s*-\s*Annuler)?(?:\s*-)?\s*\z/u',$report,$match))throw new DomainException('Rapport de convoi non reconnu. Colle la ligne « Vous allez livrer… ».',422);
+            if(!preg_match('/\A(?:-\s*)?Vous allez livrer (\d[\d ]*)(?: nourritures?)? et (\d[\d ]*)(?: mat[eé]riaux?)? [àa] (.+?) dans ((?:\d+\s*[jHhms]\s*)+)(?:[·•]\s*arriv[ée]e\s+[^-·•]*)?(?:\s*-\s*Retour le [^-]+)?(?:\s*-\s*Annuler)?(?:\s*-)?\s*\z/u',$report,$match))throw new DomainException('Rapport de convoi non reconnu. Colle la ligne « Vous allez livrer… ».',422);
             if(mb_strtolower(trim($match[3]))!==mb_strtolower($d['pseudo_demandeur']))throw new DomainException('Le destinataire du rapport ne correspond pas à cette demande.',422);
             $body['nbpomme']=convoyQuantity($match[1]);$body['nbmateriaux']=convoyQuantity($match[2]);$duration=$match[4];
         }
