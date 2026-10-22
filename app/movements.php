@@ -58,3 +58,17 @@ function movementsDay(DateTimeImmutable $day,DateTimeImmutable $today): string {
     $diff=(int)$today->diff($day)->format('%r%a');
     return ($diff===0?'Aujourd’hui · ':($diff===1?'Demain · ':($diff===-1?'Hier · ':''))).$label;
 }
+
+/** UPTEP+ in the game (Alliance › Mouvements): the same day view, as JSON for the portal iframe. */
+function scriptMovements(array $actor,array $body): array {
+    if(array_diff(array_keys($body),['action','pseudo','alliance','day']))throw new DomainException('Champ inconnu.',422);
+    $zone=new DateTimeZone('Europe/Paris');$now=new DateTimeImmutable('now',$zone);$today=$now->setTime(0,0);
+    $day=movementsDayParam($body['day']??null,$today);$first=new DateTimeImmutable(MOVEMENTS_FIRST_DAY,$zone);$last=$today->modify('+31 days');
+    $nav=static fn(DateTimeImmutable $d)=>$d<$first||$d>$last?null:['day'=>$d->format('Y-m-d'),'label'=>movementsDay($d,$today)];
+    $events=array_map(static function(array $e):array{
+        $details=[];foreach($e['details'] as $k=>$v)$details[]=[$k,(string)$v];
+        return ['type'=>$e['type'],'at'=>$e['at'],'label'=>$e['label'],'amount'=>$e['amount']??null,'players'=>$e['players'],'details'=>$details];
+    },movementsData($day,$day->modify('+1 day')));
+    return ['day'=>$day->format('Y-m-d'),'label'=>movementsDay($day,$today),'today'=>$today->format('Y-m-d'),'first'=>$first->format('Y-m-d'),'last'=>$last->format('Y-m-d'),
+        'prev'=>$nav($day->modify('-1 day')),'next'=>$nav($day->modify('+1 day')),'now'=>$now->getTimestamp(),'me'=>(string)$actor['game_player_id'],'events'=>$events];
+}

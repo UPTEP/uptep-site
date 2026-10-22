@@ -7,6 +7,8 @@
  const profileMode=new URLSearchParams(location.search).get('profile')==='1';
  const memberReportMode=new URLSearchParams(location.search).get('memberReport')==='1';
  if(profileMode||memberReportMode)document.body.classList.add('player-profile-mode');
+ const movementsMode=new URLSearchParams(location.search).get('mouvements')==='1';
+ if(movementsMode)document.body.classList.add('movements-mode');
  let memberTarget=null;
  const bridgeOnly=new URLSearchParams(location.search).get('bridge')==='1';
  let auth=null,parentOrigin='',kind='players',suggestions=[],selected=-1,timer=null,suggestVersion=0,searchVersion=0,requestController=null;
@@ -28,6 +30,7 @@
    catch(e){send({type:'uptep-convoy-result',ok:false,requestId:job?.requestId,error:e.message,status:e.status||0});}return;
   }
   if(bridgeOnly){try{const collection=event.data.collection;if(!collection||!['buildings','research','army','economy','hunts','hunts_seen'].includes(collection.group))throw Error('Relevé invalide.');await api({action:'collect',group:collection.group,values:collection.values});send({type:'uptep-collection-result',ok:true,requestId:collection.requestId});}catch(e){send({type:'uptep-collection-result',ok:false,error:e.message,requestId:event.data.collection?.requestId});}return;}
+  if(movementsMode){status.textContent='';$('movements').hidden=false;window.uptepMovements.start(api,$('movements'));return;}
   if(memberReportMode){memberTarget=event.data.memberReport;await loadMemberReport('30');return;}
   if(profileMode){try{const target=event.data.playerProfile;if(!target||typeof target.pseudo!=='string'||!target.pseudo.trim()||target.pseudo.length>100)throw Error('Joueur du profil non reconnu.');input.value=target.pseudo;status.textContent='';$('statistics').hidden=false;await search(target.player_id||null);}catch(e){status.textContent=e.message;}return;}
   try{settings=await api({action:'settings'});renderSettings();if(!settings.preferences.statistics){status.textContent='';showMenu('settings');return;}const data=await api({action:'overview'});status.textContent='';$('statistics').hidden=false;results.append(el('p','welcome',`${fmt(data.counts.players)} joueurs et ${fmt(data.counts.alliances)} alliances. Recherche une fiche pour consulter ses statistiques.`));send({type:'uptep-height',height:document.body.scrollHeight+12});}catch(e){status.textContent=e.message;}

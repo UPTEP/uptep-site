@@ -8,6 +8,7 @@ require '/home/uptep/private/app/script-settings.php';
 require '/home/uptep/private/app/script-convoys.php';
 require '/home/uptep/private/app/script-floods.php';
 require '/home/uptep/private/app/member-report.php';
+require '/home/uptep/private/app/movements.php';
 header('Content-Type: application/json; charset=utf-8');
 try{
  if($_SERVER['REQUEST_METHOD']!=='POST')throw new DomainException('Méthode refusée.',405);
@@ -16,6 +17,7 @@ try{
  $header=$_SERVER['HTTP_AUTHORIZATION']??'';$token=str_starts_with($header,'Bearer ')?substr($header,7):'';
  $actor=authorizeScript($token,$body['pseudo'],$body['alliance']);
  if(($body['action']??'')==='member-report')$result=memberReport(db(),db(true),$actor,$body);
+ elseif(($body['action']??'')==='movements')$result=scriptMovements($actor,$body);
  elseif(in_array($body['action']??'', SCRIPT_CONVOY_ACTIONS,true))$result=scriptConvoys(db(),db(true),$actor,$body);
  elseif(in_array($body['action']??'', ['flood-check','flood-declare'],true))$result=scriptFloods(db(),db(true),$actor,$body);
  elseif(in_array($body['action']??'', ['settings','save-settings','collect'],true))$result=scriptSettingsAction($actor,$body);

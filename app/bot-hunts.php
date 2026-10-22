@@ -19,9 +19,19 @@ function huntDeclare(PDO $p,PDO $game,array $b): array {
  return ['ok'=>true,'count'=>$count]+huntList($p,$game,['discord_id'=>$actor['discord']]);
 }
 
-/** Hunts in progress of the interaction author only. */
+/** Hunts in progress: the interaction author's own ("self", default) or the whole alliance's ("all", 10 per page). */
 function huntList(PDO $p,PDO $game,array $b): array {
  $actor=botActor($p,$game,botNumber($b['discord_id']??null,true),false);
+ $scope=$b['scope']??'self';if(!in_array($scope,['self','all'],true))throw new DomainException('Liste invalide.',422);
+ if($scope==='all'){
+  $page=(int)botNumber($b['page']??'1',true);if($page>100000)throw new DomainException('Page invalide.',422);
+  $sum=$p->query("SELECT count(*)::int AS total,coalesce(sum(area),0)::text AS area FROM script_hunts WHERE cancelled_at IS NULL AND arrival_at>now()")->fetch(PDO::FETCH_ASSOC);
+  $pages=max(1,(int)ceil($sum['total']/10));$page=min($page,$pages);
+  $q=$p->prepare("SELECT player_id::text,area::text,arrival_at,source FROM script_hunts WHERE cancelled_at IS NULL AND arrival_at>now() ORDER BY arrival_at,id LIMIT 10 OFFSET ".(($page-1)*10));$q->execute();$rows=$q->fetchAll(PDO::FETCH_ASSOC);
+  $names=[];if($rows){$ids=array_values(array_unique(array_column($rows,'player_id')));$q=$game->prepare("SELECT player_id::text,pseudo FROM players WHERE server='s5' AND player_id IN (".implode(',',array_fill(0,count($ids),'?')).")");$q->execute($ids);foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r)$names[$r['player_id']]=$r['pseudo'];}
+  $hunts=array_map(static fn($r)=>['pseudo'=>$names[$r['player_id']]??('Joueur '.$r['player_id']),'area'=>$r['area'],'arrival_at'=>(new DateTimeImmutable($r['arrival_at']))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),'source'=>$r['source']],$rows);
+  return ['ok'=>true,'hunts'=>$hunts,'total'=>$sum['total'],'area'=>$sum['area'],'page'=>$page,'pages'=>$pages];
+ }
  $q=$p->prepare("SELECT area::text,arrival_at,source,game_hunt_id IS NOT NULL AS exact FROM script_hunts WHERE player_id=? AND cancelled_at IS NULL AND arrival_at>now() ORDER BY arrival_at,id LIMIT 50");
  $q->execute([$actor['id']]);
  $rows=array_map(static fn($r)=>['area'=>$r['area'],'arrival_at'=>(new DateTimeImmutable($r['arrival_at']))->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),'source'=>$r['source'],'exact'=>(bool)$r['exact']],$q->fetchAll(PDO::FETCH_ASSOC));

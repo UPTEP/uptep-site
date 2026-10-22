@@ -6,9 +6,14 @@ const portalPath='/alliance.php?uptep=1';
 const entry=doc.createElement('li');entry.id='uptep-plus-alliance-entry';
 const entryLink=doc.createElement('a');entryLink.className='boutonHome';entryLink.href=portalPath;
 const entryIcon=doc.createElement('span');entryIcon.setAttribute('aria-hidden','true');entryLink.append(entryIcon,doc.createTextNode('UPTEP+'));entry.appendChild(entryLink);
+// Alliance › Mouvements: the alliance's arrivals of the day (floods, convoys, hunts), same page as on uptep.top.
+const movesEntry=doc.createElement('li');movesEntry.id='uptep-movements-alliance-entry';
+const movesLink=doc.createElement('a');movesLink.dataset.uptepMovements='1';movesLink.href='/alliance.php?uptep=mouvements';
+const movesIcon=doc.createElement('span');movesIcon.setAttribute('aria-hidden','true');movesIcon.style.backgroundPosition='-100px -302px';movesLink.append(movesIcon,doc.createTextNode('Mouvements'));movesEntry.appendChild(movesLink);
+const uptepMode=win.location.pathname==='/alliance.php'?new URLSearchParams(win.location.search).get('uptep'):null;
 const portal=doc.createElement('section');portal.id='uptep-plus-page';portal.setAttribute('aria-label','Espace UPTEP+');
 portal.style.cssText='box-sizing:border-box;margin:0;width:100%;position:relative;';
-const frame=doc.createElement('iframe');frame.src='https://uptep.top/portal.php';frame.title='Espace UPTEP+';frame.referrerPolicy='no-referrer';frame.style.cssText='display:block;width:100%;height:850px;border:0;border-radius:0;background:#c9ad63;';
+const frame=doc.createElement('iframe');frame.src=uptepMode==='mouvements'?'https://uptep.top/portal.php?mouvements=1':'https://uptep.top/portal.php';frame.title=uptepMode==='mouvements'?'Mouvements de l’alliance':'Espace UPTEP+';frame.referrerPolicy='no-referrer';frame.style.cssText='display:block;width:100%;height:850px;border:0;border-radius:0;background:#c9ad63;';
 portal.appendChild(frame);
 function sendAuth(){if(typeof uptepPortalAuth!=='undefined')frame.contentWindow?.postMessage({type:'uptep-auth',token:uptepPortalAuth.token,pseudo:context.pseudo,...(collection?{collection}: {})},'https://uptep.top');}
 function receivePortal(event){
@@ -23,9 +28,9 @@ collectionStatus.textContent=event.data.ok?(collection.group.startsWith('hunts')
 frame.addEventListener('load',sendAuth);win.addEventListener('message',receivePortal);
 const savedDisplay=new Map();
 let centrePadding=null;
-const isPortal=win.location.pathname==='/alliance.php' && new URLSearchParams(win.location.search).get('uptep')==='1';
+const isPortal=uptepMode==='1'||uptepMode==='mouvements';
 function mountPortal(){
- const menu=doc.getElementById('menuAlliance');if(menu && entry.parentNode!==menu)menu.appendChild(entry);
+ const menu=doc.getElementById('menuAlliance');if(menu && entry.parentNode!==menu)menu.appendChild(entry);if(menu && movesEntry.parentNode!==menu)menu.appendChild(movesEntry);
  if(!isPortal)return;
  const centre=doc.getElementById('centre');if(!centre)return;
  // Keep the native navigation and player identity DOM; only hide the original page content.
@@ -97,4 +102,4 @@ const cleanupMemberReport=preferences.playerProfile===false||typeof uptepMemberR
 position();
 const timer=win.setInterval(position,1000);
 win.addEventListener('resize',position);
-return ()=>{win.clearTimeout(huntTimeout);huntBadges?.remove();cleanupMemberReport();cleanupPlayerProfile();cleanupFloodDeclarations();cleanupConstructionDemands();cleanupConvoys();cleanupMultiflood();cleanupTraffic();cleanupLaboratory();cleanupHourly();win.clearTimeout(armyTimeout);armyTools.remove();cleanupClock();cleanupChaine();win.removeEventListener('message',receivePortal);frame.removeEventListener('load',sendAuth);win.clearInterval(timer);win.removeEventListener('resize',position);panel.remove();entry.remove();portal.remove();for(const [element,[value,priority]] of savedDisplay){if(value)element.style.setProperty('display',value,priority);else element.style.removeProperty('display');}savedDisplay.clear();if(centrePadding){const [element,value,priority]=centrePadding;if(value)element.style.setProperty('padding-top',value,priority);else element.style.removeProperty('padding-top');}};
+return ()=>{win.clearTimeout(huntTimeout);huntBadges?.remove();cleanupMemberReport();cleanupPlayerProfile();cleanupFloodDeclarations();cleanupConstructionDemands();cleanupConvoys();cleanupMultiflood();cleanupTraffic();cleanupLaboratory();cleanupHourly();win.clearTimeout(armyTimeout);armyTools.remove();cleanupClock();cleanupChaine();win.removeEventListener('message',receivePortal);frame.removeEventListener('load',sendAuth);win.clearInterval(timer);win.removeEventListener('resize',position);panel.remove();entry.remove();movesEntry.remove();portal.remove();for(const [element,[value,priority]] of savedDisplay){if(value)element.style.setProperty('display',value,priority);else element.style.removeProperty('display');}savedDisplay.clear();if(centrePadding){const [element,value,priority]=centrePadding;if(value)element.style.setProperty('padding-top',value,priority);else element.style.removeProperty('padding-top');}};
