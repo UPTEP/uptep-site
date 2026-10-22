@@ -21,16 +21,23 @@ function readArmyFloods(doc,at){
  }
  return out;
 }
-function mountFloodDeclarations(context,auth,serverTime){
- const {document:doc,window:win}=context;if(win.location.pathname.toLowerCase()!=='/armee.php'||!auth)return ()=>{};
- let stopped=false;const jobs=new Set(),nodes=[],at=Date.parse(serverTime)||Date.now();
- const entries=readArmyFloods(doc,at);if(!entries.length)return ()=>{};
- function api(payload){return new Promise((resolve,reject)=>{
+// Flood actions through the UPTEP portal (hidden iframe, token sent by postMessage), one iframe per call.
+// Shared by the Armée page declarations and the Multiflood tool.
+function uptepFloodBridge(context,auth){
+ const {document:doc,window:win}=context;const jobs=new Set();
+ function call(payload){return new Promise((resolve,reject)=>{
   const frame=doc.createElement('iframe');frame.hidden=true;frame.src='https://uptep.top/portal.php?bridge=convoys';frame.title='Déclarations des floods UPTEP';frame.referrerPolicy='no-referrer';const requestId=win.crypto.randomUUID();let timer;
   const cancel=()=>finish(Error('Module rechargé.'));function finish(error,result){win.clearTimeout(timer);win.removeEventListener('message',receive);frame.remove();jobs.delete(cancel);error?reject(error):resolve(result);}
   function receive(event){if(event.origin!=='https://uptep.top'||event.source!==frame.contentWindow)return;if(event.data?.type==='uptep-ready')frame.contentWindow.postMessage({type:'uptep-auth',token:auth.token,pseudo:context.pseudo,convoy:{...payload,requestId}},'https://uptep.top');if(event.data?.type==='uptep-convoy-result'&&event.data.requestId===requestId)finish(event.data.ok?null:Error(event.data.error||'UPTEP indisponible.'),event.data.result);}
   jobs.add(cancel);win.addEventListener('message',receive);timer=win.setTimeout(()=>finish(Error('UPTEP ne répond pas. Réessaie la vérification.')),20000);doc.body.append(frame);
  });}
+ return {call,cancelAll(){for(const cancel of [...jobs])cancel();}};
+}
+function mountFloodDeclarations(context,auth,serverTime){
+ const {document:doc,window:win}=context;if(win.location.pathname.toLowerCase()!=='/armee.php'||!auth)return ()=>{};
+ let stopped=false;const nodes=[],at=Date.parse(serverTime)||Date.now();
+ const entries=readArmyFloods(doc,at);if(!entries.length)return ()=>{};
+ const bridge=uptepFloodBridge(context,auth);const api=bridge.call;
  const good=[];
  for(const e of entries){
   const wrap=doc.createElement('span'),badge=doc.createElement('span'),button=doc.createElement('button');wrap.dataset.uptepFloodUi='1';if(e.game_id)wrap.dataset.uptepFloodGame=e.game_id;wrap.style.cssText='display:inline-flex;align-items:center;gap:6px;margin-left:8px;font:11px Verdana;';badge.setAttribute('role','status');badge.style.cssText='padding:3px 5px;background:#e9dfba;border:1px solid #887749;color:#302b18;';button.type='button';button.style.cssText='background:#525543;color:#d3d9b8;border:1px solid #887749;padding:4px 7px;cursor:pointer;';wrap.append(badge,button);e.node.after(wrap);nodes.push(wrap);e.wrap=wrap;e.badge=badge;e.button=button;
@@ -88,5 +95,5 @@ function mountFloodDeclarations(context,auth,serverTime){
   observer.observe(doc.getElementById('centre')||doc.body,{childList:true,subtree:true});
  }
  placeInOptizzz();
- checkAll();return ()=>{stopped=true;observer?.disconnect();for(const cancel of [...jobs])cancel();for(const node of nodes)node.remove();};
+ checkAll();return ()=>{stopped=true;observer?.disconnect();bridge.cancelAll();for(const node of nodes)node.remove();};
 }

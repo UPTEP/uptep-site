@@ -93,7 +93,7 @@ const cleanupClock=preferences.clock===false?()=>{}:mountClock(context,content);
 const cleanupChaine=preferences.chaine===false?()=>{}:mountChaine(context,typeof uptepChaineData==='undefined'?null:uptepChaineData);
 const cleanupLaboratory=preferences.laboratory===false?()=>{}:mountLaboratory(context,typeof uptepLaboratoryData==='undefined'?null:uptepLaboratoryData);
 const cleanupTraffic=preferences.traffic===false?()=>{}:mountTraffic(context,typeof uptepTrafficData==='undefined'?null:uptepTrafficData,typeof uptepTrafficServerTime==='undefined'?null:uptepTrafficServerTime);
-const cleanupMultiflood=preferences.multiflood===false?()=>{}:mountMultiflood(context,typeof uptepChaineData==='undefined'?null:uptepChaineData);
+const cleanupMultiflood=preferences.multiflood===false?()=>{}:mountMultiflood(context,typeof uptepChaineData==='undefined'?null:uptepChaineData,typeof uptepPortalAuth==='undefined'?null:uptepPortalAuth);
 const cleanupConvoys=preferences.convoys===false?()=>{}:mountConvoys(context,typeof uptepPortalAuth==='undefined'?null:uptepPortalAuth,typeof uptepTrafficServerTime==='undefined'?null:uptepTrafficServerTime,typeof uptepChaineData==='undefined'?null:uptepChaineData);
 const cleanupConstructionDemands=preferences.convoys===false?()=>{}:mountConstructionDemands(context,typeof uptepPortalAuth==='undefined'?null:uptepPortalAuth);
 const cleanupFloodDeclarations=preferences.floodDeclarations===false?()=>{}:mountFloodDeclarations(context,typeof uptepPortalAuth==='undefined'?null:uptepPortalAuth,typeof uptepTrafficServerTime==='undefined'?null:uptepTrafficServerTime);

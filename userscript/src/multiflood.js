@@ -147,7 +147,7 @@ function multifloodCampaignPlan(draft,native,records,arrivals){
  }
  return plans;
 }
-function mountMultiflood(context,data){
+function mountMultiflood(context,data,auth){
  const doc=context.document,win=context.window;
  if(!data||!Array.isArray(data.players)||win.location.pathname.toLowerCase()!=='/alliance.php')return ()=>{};
  const params=new URLSearchParams(win.location.search),isPage=params.get('uptepMultiflood')==='1',isMembers=params.has('Membres');
@@ -372,6 +372,26 @@ function mountMultiflood(context,data){
   }catch(e){showStatus(e.message,id);}
   finally{if(!disposed){renderForm();calculate();lock(false);}}
  }
+ // Record the floods just sent in UPTEP, like a declaration from the Armée page: read the attack ids on
+ // Armée.php, keep the newest attacks towards this target (the series just sent), and declare each one.
+ // Declaring is idempotent on the attack id, so a second pass never doubles a flood.
+ let bridge=null;
+ async function recordFloods(target,record){
+  if(!auth)return 'non enregistrés sur UPTEP : accès UPTEP+ indisponible. Déclare-les depuis la page Armée.';
+  bridge??=uptepFloodBridge(context,auth);
+  const wanted=target.pseudo.normalize('NFC').toLowerCase();
+  const entries=readArmyFloods(html(await request('/Armee.php')),serverNow()).filter(e=>e.flood&&e.flood.pseudo.normalize('NFC').toLowerCase()===wanted);
+  // Attack ids grow over time: the series just sent holds the highest ones. Its arrival must also be near the planned one.
+  const sent=entries.sort((a,b)=>(BigInt(b.game_id)>BigInt(a.game_id)?1:-1)).slice(0,record.count).filter(e=>Math.abs(Date.parse(e.flood.arrival_at)-record.arrivalAt)<=600000);
+  let saved=0,failure='';
+  for(const e of sent){
+   try{const r=await bridge.call({action:'flood-declare',captured_at:e.captured_at,floods:[{game_id:e.game_id,...e.flood}],confirmed:true});if(['declared','existing'].includes(r?.state))saved++;}
+   catch(error){failure||=error.message;}
+  }
+  record.recorded=saved;saveLedger();
+  if(saved===record.count)return saved+' flood(s) enregistré(s) sur UPTEP.';
+  return saved+'/'+record.count+' flood(s) enregistré(s) sur UPTEP'+(failure?' ('+failure+')':'')+'. Déclare les autres depuis la page Armée.';
+ }
  async function sendTarget(id){
   if(busy||unresolved()||ledger.targets[id]||prepared?.id!==id)return;
   if(win.performance.now()-prepared.checkedAt>90000){prepared=null;updateTiming();showStatus('Préparation expirée : revérifie cette cible avant l’envoi.');return;}
@@ -396,7 +416,9 @@ function mountMultiflood(context,data){
    const after=await getNative();
    if(batch.before.slots-after.slots!==batch.plan.attacks.length||BigInt(batch.before.army)-BigInt(after.army)!==batch.plan.sent)throw Error('Le résultat complet n’a pas pu être confirmé.');
    record.state='done';saveLedger();native=after;
-   showStatus(target.pseudo+' : '+record.count+' attaque(s) enregistrée(s). Tu peux préparer le joueur suivant.');
+   showStatus(target.pseudo+' : '+record.count+' attaque(s) envoyée(s). Enregistrement sur UPTEP…');
+   let recorded;try{recorded=await recordFloods(target,record);}catch(e){recorded='non enregistrés sur UPTEP ('+e.message+'). Déclare-les depuis la page Armée.';}
+   showStatus(target.pseudo+' : '+record.count+' attaque(s) envoyée(s) · '+recorded+' Tu peux préparer le joueur suivant.',id);
   }catch(e){
    if(attempted){ledger.targets[id]={...ledger.targets[id],state:'uncertain'};try{saveLedger();}catch{}showStatus(e.message+'\nVérifie la page Armée. Aucun renvoi automatique.');}
    else showStatus(e.message);
@@ -429,5 +451,5 @@ function mountMultiflood(context,data){
    timingTimer=win.setInterval(updateTiming,100);
   }
  }
- return ()=>{disposed=true;win.clearInterval(timer);win.clearInterval(timingTimer);for(const controller of controllers)controller.abort();for(const n of added)n.remove();tools?.remove();page?.remove();style.remove();for(const [child,[display,priority]] of hidden){if(display)child.style.setProperty('display',display,priority);else child.style.removeProperty('display');}};
+ return ()=>{bridge?.cancelAll();disposed=true;win.clearInterval(timer);win.clearInterval(timingTimer);for(const controller of controllers)controller.abort();for(const n of added)n.remove();tools?.remove();page?.remove();style.remove();for(const [child,[display,priority]] of hidden){if(display)child.style.setProperty('display',display,priority);else child.style.removeProperty('display');}};
 }
