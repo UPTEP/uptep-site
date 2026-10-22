@@ -63,7 +63,7 @@ function hcDetailSources(array $ids):array{
         $out['convoys_in'][(string)$r['iddemandeur']][]=$r;
     }
     // Hunts in progress read by UPTEP+ (opt-in), and each player's last hunt collection.
-    foreach(db()->query("SELECT player_id::text,area::text,arrival_at FROM script_hunts WHERE cancelled_at IS NULL AND arrival_at>now() ORDER BY arrival_at,id") as $r)$out['hunts'][$r['player_id']][]=$r;
+    foreach(db()->query("SELECT player_id::text,area::text,arrival_at,source FROM script_hunts WHERE cancelled_at IS NULL AND arrival_at>now() ORDER BY arrival_at,id") as $r)$out['hunts'][$r['player_id']][]=$r;
     foreach(db()->query("SELECT u.game_player_id::text AS player_id,max(s.hunts_synced_at) AS synced,bool_or(coalesce((s.preferences->>'hunts')::boolean,false)) AS enabled FROM users u JOIN script_settings s ON s.user_id=u.id WHERE u.status='active' AND u.game_player_id IS NOT NULL GROUP BY u.game_player_id") as $r)$out['hunts_sync'][$r['player_id']]=$r;
     // Floods still on their way, indexed by sender and by target (both are game player ids).
     $q=db()->query("SELECT sender_id,sender_pseudo,target_id,target_pseudo,location,troops,arrival_at FROM floods WHERE arrival_at>now() ORDER BY arrival_at,id");
@@ -141,8 +141,8 @@ function hcDetailHtml(array $row,array $src,?array $chain):string{
     if(!$hunts)$html.=hcSection('Chasses en cours','<p class="hc-detail-empty">Aucune chasse en cours enregistrée.</p>',$note);
     else{
         $total=array_sum(array_map(static fn($h)=>(int)$h['area'],$hunts));
-        $body='<table class="hc-detail-table"><thead><tr><th scope="col">Surface</th><th scope="col">Arrive le (heure de Paris)</th></tr></thead><tbody>';
-        foreach($hunts as $h)$body.='<tr><td>'.e(hcGroup($h['area'])).' cm²</td><td>'.e(hcDate($h['arrival_at'])).'</td></tr>';
+        $body='<table class="hc-detail-table"><thead><tr><th scope="col">Surface</th><th scope="col">Arrive le (heure de Paris)</th><th scope="col">Source</th></tr></thead><tbody>';
+        foreach($hunts as $h)$body.='<tr><td>'.e(hcGroup($h['area'])).' cm²</td><td>'.e(hcDate($h['arrival_at'])).'</td><td>'.($h['source']==='discord'?'Discord':'UPTEP+').'</td></tr>';
         $html.=hcSection('Chasses en cours',$body.'</tbody></table><p class="hc-detail-note">Total : '.e(hcGroup((string)$total)).' cm² à venir.</p>',count($hunts).' · '.$note);
     }
     // Floods in progress, sent and received
