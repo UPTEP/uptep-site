@@ -1,5 +1,5 @@
 <?php declare(strict_types=1); ?>
-<link rel="stylesheet" href="/assets/convoy-daily.css?v=6">
+<link rel="stylesheet" href="/assets/convoy-daily.css?v=9">
 <?php $c=$data['consumption']??null;$cIn=fn($k)=>is_string($_GET[$k]??null)?$_GET[$k]:''; ?>
 <section class="conso" aria-labelledby="conso-title">
 <form method="get" class="convoy-filters"><input type="hidden" name="vue" value="statistiques"><?php foreach(['ressource','sens','joueur'] as $k)if($cIn($k)!==''):?><input type="hidden" name="<?=e($k)?>" value="<?=e($cIn($k))?>"><?php endif;?>
@@ -32,18 +32,43 @@
 <p>Du <?=e($data['start'])?> au <?=e($data['end'])?> · heure de Paris. <strong>Aujourd’hui est une journée en cours.</strong></p>
 <p class="daily-note">Les envois et réceptions déclarés sont regroupés par date de départ du convoi. Seuls les convois non annulés contenant la ressource choisie sont comptés. La moyenne par jour est le total divisé par 7, jours sans convoi inclus.</p>
 <p class="daily-note">Production : calculée à partir du TdC des exports Fourmizzz, à raison d’une ressource par cm² de terrain de chasse et par cycle de 30 minutes, soit TdC × 48 par jour (nourriture et matériaux confondus). Pour l’alliance, c’est le TdC moyen cumulé de tous les joueurs affichés. C’est une production théorique : colonies, consommation et stocks ne sont pas pris en compte. La production moyenne sur 7 jours utilise les jours qui ont au moins un relevé.</p>
-<p class="daily-note">TdC : moyenne des relevés disponibles pour le joueur ce jour-là ; leur nombre est indiqué sous la valeur. « — » signifie qu’aucun relevé n’est disponible.</p>
+<p class="daily-note">TdC : moyenne des relevés disponibles pour le joueur ce jour-là ; survole la valeur pour voir leur nombre. Pour le total de l’alliance, une valeur en italique est partielle : certains joueurs n’ont pas de relevé ce jour-là. « — » signifie qu’aucune donnée n’est disponible. Le TdC n’a pas de total sur 7 jours, seulement une moyenne.</p>
 <div class="users-panel users-scroll daily-scroll" tabindex="0" role="region" aria-label="Statistiques quotidiennes, tableau défilant horizontalement">
-<table class="users-table daily-table"><caption class="daily-caption"><?= $data['resource']==='pommes'?'Pommes':'Matériaux'?> · <?=$data['direction']==='envois'?'Livraisons envoyées':'Réceptions'?></caption>
-<thead><tr><th scope="col">Pseudo</th><?php foreach($data['days'] as $day):?><th scope="col"><?=e($day['label'])?><br><small><?=e($day['display'])?></small></th><?php endforeach;?><th scope="col">Bilan sur 7 jours</th></tr></thead>
-<tbody>
+<?php
+// Four rows per player, labels in their own column: the cells hold numbers only.
+$isSend=$data['direction']==='envois';
+$metrics=[['tdc','TdC moyen'],['production','Production / jour'],['count',$isSend?'Envois':'Réceptions'],['quantity',$isSend?'Total livré':'Total reçu']];
+$dailyValue=static fn(array $v,string $k):?string=>$k==='production'?convoyProduction($v['tdc']):$v[$k];
+// 7-day columns: total and average per day (TdC has no total; its average is the 7-day mean).
+$summary=static function(array $days,array $r,string $k):array{
+    $avgTdc=convoyTdcAverage($days);
+    if($k==='tdc')return [null,$avgTdc];
+    if($k==='production'){$sum=0.0;$any=false;foreach($days as $d)if(isset($d['tdc'])&&is_numeric($d['tdc'])){$sum+=(float)$d['tdc']*48;$any=true;}return [$any?(string)round($sum):null,convoyProduction($avgTdc)];}
+    if($k==='count')return [$r['total_count'],(string)round((float)$r['total_count']/7,2)];
+    return [$r['total_quantity'],$r['daily_average']];
+};
+$group=static function(string $name,string $sub,array $days,array $r,bool $total)use($metrics,$dailyValue,$summary,$data){
+    $n=count($metrics);
+    foreach($metrics as $index=>[$k,$label]){
+        echo '<tr class="daily-row'.($index===0?' is-first':'').($total?' daily-grand-total':'').'" data-metric="'.e($k).'">';
+        if($index===0)echo '<th scope="rowgroup" rowspan="'.$n.'" class="daily-player">'.e($name).($sub!==''?'<small>'.e($sub).'</small>':'').'</th>';
+        echo '<th scope="row" class="daily-metric-name">'.e($label).'</th>';
+        foreach($data['days'] as $day){
+            $v=$days[$day['date']];$value=$dailyValue($v,$k);$title='';$cls='';
+            if($k==='tdc'){
+                if($total){$title=$v['covered'].' / '.$data['totals']['members'].' joueurs avec relevés';if($v['covered']<$data['totals']['members']&&$v['tdc']!==null)$cls=' is-partial';}
+                else $title=$v['samples'].' relevé'.($v['samples']!==1?'s':'');
+            }
+            echo '<td class="daily-num'.$cls.'"'.($title!==''?' title="'.e($title).'"':'').'>'.convoyStatCompact($value).'</td>';
+        }
+        [$sum,$avg]=$summary($days,$r,$k);
+        echo '<td class="daily-num daily-total">'.convoyStatCompact($sum).'</td><td class="daily-num daily-total">'.convoyStatCompact($avg).'</td></tr>';
+    }
+};
+?>
+<table class="users-table daily-table"><caption class="daily-caption"><?= $data['resource']==='pommes'?'Pommes':'Matériaux'?> · <?=$isSend?'Livraisons envoyées':'Réceptions'?></caption>
+<thead><tr><th scope="col">Pseudo</th><th scope="col">Indicateur</th><?php foreach($data['days'] as $day):?><th scope="col"><?=e($day['label'])?><br><small><?=e($day['display'])?></small></th><?php endforeach;?><th scope="col">Total 7 jours</th><th scope="col">Moyenne / jour</th></tr></thead>
 <?php $t=$data['totals']; ?>
-<tr class="daily-grand-total"><th scope="row">Total<small><?=$t['members']?> joueur<?=$t['members']!==1?'s':''?> affiché<?=$t['members']!==1?'s':''?></small></th>
-<?php foreach($data['days'] as $day):$v=$t['days'][$day['date']];?><td>
-<div class="daily-metric"><span>TdC moyen cumulé</span><strong><?=convoyStatCompact($v['tdc'])?></strong><small><?=$v['covered']?> / <?=$t['members']?> joueurs avec relevés<?=$v['covered']<$t['members']?' · partiel':''?></small></div>
-<div class="daily-metric"><span>Production / jour</span><strong><?=convoyStatCompact(convoyProduction($v['tdc']))?></strong></div>
-<div class="daily-metric"><span><?=$data['direction']==='envois'?'Envois':'Réceptions'?></span><strong><?=convoyStatCompact($v['count'])?></strong></div>
-<div class="daily-metric"><span><?=$data['direction']==='envois'?'Total livré':'Total reçu'?></span><strong><?=convoyStatCompact($v['quantity'])?></strong></div></td><?php endforeach;?>
-<td class="daily-total"><?php $avgTdc=convoyTdcAverage($t['days']); ?><div class="daily-metric"><span>TdC moyen (7 jours)</span><strong><?=convoyStatCompact($avgTdc)?></strong></div><div class="daily-metric"><span>Production moyenne / jour</span><strong><?=convoyStatCompact(convoyProduction($avgTdc))?></strong></div><div class="daily-metric"><span>Total des convois</span><strong><?=convoyStatCompact($t['total_count'])?></strong></div><div class="daily-metric"><span>Quantité totale</span><strong><?=convoyStatCompact($t['total_quantity'])?></strong></div><div class="daily-metric"><span>Moyenne / jour</span><strong><?=convoyStatCompact($t['daily_average'])?></strong></div></td></tr>
-<?php foreach($data['rows'] as $r):?><tr><th scope="row"><?=e($r['pseudo'])?></th><?php foreach($data['days'] as $day):$v=$r['days'][$day['date']];?><td><div class="daily-metric"><span>TdC moyen</span><strong><?=convoyStatCompact($v['tdc'])?></strong><small><?=$v['samples']?> relevé<?=$v['samples']!==1?'s':''?></small></div><div class="daily-metric"><span>Production / jour</span><strong><?=convoyStatCompact(convoyProduction($v['tdc']))?></strong></div><div class="daily-metric"><span><?=$data['direction']==='envois'?'Envois':'Réceptions'?></span><strong><?=convoyStatCompact($v['count'])?></strong></div><div class="daily-metric"><span><?=$data['direction']==='envois'?'Total livré':'Total reçu'?></span><strong><?=convoyStatCompact($v['quantity'])?></strong></div></td><?php endforeach;?><td class="daily-total"><?php $avgTdc=convoyTdcAverage($r['days']); ?><div class="daily-metric"><span>TdC moyen (7 jours)</span><strong><?=convoyStatCompact($avgTdc)?></strong></div><div class="daily-metric"><span>Production moyenne / jour</span><strong><?=convoyStatCompact(convoyProduction($avgTdc))?></strong></div><div class="daily-metric"><span>Total des convois</span><strong><?=convoyStatCompact($r['total_count'])?></strong></div><div class="daily-metric"><span>Quantité totale</span><strong><?=convoyStatCompact($r['total_quantity'])?></strong></div><div class="daily-metric"><span>Moyenne / jour</span><strong><?=convoyStatCompact($r['daily_average'])?></strong></div></td></tr><?php endforeach;?></tbody>
+<tbody class="daily-group"><?php $group('Total',$t['members'].' joueur'.($t['members']!==1?'s':'').' affiché'.($t['members']!==1?'s':''),$t['days'],$t,true); ?></tbody>
+<?php foreach($data['rows'] as $r):?><tbody class="daily-group"><?php $group($r['pseudo'],'',$r['days'],$r,false); ?></tbody><?php endforeach;?>
 </table><?php if(!$data['rows']):?><p class="chaine-empty">Aucun joueur pour ces critères.</p><?php endif;?></div></section>

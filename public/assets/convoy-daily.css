@@ -28,3 +28,24 @@
 .conso-chart{display:block;width:100%;max-width:1100px;min-width:760px;height:auto;font-variant-numeric:tabular-nums}
 .conso-row:hover>rect:first-of-type{fill:#e9eef6}
 .conso-table{margin-top:10px}.conso-table summary{cursor:pointer;font-weight:700}
+/* Four rows per player (Indicateur column): numbers only in the cells. */
+.daily-table{min-width:1080px}
+.daily-table th,.daily-table td{min-width:0;padding:6px 10px;vertical-align:middle}
+.daily-table thead th{white-space:nowrap}
+.daily-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.daily-num.is-partial{font-style:italic;color:#7c8c93}
+.daily-table tbody th.daily-player{min-width:120px;font-weight:700;border-right:1px solid #d8e3e4}
+.daily-table tbody th.daily-player small{display:block;font-weight:400;font-size:.72rem;color:#5d737c}
+.daily-table tbody th.daily-metric-name{position:static;min-width:0;background:transparent;font-weight:400;font-size:.8rem;color:#5d737c;white-space:nowrap;text-align:left;border-right:1px solid #eceeea}
+.daily-group{border-top:2px solid #d8e3e4}
+.daily-table tbody tr:nth-child(even) th.daily-player{background:#fff}
+.daily-table tbody.daily-group:nth-of-type(odd) td,.daily-table tbody.daily-group:nth-of-type(odd) th.daily-metric-name{background:#f8faf9}
+.daily-table tbody.daily-group:nth-of-type(odd) th.daily-player{background:#f8faf9}
+.daily-table .daily-row td.daily-total{min-width:0;background:#edf5ef}
+.daily-table .daily-grand-total td,.daily-table .daily-grand-total th{font-weight:700;background:#f2f7f3}
+.daily-table .daily-row:hover td{background:#eef3f5}
+.convoy-daily .daily-table .daily-grand-total>th,.convoy-daily .daily-table .daily-grand-total>td{border-bottom:1px solid #eceeea;background:#e9f2ec}
+.convoy-daily .daily-table .daily-grand-total>td.daily-total{background:#d6e8dc}
+.convoy-daily .daily-table tbody.daily-group:first-of-type{border-bottom:2px solid #86aa96}
+.daily-table tbody tr:nth-child(even) th.daily-metric-name{background:transparent}
+.daily-table tbody.daily-group:nth-of-type(odd) td.daily-total{background:#e6f1e9}
