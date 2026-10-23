@@ -14,6 +14,7 @@ function movementsData(DateTimeImmutable $from,DateTimeImmutable $to): array {
     foreach($q as $f){
         $events[]=['type'=>'flood','at'=>movementsTime($f['arrival_at']),'label'=>$f['sender_pseudo'].' → '.$f['target_pseudo'],
             'players'=>array_values(array_filter([$f['sender_id'],$f['target_id']])),
+            'people'=>array_values(array_filter([[$f['sender_id'],$f['sender_pseudo']],$f['target_id']?[$f['target_id'],$f['target_pseudo']]:null])),
             'details'=>['Attaquant'=>$f['sender_pseudo'],'Cible'=>$f['target_pseudo'],'Lieu'=>$f['location'],'Troupes'=>trim((string)$f['troops'])!==''?mb_strimwidth(trim((string)$f['troops']),0,160,'…'):'Non renseignées','Déclaré le'=>movementsDate($f['created_at'])]];
     }
     $q=db()->prepare("SELECT c.id,c.iddemande,c.idenvoyeur::text,c.pseudo_envoyeur,d.iddemandeur::text,d.pseudo_demandeur,c.nbpomme,c.nbmateriaux,c.date_convoi,c.date_arrivee
@@ -22,7 +23,7 @@ function movementsData(DateTimeImmutable $from,DateTimeImmutable $to): array {
     foreach($q as $c){
         $total=(int)$c['nbpomme']+(int)$c['nbmateriaux'];
         $events[]=['type'=>'convoy','at'=>movementsTime($c['date_arrivee']),'label'=>$c['pseudo_envoyeur'].' → '.$c['pseudo_demandeur'],'amount'=>$total,
-            'players'=>[$c['idenvoyeur'],$c['iddemandeur']],
+            'players'=>[$c['idenvoyeur'],$c['iddemandeur']],'people'=>[[$c['idenvoyeur'],$c['pseudo_envoyeur']],[$c['iddemandeur'],$c['pseudo_demandeur']]],
             'details'=>['Expéditeur'=>$c['pseudo_envoyeur'],'Destinataire'=>$c['pseudo_demandeur'],'Nourriture'=>movementsFormat($c['nbpomme']),'Matériaux'=>movementsFormat($c['nbmateriaux']),'Parti le'=>movementsDate($c['date_convoi']),'Demande'=>'#'.$c['iddemande']]];
     }
     $q=db()->prepare("SELECT player_id::text,area,arrival_at,source FROM script_hunts WHERE cancelled_at IS NULL AND arrival_at>=?::timestamptz AND arrival_at<?::timestamptz ORDER BY arrival_at,id");$q->execute($range);$hunts=$q->fetchAll(PDO::FETCH_ASSOC);
@@ -33,7 +34,7 @@ function movementsData(DateTimeImmutable $from,DateTimeImmutable $to): array {
         foreach($hunts as $h){
             $name=$names[$h['player_id']]??('Joueur '.$h['player_id']);
             $events[]=['type'=>'hunt','at'=>movementsTime($h['arrival_at']),'label'=>$name.' +'.movementsFormat($h['area']).' cm²','amount'=>(int)$h['area'],
-                'players'=>[$h['player_id']],'details'=>['Joueur'=>$name,'Surface'=>movementsFormat($h['area']).' cm²','Relevé par'=>$h['source']==='discord'?'Discord':'UPTEP+']];
+                'players'=>[$h['player_id']],'people'=>[[$h['player_id'],$name]],'details'=>['Joueur'=>$name,'Surface'=>movementsFormat($h['area']).' cm²','Relevé par'=>$h['source']==='discord'?'Discord':'UPTEP+']];
         }
     }
     usort($events,static fn($a,$b)=>$a['at']<=>$b['at']?:strcmp($a['type'],$b['type']));
@@ -67,7 +68,7 @@ function scriptMovements(array $actor,array $body): array {
     $nav=static fn(DateTimeImmutable $d)=>$d<$first||$d>$last?null:['day'=>$d->format('Y-m-d'),'label'=>movementsDay($d,$today)];
     $events=array_map(static function(array $e):array{
         $details=[];foreach($e['details'] as $k=>$v)$details[]=[$k,(string)$v];
-        return ['type'=>$e['type'],'at'=>$e['at'],'label'=>$e['label'],'amount'=>$e['amount']??null,'players'=>$e['players'],'details'=>$details];
+        return ['type'=>$e['type'],'at'=>$e['at'],'label'=>$e['label'],'amount'=>$e['amount']??null,'players'=>$e['players'],'people'=>$e['people'],'details'=>$details];
     },movementsData($day,$day->modify('+1 day')));
     return ['day'=>$day->format('Y-m-d'),'label'=>movementsDay($day,$today),'today'=>$today->format('Y-m-d'),'first'=>$first->format('Y-m-d'),'last'=>$last->format('Y-m-d'),
         'prev'=>$nav($day->modify('-1 day')),'next'=>$nav($day->modify('+1 day')),'now'=>$now->getTimestamp(),'me'=>(string)$actor['game_player_id'],'events'=>$events];

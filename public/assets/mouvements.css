@@ -44,3 +44,17 @@
 @media(max-width:700px){.moves-nav{display:grid;grid-template-columns:auto 1fr auto;padding:8px}.moves-nav-step{padding:7px 9px;font-size:18px}.moves-nav-step span{display:none}.moves-nav-form{gap:6px}}
 .moves-earlier{display:block;width:100%;margin:0 0 8px;padding:7px 12px;border:1px dashed #b9c6cb;border-radius:7px;background:#f6f8f7;color:#153e50;font:inherit;font-size:13px;font-weight:700;text-align:left;cursor:pointer}
 .moves-earlier:hover{background:#eef3f5}.moves-earlier:focus-visible{outline:2px solid #254e59;outline-offset:2px}
+.moves-members{position:relative;margin:-8px 0 16px}
+.moves-members summary{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border:1px solid #cfd8db;border-radius:999px;background:#fffefd;color:#123647;font-size:13px;font-weight:700;cursor:pointer;list-style:none}
+.moves-members summary::-webkit-details-marker{display:none}
+.moves-members summary::after{content:'▾';font-size:11px;color:#687b85}
+.moves-members[open] summary{border-color:#153e50}
+.moves-members [data-members-label]{font-weight:400;max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.moves-members-panel{position:absolute;z-index:10;top:calc(100% + 6px);left:0;width:min(320px,calc(100vw - 32px));padding:10px;border:1px solid #c9d4d8;border-radius:9px;background:#fffefd;box-shadow:0 10px 28px #0a1e2a2e}
+.moves-members-actions{display:flex;gap:6px;margin-bottom:8px}
+.moves-members-actions input{flex:1;min-width:0;padding:6px 8px;border:1px solid #cfd8db;border-radius:6px;font:inherit;font-size:13px}
+.moves-members-actions button{padding:6px 10px;border:1px solid #cfd8db;border-radius:6px;background:#fffefd;color:#153e50;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.moves-members ul{list-style:none;margin:0;padding:0;max-height:300px;overflow:auto}
+.moves-members li label{display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:5px;font-size:13px;cursor:pointer}
+.moves-members li label:hover{background:#f3f6f4}
+.moves-members li .moves-count{margin-left:auto}

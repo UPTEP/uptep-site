@@ -12,6 +12,12 @@ try{$events=movementsData($day,$next);}catch(Throwable $ex){error_log('UPTEP mou
 $me=$u['game_player_id']!==null?(string)$u['game_player_id']:null;
 $types=['flood'=>['Floods','Flood'],'convoy'=>['Convois','Convoi'],'hunt'=>['Chasses','Chasse']];
 $counts=array_fill_keys(array_keys($types),0);$hours=[];
+// Member filter: everyone involved in the day's movements, plus members already selected (?membres=1,2).
+$people=[];foreach($events as $ev)foreach($ev['people'] as [$pid,$pname]){$pid=(string)$pid;$people[$pid]??=['name'=>$pname,'count'=>0];$people[$pid]['count']++;}
+$selected=array_values(array_unique(array_filter(explode(',',is_string($_GET['membres']??null)?$_GET['membres']:''),static fn($v)=>preg_match('/\A[1-9][0-9]{0,17}\z/',$v))));
+$missing=array_values(array_diff($selected,array_keys($people)));
+if($missing){try{$q=db(true)->prepare("SELECT player_id::text,pseudo FROM players WHERE server='s5' AND player_id IN (".implode(',',array_fill(0,count($missing),'?')).")");$q->execute($missing);foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r)$people[$r['player_id']]=['name'=>$r['pseudo'],'count'=>0];}catch(Throwable){}}
+uasort($people,static fn($a,$b)=>strnatcasecmp($a['name'],$b['name']));
 foreach($events as $ev){
     $counts[$ev['type']]++;
     $at=(new DateTimeImmutable('@'.$ev['at']))->setTimezone($zone);
@@ -29,7 +35,7 @@ function movementsLeft(int $seconds): string {
 $dayLink=static fn(DateTimeImmutable $d)=>'/mouvements.php'.($d==$today?'':'?jour='.$d->format('Y-m-d'));
 workspaceStart($u,'Mouvements');
 ?>
-<link rel="stylesheet" href="/assets/mouvements.css?v=7"><script src="/assets/mouvements.js?v=6" defer></script>
+<link rel="stylesheet" href="/assets/mouvements.css?v=8"><script src="/assets/mouvements.js?v=9" defer></script>
 <div class="moves-page" data-me="<?= e($me??'') ?>" data-today="<?= $day==$today?'1':'0' ?>">
 <h1>Mouvements</h1>
 <p class="admin-intro">Les arrivées de la journée pour l’alliance : floods, convois et chasses, heure par heure (heure de Paris). Survole ou touche un élément pour le détail.</p>
@@ -46,6 +52,9 @@ workspaceStart($u,'Mouvements');
 <?php if($me): ?><button type="button" class="moves-filter moves-me" data-filter="me" aria-pressed="false">Seulement moi</button><?php endif; ?>
 <span class="sr-only" data-moves-status aria-live="polite"></span>
 </div>
+<?php if($people): ?><details class="moves-members" data-moves-members><summary>Membres : <span data-members-label>tous</span></summary>
+<div class="moves-members-panel"><div class="moves-members-actions"><input type="search" placeholder="Rechercher un membre" aria-label="Rechercher un membre" data-members-search><button type="button" data-members-clear>Tout effacer</button></div>
+<ul><?php foreach($people as $pid=>$person): ?><li><label><input type="checkbox" value="<?= e((string)$pid) ?>"<?= in_array((string)$pid,$selected,true)?' checked':'' ?>> <span><?= e($person['name']) ?></span> <span class="moves-count"><?= (int)$person['count'] ?></span></label></li><?php endforeach; ?></ul></div></details><?php endif; ?>
 <?php if(!$hours): ?><p class="moves-empty"><?= $day<$today?'Aucune arrivée enregistrée ce jour-là.':'Aucune arrivée prévue ce jour-là pour le moment.' ?></p><?php else: ?>
 <button type="button" class="moves-earlier" data-moves-earlier hidden aria-expanded="false"></button>
 <ol class="moves-hours">

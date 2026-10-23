@@ -23,12 +23,15 @@ function huntArea(text){
 // AcquerirTerrain.php and the "Terrain de Chasse" box of Ressources.php (both carry the #AcquerirTerrain
 // form) list every hunt ("hunts": missing ones are cancelled). Any other hunt text on Ressources.php is
 // treated as partial and only adds or refreshes ("hunts_seen").
-function readGameHunts(doc,win){
+function readGameHunts(doc,win,serverTime){
  const root=doc.getElementById('centre');if(!root)return null;
  const full=!!doc.getElementById('AcquerirTerrain');
  if(!full&&win.location.pathname.toLowerCase()!=='/ressources.php')return null;
- const nav=win.performance?.getEntriesByType?.('navigation')?.[0];
- const base=Number.isFinite(win.performance?.timeOrigin)&&nav&&nav.responseStart>0?win.performance.timeOrigin+nav.responseStart:Date.now();
+ // Countdowns start when the page is served. Use the server time sent with UPTEP+ at page load:
+ // neither the device clock (often off on phones) nor performance.timeOrigin (Firefox gives the
+ // userscript its own, much older origin) can be trusted for an absolute time.
+ const served=Date.parse(serverTime??'');
+ const base=Number.isFinite(served)?served:Date.now();
  const iso=ms=>new Date(Math.round(ms/1000)*1000).toISOString().replace(/\.\d{3}Z$/,'Z');
  const countdowns=new Map();
  for(const script of root.querySelectorAll('script'))for(const m of script.textContent.matchAll(/reste\(\s*(\d+)\s*,\s*["']chasse_(\d+)["']\s*\)/g))countdowns.set(m[2],Number(m[1]));

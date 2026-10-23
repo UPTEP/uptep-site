@@ -1,7 +1,7 @@
 const doc=context.document,win=context.window;
 const preferences=typeof uptepPreferences==='undefined'?{}:uptepPreferences;
 const collectionGroup={'/construction.php':'buildings','/laboratoire.php':'research','/acquerirterrain.php':'hunts','/ressources.php':'hunts'}[win.location.pathname.toLowerCase()]||null;
-let collection=collectionGroup&&preferences[collectionGroup]?(collectionGroup==='hunts'?readGameHunts(doc,win):readGameLevels(doc,win.location.pathname)):null;
+let collection=collectionGroup&&preferences[collectionGroup]?(collectionGroup==='hunts'?readGameHunts(doc,win,typeof uptepTrafficServerTime==='undefined'?null:uptepTrafficServerTime):readGameLevels(doc,win.location.pathname)):null;
 const portalPath='/alliance.php?uptep=1';
 const entry=doc.createElement('li');entry.id='uptep-plus-alliance-entry';
 const entryLink=doc.createElement('a');entryLink.className='boutonHome';entryLink.href=portalPath;
@@ -78,7 +78,7 @@ const collectionStatus=doc.createElement('div');collectionStatus.className='upte
 // Ressources.php without any hunt shown stays silent: there is simply nothing to record.
 if(collectionGroup&&preferences[collectionGroup]&&(collection||win.location.pathname.toLowerCase()!=='/ressources.php')){collectionStatus.textContent=collectionGroup==='hunts'?(collection?'Synchronisation des chasses…':'Chasses non reconnues : aucune donnée envoyée.'):(collection?'Synchronisation des niveaux…':'Niveaux non reconnus : aucune donnée envoyée.');content.append(collectionStatus);}
 // Hunt pages: badges next to each hunt, also when the collection is off (read locally, nothing sent).
-const huntBadges=collectionGroup==='hunts'?mountHuntBadges(doc,preferences.hunts?collection:readGameHunts(doc,win),!!preferences.hunts):null;
+const huntBadges=collectionGroup==='hunts'?mountHuntBadges(doc,preferences.hunts?collection:readGameHunts(doc,win,typeof uptepTrafficServerTime==='undefined'?null:uptepTrafficServerTime),!!preferences.hunts):null;
 const huntTimeout=huntBadges&&collection?win.setTimeout(()=>huntBadges.set('error','UPTEP ne répond pas, recharge la page'),25000):null;
 if(collection){frame.src='https://uptep.top/portal.php?bridge=1';portal.hidden=true;doc.body.append(portal);}
 let armyTimeout=null;const armyTools=doc.createElement('div'),armyButton=doc.createElement('button'),armyStatus=doc.createElement('span');

@@ -8,6 +8,8 @@ window.uptepMovements=(()=>{
  const TYPES={flood:['Floods','Flood'],convoy:['Convois','Convoi'],hunt:['Chasses','Chasse']};
  const left=seconds=>{if(seconds<=0)return 'arrivé';const d=Math.floor(seconds/86400),h=Math.floor(seconds%86400/3600),m=Math.floor(seconds%3600/60);return d?`dans ${d} j ${h} h`:h?`dans ${h} h ${String(m).padStart(2,'0')}`:`dans ${m} min`;};
  let api=null,root=null,data=null,clock=null,version=0,showEarlier=false;
+ // Member filter (one or several), kept from day to day; names of selected members are remembered.
+ const selected=new Set(),names=new Map();let membersOpen=false,membersQuery='';
  // Keep a tooltip inside the frame: shift it left when it would pass the right edge, and show it above
  // the item when there is no room below (the in-game page is an iframe that clips what overflows).
  function fitTip(item,tip){
@@ -49,7 +51,7 @@ window.uptepMovements=(()=>{
   for(const hour of [...hours.keys()].sort((a,b)=>a-b)){
    const items=el('div','pm-items');
    for(const e of hours.get(hour).values()){
-    if(!shown.has(e.type)||(onlyMe&&!e.players.includes(data.me)))continue;visible++;n++;
+    if(!shown.has(e.type)||(onlyMe&&!e.players.includes(data.me))||(selected.size&&!e.players.some(p=>selected.has(String(p)))))continue;visible++;n++;
     const chip=el('div','pm-item is-'+e.type+(isToday&&e.at<=data.now?' is-past':''));chip.tabIndex=0;const tipId='pm-tip-'+n;chip.setAttribute('aria-describedby',tipId);chip.dataset.at=e.at;
     chip.append(el('span','pm-dot is-'+e.type),el('span','pm-time',e.minute),el('span','pm-label',e.label+(e.type==='convoy'?' · '+fmt(e.amount):'')));
     if(e.count>1)chip.append(el('span','pm-times','×'+e.count));
@@ -66,7 +68,22 @@ window.uptepMovements=(()=>{
    if(hour<currentHour){folded+=items.childElementCount;foldedHours++;if(!showEarlier){visible-=items.childElementCount;continue;}}
    const li=el('li','pm-hour');li.append(el('span','pm-hour-label',String(hour).padStart(2,'0')+' h'),items);list.append(li);
   }
-  const body=[nav,el('h2','pm-title',data.label),filters];
+  const people=new Map();for(const e of data.events)for(const [pid,name] of e.people||[]){const id=String(pid);names.set(id,name);people.set(id,(people.get(id)||0)+1);}
+  for(const id of selected)if(!people.has(id))people.set(id,0);
+  const members=el('details','pm-members');members.open=membersOpen;members.addEventListener('toggle',()=>{membersOpen=members.open;});
+  const chosen=[...selected].map(id=>names.get(id)||id);
+  const summary=el('summary','','Membres : ');summary.append(el('span','pm-members-label',!chosen.length?'tous':chosen.length<=3?chosen.join(', '):chosen.length+' membres'));members.append(summary);
+  const panel=el('div','pm-members-panel'),actions=el('div','pm-members-actions'),search=el('input');search.type='search';search.placeholder='Rechercher un membre';search.setAttribute('aria-label','Rechercher un membre');search.value=membersQuery;
+  const clear=el('button','','Tout effacer');clear.type='button';clear.addEventListener('click',()=>{selected.clear();render();});actions.append(search,clear);panel.append(actions);
+  const ul=el('ul');
+  for(const [id,count] of [...people].sort((a,b)=>(names.get(a[0])||'').localeCompare(names.get(b[0])||'','fr',{sensitivity:'base'}))){
+   const li=el('li'),label=el('label'),box=el('input');box.type='checkbox';box.value=id;box.checked=selected.has(id);
+   box.addEventListener('change',()=>{box.checked?selected.add(id):selected.delete(id);render();});
+   label.append(box,el('span','',names.get(id)||id),el('span','pm-count',String(count)));li.append(label);li.hidden=!!membersQuery&&!(names.get(id)||'').toLowerCase().includes(membersQuery);ul.append(li);
+  }
+  search.addEventListener('input',()=>{membersQuery=search.value.trim().toLowerCase();for(const li of ul.children)li.hidden=!!membersQuery&&!li.textContent.toLowerCase().includes(membersQuery);});
+  panel.append(ul);members.append(panel);
+  const body=[nav,el('h2','pm-title',data.label),filters,members];
   if(folded){const toggle=el('button','pm-earlier',showEarlier?`Masquer les heures précédentes (${folded} mouvement${folded>1?'s':''})`:`Afficher les heures précédentes · ${foldedHours} heure${foldedHours>1?'s':''}, ${folded} mouvement${folded>1?'s':''}`);toggle.type='button';toggle.setAttribute('aria-expanded',String(showEarlier));toggle.addEventListener('click',()=>{showEarlier=!showEarlier;render();});body.push(toggle);}
   if(!data.events.length)body.push(el('p','pm-empty',data.day<data.today?'Aucune arrivée enregistrée ce jour-là.':'Aucune arrivée prévue ce jour-là pour le moment.'));
   else if(!visible)body.push(el('p','pm-empty',folded&&!showEarlier?'Plus aucune arrivée prévue pour le reste de la journée.':'Aucun mouvement pour ces filtres.'));
@@ -77,5 +94,10 @@ window.uptepMovements=(()=>{
    // A new hour starts: the hour just ended joins the folded ones.
    if(isToday&&parseInt(paris(now,{hour:'2-digit',hourCycle:'h23'}),10)!==currentHour){data.now=Math.floor(now);render();}},30000);
  }
+ // A click or Escape outside the member list closes it.
+ document.addEventListener('click',e=>{const box=root?.querySelector('.pm-members');if(box?.open&&!box.contains(e.target)){box.open=false;membersOpen=false;}});
+ // In the game this page is an iframe: a click on the game around it only shows as the frame losing focus.
+ window.addEventListener('blur',()=>{const box=root?.querySelector('.pm-members');if(box?.open){box.open=false;membersOpen=false;}});
+ document.addEventListener('keydown',e=>{const box=root?.querySelector('.pm-members');if(e.key==='Escape'&&box?.open){box.open=false;membersOpen=false;box.querySelector('summary').focus();}});
  return {start(apiFn,container){api=apiFn;root=container;load(null);}};
 })();

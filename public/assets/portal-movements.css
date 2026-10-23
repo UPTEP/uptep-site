@@ -38,3 +38,22 @@
 @media(max-width:600px){.pm-nav{grid-template-columns:auto 1fr auto}.pm-step{font-size:0;padding:6px 10px}.pm-step::first-letter{font-size:14px}}
 .pm-earlier{display:block;width:100%;margin:0 0 8px;padding:6px 10px;border:1px dashed #887749;background:#e2d29e;color:#302b18;font:bold 12px Verdana,sans-serif;text-align:left;cursor:pointer}
 .pm-earlier:hover{background:#eadcae}.pm-earlier:focus-visible{outline:2px solid #254e59;outline-offset:2px}
+.pm-members{position:relative;margin:0 0 8px}
+.pm-members summary{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid #887749;border-radius:12px;background:#fffdf3;font:bold 12px Verdana,sans-serif;cursor:pointer;list-style:none}
+.pm-members summary::-webkit-details-marker{display:none}.pm-members summary::after{content:'▾';font-size:10px}
+.pm-members[open] summary{background:#525543;border-color:#525543;color:#fff3d3}
+.pm-members-label{font-weight:normal;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pm-members-panel{position:relative;z-index:10;margin-top:4px;width:min(300px,calc(100vw - 24px));padding:8px;border:1px solid #887749;border-radius:4px;background:#fffdf3;box-shadow:0 8px 22px #302b1866}
+.pm-members-actions{display:flex;gap:6px;margin:0 0 6px}
+.pm-members .pm-members-actions input{flex:1;width:auto;min-width:0;padding:5px 7px;border:1px solid #b39b61;border-radius:3px;background:#fff;font:12px Verdana,sans-serif}
+.pm-members-actions button{flex:none;padding:5px 9px;border:1px solid #887749;border-radius:3px;background:#e2d29e;color:#302b18;font:bold 11px Verdana,sans-serif;cursor:pointer}
+.pm-members-actions button:hover{background:#d7c384}
+.pm-members ul{list-style:none;margin:0;padding:0;max-height:260px;overflow-y:auto;border-top:1px solid #e2d29e}
+.pm-members li{border-bottom:1px solid #f0e6c8}
+.pm-members li[hidden]{display:none}
+.pm-members li label{display:flex;align-items:center;gap:8px;padding:5px 6px;font-size:12px;text-align:left;cursor:pointer}
+.pm-members li label:hover{background:#f3ead0}
+.pm-members .pm-members-panel input[type=checkbox]{flex:0 0 15px;width:15px;height:15px;margin:0;padding:0;accent-color:#525543}
+.pm-members li label>span:nth-of-type(1){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pm-members li .pm-count{flex:none;min-width:22px;padding:1px 6px;border-radius:9px;background:#e2d29e;font-size:10px;font-weight:bold;text-align:center}
+.pm-members li label:has(input:checked){background:#ece2bf;font-weight:bold}

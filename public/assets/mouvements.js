@@ -26,12 +26,40 @@
   let showEarlier = false;
   const parisHour = () => parseInt(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', hourCycle: 'h23' }).format(new Date()), 10);
   if (earlierButton) earlierButton.addEventListener('click', () => { showEarlier = !showEarlier; apply(); });
+  // Member filter (one or several): a movement stays when one of its members is selected.
+  const membersBox = page.querySelector('[data-moves-members]');
+  const memberChecks = membersBox ? [...membersBox.querySelectorAll('input[type=checkbox]')] : [];
+  const selectedMembers = () => new Set(memberChecks.filter(c => c.checked).map(c => c.value));
+  const syncMembers = () => {
+    const chosen = memberChecks.filter(c => c.checked);
+    const label = membersBox?.querySelector('[data-members-label]');
+    if (label) label.textContent = !chosen.length ? 'tous' : chosen.length <= 3 ? chosen.map(c => c.parentNode.querySelector('span').textContent).join(', ') : `${chosen.length} membres`;
+    // Keep the selection in the address and in the day navigation, so it follows from day to day.
+    const ids = chosen.map(c => c.value).join(',');
+    const withMembers = href => { const url = new URL(href, location.href); if (ids) url.searchParams.set('membres', ids); else url.searchParams.delete('membres'); return url.pathname + url.search; };
+    try { history.replaceState(null, '', withMembers(location.href)); } catch {}
+    for (const link of page.querySelectorAll('.moves-nav a')) { try { link.setAttribute('href', withMembers(link.getAttribute('href'))); } catch {} }
+    const form = page.querySelector('.moves-nav-form');
+    if (form) { let hidden = form.querySelector('input[name=membres]'); if (!hidden) { hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'membres'; form.append(hidden); } hidden.value = ids; hidden.disabled = !ids; }
+  };
+  if (membersBox) {
+    membersBox.addEventListener('change', () => { syncMembers(); apply(); });
+    membersBox.querySelector('[data-members-clear]')?.addEventListener('click', () => { for (const c of memberChecks) c.checked = false; syncMembers(); apply(); });
+    const search = membersBox.querySelector('[data-members-search]');
+    search?.addEventListener('input', () => { const q = search.value.trim().toLowerCase(); for (const c of memberChecks) c.closest('li').hidden = !!q && !c.parentNode.textContent.toLowerCase().includes(q); });
+    syncMembers();
+    // A click or Escape outside the list closes it.
+    document.addEventListener('click', e => { if (membersBox.open && !membersBox.contains(e.target)) membersBox.open = false; });
+    window.addEventListener('blur', () => { membersBox.open = false; });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && membersBox.open) { membersBox.open = false; membersBox.querySelector('summary').focus(); } });
+  }
   const apply = () => {
     const shown = new Set(filters.filter(b => b.dataset.filter !== 'me' && b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.filter));
     const onlyMe = filters.some(b => b.dataset.filter === 'me' && b.getAttribute('aria-pressed') === 'true');
-    let visible = 0;
+    let visible = 0;const members = selectedMembers();
     for (const item of items) {
-      const ok = shown.has(item.dataset.type) && (!onlyMe || item.dataset.players.split(',').includes(me));
+      const players = item.dataset.players.split(',');
+      const ok = shown.has(item.dataset.type) && (!onlyMe || players.includes(me)) && (!members.size || players.some(p => members.has(p)));
       item.hidden = !ok; if (ok) visible++;
     }
     // Hide hours and days left empty by the filters.
