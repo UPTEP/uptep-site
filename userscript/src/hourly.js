@@ -1,5 +1,6 @@
 function readEconomy(doc){
- const values={};for(const [key,id] of Object.entries({ouvrieres:'nb_ouvrieres',materiaux:'nb_materiaux',nourriture:'nb_nourriture',terrain:'quantite_tdc'})){
+ const values={};// Resources only: workers are read on Reine.php (readGameWorkers), where the game gives its own count.
+ for(const [key,id] of Object.entries({materiaux:'nb_materiaux',nourriture:'nb_nourriture',terrain:'quantite_tdc'})){
   const text=doc.getElementById(id)?.textContent.replace(/[\s\u00a0\u202f]/g,'');if(!text||!/^\d+(?:[.,]\d+)?$/.test(text))return null;
   const value=BigInt(text.split(/[.,]/)[0]);if(value>9223372036854775807n)return null;values[key]=String(value);
  }return {group:'economy',values};

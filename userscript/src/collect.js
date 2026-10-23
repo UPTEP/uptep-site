@@ -32,3 +32,12 @@ function readGameArmy(doc){
  for(const key of ['ce','te'])if(!(key in values))values[key]='0';
  if(Object.keys(values).length!==14)throw Error('Armée incomplète : certaines unités ne sont pas visibles. Aucune donnée envoyée.');return {group:'army',values};
 }
+
+// Reine.php: the "Ouvrière" row carries the game's worker count in a hidden span (#armee_initial),
+// premium or not. Read at every visit of the page.
+function readGameWorkers(doc){
+ const row=doc.querySelector('#centre tr.ligneAmelioration');if(!row||row.querySelector('h2')?.textContent.trim()!=='Ouvrière')return null;
+ const text=doc.getElementById('armee_initial')?.textContent.replace(/[\s\u00a0\u202f]/g,'');
+ if(!text||!/^\d{1,19}$/.test(text)||BigInt(text)>9223372036854775807n)return null;
+ return {group:'workers',values:{total:BigInt(text).toString()}};
+}
