@@ -30,6 +30,24 @@ function hcGroup(mixed $value):string{
     return strrev(trim(chunk_split(strrev($value),3,' ')));
 }
 
+/* ---- Table columns ---- */
+/**
+ * Every column the chefs can show, in table order: key => [header, picker label, group, shown by default, sort type].
+ * Building (b_) and research (r_) columns hold one level each; the name column is always shown.
+ */
+function hcColumns():array{
+    $cols=['grade'=>['Grade chaîne','Grade chaîne','Général',true,'asc'],'field'=>['TDC','Terrain de chasse (TDC)','Général',true,'num'],
+        'tdp'=>['TDP','Temps de ponte (TDP)','Général',true,'num'],'workers'=>['Ouvrières','Ouvrières','Général',true,'num']];
+    foreach(STATS_GROUPS['buildings'][1] as $key=>$label)$cols['b_'.$key]=[$label,$label,'Bâtiments',false,'num'];
+    // Weapons, shield and attack speed lead the research columns, as before.
+    $short=['armes'=>'Arme','bouclier'=>'Bouclier','vitesse_attaque'=>'VA'];
+    foreach(array_merge(array_intersect_key($short,STATS_GROUPS['research'][1]),STATS_GROUPS['research'][1]) as $key=>$_)
+        $cols['r_'.$key]=[$short[$key]??STATS_GROUPS['research'][1][$key],STATS_GROUPS['research'][1][$key],'Laboratoire',isset($short[$key]),'num'];
+    return $cols+['fdf'=>['FDF','Force de frappe (FDF)','Général',true,'num'],'cdf'=>['CDF','Capacité de flood (CDF)','Général',true,'num'],
+        'convoys'=>['Convois en cours','Convois en cours','Général',true,'num'],'floods'=>['Floods en cours','Floods en cours','Général',true,'num'],
+        'access'=>['Site & userscript','Site et userscript','Général',true,'num']];
+}
+
 /* ---- Member detail modal ---- */
 function hcYesNo(?bool $v):string{return $v===null?'<span class="hc-unknown">—</span>':($v?hcStatus('yes','Oui'):hcStatus('no','Non'));}
 function hcText(mixed $v):string{$v=$v===null||$v===''?'':(string)$v;return $v===''?'<span class="hc-unknown">—</span>':e($v);}

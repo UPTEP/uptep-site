@@ -29,6 +29,55 @@
     sortBy(button, current === 'none' ? first : (current === 'ascending' ? -1 : 1));
   }));
 
+  // Column picker: the choice is a per-browser convenience, the defaults work without storage.
+  const picker = document.getElementById('hc-columns');
+  if (picker) {
+    const storageKey = 'uptep-hc-columns';
+    const boxes = [...picker.querySelectorAll('input[type=checkbox]')];
+    const cells = key => table.querySelectorAll(`[data-col="${key}"]`);
+    const count = picker.querySelector('[data-hc-columns-count]');
+    const apply = () => {
+      boxes.forEach(box => cells(box.value).forEach(cell => { cell.hidden = !box.checked; }));
+      count.textContent = `${boxes.filter(box => box.checked).length}/${boxes.length}`;
+    };
+    const save = () => {
+      try { localStorage.setItem(storageKey, JSON.stringify(boxes.filter(box => box.checked).map(box => box.value))); } catch {}
+    };
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
+      // Unknown keys (renamed columns) are ignored.
+      if (Array.isArray(saved)) boxes.forEach(box => { box.checked = saved.includes(box.value); });
+    } catch {}
+    apply();
+    boxes.forEach(box => box.addEventListener('change', () => { apply(); save(); }));
+    picker.querySelector('[data-hc-columns-reset]').addEventListener('click', () => {
+      boxes.forEach(box => { box.checked = box.dataset.default === '1'; });
+      apply();
+      try { localStorage.removeItem(storageKey); } catch {}
+    });
+    const search = document.getElementById('hc-columns-search');
+    const empty = picker.querySelector('[data-hc-columns-empty]');
+    const fold = text => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    search.addEventListener('input', () => {
+      const query = fold(search.value.trim());
+      picker.querySelectorAll('.hc-columns-group').forEach(group => {
+        let visible = 0;
+        group.querySelectorAll('label').forEach(label => {
+          label.hidden = query !== '' && !fold(label.textContent).includes(query);
+          if (!label.hidden) visible++;
+        });
+        group.hidden = visible === 0;
+      });
+      empty.hidden = [...picker.querySelectorAll('.hc-columns-group')].some(group => !group.hidden);
+    });
+    // Close on a click outside or Escape, like a menu.
+    document.addEventListener('click', event => { if (picker.open && !picker.contains(event.target)) picker.open = false; });
+    picker.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && picker.open) { picker.open = false; picker.querySelector('summary').focus(); }
+    });
+    picker.addEventListener('toggle', () => { if (picker.open) search.focus({ preventScroll: true }); });
+  }
+
   // Member detail modal: opened from a row click or from the pseudo button.
   const modal = document.getElementById('hc-modal');
   if (!modal || typeof modal.showModal !== 'function') return;
