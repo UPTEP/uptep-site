@@ -1,7 +1,7 @@
 const {chromium}=require(process.env.UPTEP_PLAYWRIGHT_MODULE||'playwright');const fs=require('fs'),assert=require('assert/strict');
 const root=require('path').resolve(__dirname,'..'),fixture=fs.readFileSync(root+'/tests/fixtures/commerce.html','utf8'),moduleCode=fs.readFileSync(root+'/userscript/src/chaine.js','utf8')+'\n'+fs.readFileSync(process.env.UPTEP_CONVOYS_SOURCE||root+'/userscript/src/convoys.js','utf8');
 (async()=>{const browser=await chromium.launch({headless:true,args:['--no-sandbox']});try{
-for(const mode of (process.env.UPTEP_CONVOY_TEST_MODES?process.env.UPTEP_CONVOY_TEST_MODES.split(','):['success','refused','api-failure','lost-response','wrong-account','no-stock','double-click','storage-failure','ambiguous','compiled','etable','tabs','create-retry','create-validation','auto-cancel','auto-send','auto-late','auto-retry','overage-cancel','overage-send','overage-retry','auto-overage','protected-document','protected-after-send','protected-bridge','protected-bridge-retry','protected-bridge-legacy','projection','colonies','colonies-unknown'])){
+for(const mode of (process.env.UPTEP_CONVOY_TEST_MODES?process.env.UPTEP_CONVOY_TEST_MODES.split(','):['success','max','max-workers','max-none','refused','api-failure','lost-response','wrong-account','no-stock','double-click','storage-failure','ambiguous','compiled','etable','tabs','create-retry','create-validation','auto-cancel','auto-send','auto-late','auto-retry','overage-cancel','overage-send','overage-retry','auto-overage','protected-document','protected-after-send','protected-bridge','protected-bridge-retry','protected-bridge-legacy','projection','colonies','colonies-unknown'])){
  const ctx=await browser.newContext();let demandCalls=0;let warnings=0,posts=0,declares=0,gameSent=false,failDeclare=['api-failure','auto-retry','overage-retry','protected-bridge-retry'].includes(mode),createCalls=[],failCreate=mode==='create-retry',invalidCreate=mode==='create-validation',lost=mode==='lost-response',posted;
  const colony={own:'80',loss:{terrain:'80',percent:20},gains:[{terrain:'100',percent:20}],assumed_rates:mode==='colonies-unknown'};
  const line='<br><span class="gras">- Vous allez livrer 10 <img alt="nourritures"> et 20 <img alt="materiaux"> à <a href="Membre.php?Pseudo=Target">Target</a> dans 1H 0m 0s</span> - <a href="commerce.php?annuler=9001&t=new-token">Annuler</a><br>';
@@ -9,7 +9,7 @@ for(const mode of (process.env.UPTEP_CONVOY_TEST_MODES?process.env.UPTEP_CONVOY_
  await ctx.route('**/*',async route=>{const req=route.request(),u=new URL(req.url());
   if(u.hostname==='s5.fourmizzz.fr'){
    if(req.method()==='POST'){posts++;posted=new URLSearchParams(req.postData());if(mode!=='refused')gameSent=true;if(lost){lost=false;return route.abort();}}
-   let body=html().replace(/<script type="text\/javascript">/g,'<script type="application/json">');if(mode==='etable')body=body.replaceAll('var bonus = 0;','var bonus = 20;');if(mode==='ambiguous'&&gameSent)body=body.replace('<div class="Bas">',line.replace('9001','9002')+'<div class="Bas">');if(mode==='wrong-account'&&req.resourceType()!=='document')body=body.replace('id="pseudo">Sender','id="pseudo">Other');if(mode==='no-stock')body=body.replace(/max_materiaux = 477986/g,'max_materiaux = 0');
+   let body=html().replace(/<script type="text\/javascript">/g,'<script type="application/json">');if(mode==='etable')body=body.replaceAll('var bonus = 0;','var bonus = 20;');if(mode==='max-workers')body=body.replaceAll('var max_ouvriere = 29999;','var max_ouvriere = 25350;');if(mode==='max-none')body=body.replaceAll('var max_ouvriere = 29999;','var max_ouvriere = 25000;');if(mode==='ambiguous'&&gameSent)body=body.replace('<div class="Bas">',line.replace('9001','9002')+'<div class="Bas">');if(mode==='wrong-account'&&req.resourceType()!=='document')body=body.replace('id="pseudo">Sender','id="pseudo">Other');if(mode==='no-stock')body=body.replace(/max_materiaux = 477986/g,'max_materiaux = 0');
    return route.fulfill({status:200,contentType:'text/html; charset=utf-8',body});
   }
   if(u.pathname==='/portal.php')return route.fulfill({status:200,contentType:'text/html; charset=utf-8',body:fs.readFileSync(root+'/public/portal.php','utf8').replace(/<\?php[\s\S]*?\?>/g,'')});
@@ -80,6 +80,16 @@ for(const mode of (process.env.UPTEP_CONVOY_TEST_MODES?process.env.UPTEP_CONVOY_
  const parsed=await page.evaluate(()=>readCommerceConvoys(document,location.href,Date.now()).map(({anchor,...r})=>r));assert.equal(parsed.length,1);assert.equal(parsed[0].game_id,'8102');assert.equal(parsed[0].wood,'1');
  await page.fill('#uptep-convoys-panel-current [name=apples]','1k');await page.fill('#uptep-convoys-panel-current [name=wood]','500');assert.match(await page.locator('.uptep-convoy-workers').innerText(),new RegExp('Ouvrières mobilisées : '+(mode==='etable'?'75':'150')+' · Étable à pucerons niveau '+(mode==='etable'?'20':'0')));
  if(mode.includes('protected-bridge'))await page.evaluate(()=>{window.protectBridge=true;});
+ if(mode.startsWith('max')){
+  // Max fills from free workers (beyond the 25 340 cm² TdC), the stock and the 100/100 remaining, without sending.
+  const panel='#uptep-convoys-panel-current',note=page.locator(panel+' .uptep-convoy-max');
+  await page.getByRole('button',{name:'Max',exact:true}).click();await note.filter({hasText:mode==='max-none'?'Aucune ouvrière libre':'Max :'}).waitFor();
+  const expected={max:['100','100',/tout le restant de la demande, dans la limite de tes 4[\s\u202f]659 ouvrières libres/],'max-workers':['50','50',/limité par tes 10 ouvrières libres sans découvrir ton TdC → 100 ressources/],'max-none':['0','0',/toutes tes ouvrières exploitent ton TdC/]}[mode];
+  assert.equal(await page.inputValue(panel+' [name=apples]'),expected[0]);assert.equal(await page.inputValue(panel+' [name=wood]'),expected[1]);assert.match(await note.innerText(),expected[2]);
+  if(mode==='max-workers')assert.match(await page.locator(panel+' .uptep-convoy-workers').innerText(),/Ouvrières mobilisées : 10 ·/);
+  await page.fill(panel+' [name=apples]','1');assert.equal(await note.isHidden(),true);
+  assert.equal(posts,0);assert.equal(declares,0);assert.deepEqual(errors,[]);console.log('Browser:',mode,'OK');await ctx.close();continue;
+ }
  await page.fill('#uptep-convoys-panel-current [name=apples]','10');await page.fill('#uptep-convoys-panel-current [name=wood]','20');
  if(mode==='storage-failure')await page.evaluate(()=>{Storage.prototype.setItem=function(){throw Error('Stockage indisponible');};});
  if(mode.startsWith('auto-')&&mode!=='auto-retry'){
