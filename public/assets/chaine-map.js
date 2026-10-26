@@ -2,7 +2,7 @@
   const root = document.querySelector('[data-chaine-map]');
   const source = document.getElementById('chaine-map-data');
   if (!root || !source) return;
-  const { players, grades } = JSON.parse(source.textContent);
+  const { players, grades, times } = JSON.parse(source.textContent);
   const NS = 'http://www.w3.org/2000/svg';
   const form = root.querySelector('[data-map-filters]');
   const svg = root.querySelector('[data-map-svg]');
@@ -58,6 +58,8 @@
 
   // Camera in game coordinates; y grows upwards like on the portal map.
   let width = 0, height = 0, view = null, filters = readFilters(), shown = players;
+  // Distance measure from a clicked member: free end on the cursor, snapped to a nearby member, or pinned.
+  let measure = null, measureLayer = null;
   const fit = targets => {
     const set = targets.length ? targets : players;
     const xs = set.map(p => p.x), ys = set.map(p => p.y);
@@ -111,6 +113,9 @@
       }
     }
     svg.append(layer);
+    measureLayer = el('g', { class: 'cm-measure' });
+    svg.append(measureLayer);
+    renderMeasure();
   };
 
   const update = () => {
@@ -125,7 +130,9 @@
       item.append(dot, `${gradeName(grade)} (${n})`);
       return item;
     }));
-    hideTip(); draw();
+    if (measure && (!shown.includes(measure.from) || (measure.to && !shown.includes(measure.to)))) stopMeasure();
+    if (!measure) hideTip();
+    draw();
   };
   form.addEventListener('input', update);
   form.addEventListener('change', update);
@@ -137,10 +144,63 @@
   const memberAt = target => { const g = target.closest && target.closest('.cm-member'); return g ? players.find(p => String(p.id) === g.dataset.id) : null; };
   const hideTip = () => { tip.hidden = true; };
   const showTip = (member, at) => {
+    tip.classList.remove('is-measure');
     tip.replaceChildren(html('strong', '', member.pseudo), html('span', '', `${gradeName(member.grade)}${member.order !== null ? ' · ' + member.order : ''} · ${member.field === null ? '—' : number(member.field)} TDC · X ${member.x}, Y ${member.y}`));
     tip.hidden = false;
     tip.style.left = Math.max(6, Math.min(width - tip.offsetWidth - 6, at.x + 14)) + 'px';
     tip.style.top = Math.max(6, at.y - tip.offsetHeight - 10) + 'px';
+  };
+
+  // Distance and one-way attack travel time, same formula as the userscript (checked against Toolzzz).
+  const travelSeconds = (distance, speed) => (Number.isInteger(speed) ? Math.round(86400 * (1 - Math.exp(-distance / 350)) * 7.375 * Math.pow(0.9, speed)) : null);
+  const duration = seconds => {
+    const days = Math.floor(seconds / 86400), pad = n => String(n).padStart(2, '0');
+    return (days ? days + 'j ' : '') + pad(Math.floor(seconds % 86400 / 3600)) + ':' + pad(Math.floor(seconds % 3600 / 60)) + ':' + pad(seconds % 60);
+  };
+  const SNAP = 26;
+  const snapAt = at => {
+    let best = null, distance = SNAP;
+    for (const p of shown) {
+      if (p === measure.from) continue;
+      const s = screen(p), d = Math.hypot(s.x - at.x, s.y - at.y);
+      if (d <= distance) { best = p; distance = d; }
+    }
+    return best;
+  };
+  const renderMeasure = () => {
+    if (!measureLayer) return;
+    measureLayer.replaceChildren();
+    if (!measure) return;
+    const from = measure.from, a = screen(from);
+    const end = measure.to ? measure.to : measure.at;
+    measureLayer.append(el('circle', { cx: a.x, cy: a.y, r: radius(from) + 6, class: 'cm-measure-origin' }));
+    if (!end) return;
+    const b = screen(end);
+    measureLayer.append(el('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: 'cm-measure-line' }));
+    measureLayer.append(el('circle', { cx: b.x, cy: b.y, r: measure.to ? radius(measure.to) + 6 : 4, class: measure.to ? 'cm-measure-target' : 'cm-measure-end' }));
+    // Shown rounded up like the userscript's distance column; the travel time uses the exact distance.
+    const distance = Math.hypot(end.x - from.x, end.y - from.y);
+    const rows = [html('strong', '', `${from.pseudo} → ${measure.to ? measure.to.pseudo : `X ${Math.round(end.x)} · Y ${Math.round(end.y)}`}`),
+      html('span', '', `Distance : ${number(Math.ceil(distance))} cases`)];
+    if (times) {
+      const seconds = travelSeconds(distance, from.speed);
+      rows.push(html('span', '', seconds === null ? `Trajet : VA de ${from.pseudo} inconnue` : `Trajet : ${duration(seconds)} (VA ${from.speed})`));
+    }
+    rows.push(html('small', '', measure.pinned ? 'Clic ailleurs pour effacer' : 'Clic sur un membre pour figer · Échap pour annuler'));
+    tip.replaceChildren(...rows);
+    tip.classList.add('is-measure');
+    tip.hidden = false;
+    tip.style.left = Math.max(6, Math.min(width - tip.offsetWidth - 6, b.x + 16)) + 'px';
+    tip.style.top = Math.max(6, b.y - tip.offsetHeight - 14) + 'px';
+  };
+  const stopMeasure = () => { measure = null; tip.classList.remove('is-measure'); hideTip(); renderMeasure(); };
+  const clickMember = member => {
+    if (!measure || measure.pinned) measure = { from: member, to: null, at: null, pinned: false };
+    else if (member === measure.from) return stopMeasure();
+    else Object.assign(measure, { to: member, pinned: true });
+    tip.classList.add('is-measure');
+    if (!measure.to) hideTip();
+    renderMeasure();
   };
 
   // Zoom and pan.
@@ -172,22 +232,35 @@
       return;
     }
     if (event.pointerType !== 'mouse') return;
+    if (measure && !measure.pinned) {
+      // Snap to a member near the cursor; moving further away frees the line again.
+      measure.to = snapAt(p);
+      measure.at = world(p.x, p.y);
+      return renderMeasure();
+    }
+    if (measure) return;
     const member = memberAt(event.target);
     if (member) showTip(member, p); else hideTip();
   });
   svg.addEventListener('pointerup', event => {
     if (!drag || drag.id !== event.pointerId) return;
-    if (!drag.moved) { if (drag.member) showTip(drag.member, local(event)); else hideTip(); }
+    if (!drag.moved) {
+      const member = drag.member || (measure && !measure.pinned ? measure.to : null);
+      if (member) clickMember(member);
+      else if (measure) stopMeasure();
+      else hideTip();
+    }
     drag = null;
   });
   for (const type of ['pointercancel', 'lostpointercapture']) svg.addEventListener(type, () => { drag = null; });
-  svg.addEventListener('pointerleave', event => { if (event.pointerType === 'mouse') hideTip(); });
+  svg.addEventListener('pointerleave', event => { if (event.pointerType === 'mouse' && !measure) hideTip(); });
   svg.addEventListener('keydown', event => {
     const step = 60 / view.scale;
     const pan = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[event.key];
     if (pan) { view.x += pan[0]; view.y += pan[1]; hideTip(); draw(); }
     else if (event.key === '+' || event.key === '=') zoom(1.5);
     else if (event.key === '-') zoom(1 / 1.5);
+    else if (event.key === 'Escape' && measure) stopMeasure();
     else return;
     event.preventDefault();
   });
@@ -218,7 +291,12 @@
     } else { overlay = true; syncFull(); }
   });
   document.addEventListener('fullscreenchange', syncFull);
-  document.addEventListener('keydown', event => { if (event.key === 'Escape' && overlay) { overlay = false; syncFull(); fullButton.focus(); } });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    // Escape first cancels a measure, then leaves the overlay full screen.
+    if (measure) stopMeasure();
+    else if (overlay) { overlay = false; syncFull(); fullButton.focus(); }
+  });
 
   new ResizeObserver(() => {
     const ready = width > 0;
