@@ -16,8 +16,6 @@
 .chaine-map-chip:has(input:not(:checked)){background:#f2f3f0;color:#9aa39e;text-decoration:line-through;border-style:dashed}
 .chaine-map-chip:has(input:focus-visible){outline:3px solid #e5a941;outline-offset:2px}
 .chaine-map-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#9aa39e;flex:none}
-.chaine-map-dot[data-grade="Grenier"]{background:#d39b16}.chaine-map-dot[data-grade="Passeur"]{background:#2f7fb5}.chaine-map-dot[data-grade="Chasseur"]{background:#7d55b8}
-.chaine-map-dot[data-grade="A flooder"]{background:#d06a24}.chaine-map-dot[data-grade="Ne pas toucher"]{background:#c0405a}.chaine-map-dot[data-grade="Hors chaîne"]{background:#5f7584}
 .chaine-map-display{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
 .chaine-map-select select{width:auto!important}
 .chaine-map-toggle{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;white-space:nowrap}

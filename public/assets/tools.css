@@ -5,3 +5,37 @@
 .tool-panel .simrow{margin-top:16px}.tool-panel .radios.row{display:flex;flex-wrap:wrap;gap:8px}.tool-panel .radios label{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid var(--rc-line);border-radius:999px;cursor:pointer;font-size:14px;background:#fff}.tool-panel .radios input{accent-color:var(--rc-accent);margin:0;width:15px;height:15px}.tool-panel .radios label:has(input:checked){background:#e8f3f1;border-color:var(--rc-accent);font-weight:700}.tool-panel .btn{margin-top:18px;background:var(--rc-ink);color:#fff;border:0;border-radius:10px;padding:12px 25px;font:inherit;font-weight:750;cursor:pointer}.tool-panel .btn:hover{background:var(--rc-accent)}
 .tool-panel #rc-out:not(:empty){margin-top:24px}.tool-panel .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}.tool-panel .kpi{padding:20px 18px;background:#f6faf9}.tool-panel .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:800;color:var(--rc-muted);margin-bottom:12px}.tool-panel .kpi .v{font-size:29px;font-weight:800;line-height:1.2;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.tool-panel .kpi .muted{margin-top:8px;font-size:12px}.tool-panel .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px;margin:16px 0}.tool-panel .pairs{display:flex;flex-wrap:wrap;gap:7px}.tool-panel .pairs .tag{display:inline-block;padding:6px 10px;border-radius:8px;background:#eef4f5;font-size:12px;font-weight:650}.tool-panel .down{color:#a33c39;font-weight:650}.tools-privacy{margin-top:22px;color:var(--rc-muted);font-size:12px;border-top:1px solid var(--rc-line);padding-top:14px}
 @media(max-width:760px){.tool-panel .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.tool-panel .card{padding:17px}.tool-panel .kpi .v{font-size:25px}.tool-panel h2{font-size:21px}.tools-heading{margin-bottom:18px}.tool-panel .radios label{font-size:12px;padding:8px 10px}.tools-tabs button{padding:12px 15px}.tool-panel .bigta{font-size:13px;min-height:240px}}
+/* Trajets: distances and travel times to alliances */
+.tools-page:has(#panel-trajets:not([hidden])){max-width:none}
+.trajets-form{display:grid;gap:18px}
+.trajets-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px}
+.trajets-field span,.trajets-alliances legend{display:block;font-weight:750;margin-bottom:8px}
+.trajets-field input,.trajets-filter{box-sizing:border-box;width:100%;padding:11px 13px;border:1px solid #b9ced6;border-radius:10px;background:#f8fbfc;color:var(--rc-ink);font:inherit}
+.trajets-field small{display:block;margin-top:6px;color:var(--rc-muted);font-size:12px;line-height:1.5}
+.trajets-alliances{margin:0;padding:0;border:0;min-width:0}
+.trajets-alliances legend small{font-weight:600;color:var(--rc-muted)}
+.trajets-alliance-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;max-height:230px;overflow:auto;margin-top:10px;padding:4px}
+.trajets-alliance{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--rc-line);border-radius:999px;background:#fff;font-size:13px;cursor:pointer}
+.trajets-alliance[hidden]{display:none}
+.trajets-alliance small{margin-left:auto;color:var(--rc-muted);font-weight:700}
+.trajets-alliance input{accent-color:var(--rc-accent);margin:0;width:15px;height:15px;flex:none}
+.trajets-alliance:has(input:checked){background:#e8f3f1;border-color:var(--rc-accent);font-weight:700}
+.trajets-empty{margin:8px 0 0;color:var(--rc-muted);font-size:13px}
+.trajets-form .btn{margin-top:0;justify-self:start}
+.tool-panel .trajets-summary{margin-top:20px;padding:16px 20px}
+.trajets-summary p{margin:0}.trajets-summary p+p{margin-top:4px;font-size:13px}
+.trajets-tag{display:inline-block;padding:2px 8px;border-radius:6px;background:#eef4f5;font-size:12px;font-weight:700}
+.trajets-table-wrap{margin-top:16px;max-height:min(60vh,620px);overflow:auto;border:1px solid var(--rc-line);border-radius:14px;background:#fff}
+.trajets-table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.trajets-table th,.trajets-table td{padding:10px 12px;text-align:left;border-bottom:1px solid #edf2f3;white-space:nowrap}
+.trajets-table thead th{position:sticky;top:0;z-index:1;background:#f3f8f8;color:var(--rc-muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.trajets-table td:nth-child(n+4):not(:last-child){text-align:right}.trajets-table thead th:nth-child(n+4):not(:last-child){text-align:right}
+.trajets-table td:first-child{color:var(--rc-muted)}
+.trajets-table tbody tr:hover>*{background:#f6faf9}
+.trajets-state{margin-left:6px;padding:1px 7px;border-radius:999px;background:#fff0c9;color:#7a5600;font-size:11px;font-weight:700}
+.trajets-show{padding:5px 10px;border:1px solid #c9d4d8;border-radius:6px;background:#fff;color:var(--rc-ink);font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.trajets-show:hover{background:#e8f3f1}
+.trajets-map{margin-top:24px;border:1px solid var(--rc-line);border-radius:14px;background:#fffefd;overflow:visible}
+.trajets-map-heading{display:flex;align-items:center;gap:12px;padding:16px 25px;border-bottom:1px solid #e6e9e6}
+.trajets-map-heading h3{margin:0}
+.cm-alliance{padding:2px 7px;border:1px solid;border-radius:5px;background:#fffefd;font-size:11px;font-weight:700;color:#1d3440;box-shadow:0 1px 2px #0a1e2a14}

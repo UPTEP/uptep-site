@@ -4,6 +4,7 @@ require '/home/uptep/private/app/bootstrap.php';
 require '/home/uptep/private/app/view.php';
 require '/home/uptep/private/app/chaine.php';
 require '/home/uptep/private/app/chaine-focus.php';
+require '/home/uptep/private/app/map-view.php';
 $u=requireUser();$canEdit=(bool)$u['is_chaine'];$error='';$unavailable=false;
 $success=$_SESSION['chaine_saved']??false;unset($_SESSION['chaine_saved']);
 if ($_SERVER['REQUEST_METHOD']==='POST') {
@@ -79,19 +80,12 @@ foreach($players as $player){
         'grade'=>$player['chaine_grade'],'order'=>$player['sort_order']===null?null:(int)$player['sort_order'],
         'self'=>$focus['self']===(int)$player['player_id']]+($mapTimes?['speed'=>$speeds[(string)$player['player_id']]??null]:[]);
 } ?>
-<link rel="stylesheet" href="/assets/chaine-map.css?v=9"><script src="/assets/chaine-map.js?v=8" defer></script>
+<link rel="stylesheet" href="/assets/uptep-map.css?v=1"><script src="/assets/uptep-map.js?v=1" defer></script><script src="/assets/chaine-map.js?v=9" defer></script>
 <section class="users-panel chaine-map-panel" aria-labelledby="chaine-map-title"><div class="users-panel-heading"><h2 id="chaine-map-title">Carte de l’alliance</h2><span class="user-count" data-map-count><?= count($mapPlayers) ?> membres</span></div>
 <?php if(!$mapPlayers): ?><p class="chaine-empty">Aucun membre avec des coordonnées dans le dernier relevé.</p><?php else: ?>
 <script type="application/json" id="chaine-map-data"><?= json_encode(['players'=>$mapPlayers,'grades'=>CHAINE_GRADES,'times'=>$mapTimes],JSON_UNESCAPED_UNICODE|JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR) ?></script>
-<div class="chaine-map" data-chaine-map><form class="chaine-map-filters" data-map-filters aria-label="Filtres de la carte">
-<fieldset><legend>Grade de chaîne</legend><div class="chaine-map-chips" data-map-options="grade"></div></fieldset>
-<fieldset><legend>Affichage</legend><div class="chaine-map-display"><label class="chaine-map-select"><span class="sr-only">Étiquettes</span><select name="labels"><option value="grade">Étiquettes : pseudo + grade</option><option value="pseudo">Étiquettes : pseudo</option><option value="none">Sans étiquettes</option></select></label><label class="chaine-map-toggle"><input type="checkbox" name="sized"> Taille selon le TDC</label></div></fieldset>
-<button type="reset" class="chaine-map-reset">Réinitialiser</button>
-</form>
-<div class="chaine-map-view"><div class="chaine-map-toolbar"><button type="button" data-map-zoom="in" aria-label="Zoom avant">+</button><button type="button" data-map-zoom="out" aria-label="Zoom arrière">−</button><button type="button" data-map-zoom="fit" aria-label="Recentrer sur les membres affichés">↺</button><button type="button" class="chaine-map-full" data-map-fullscreen aria-pressed="false">Plein écran</button><span class="chaine-map-hint">Clic sur un membre pour mesurer une distance<?= $mapTimes?' et un temps de trajet':'' ?> · molette ou +/− pour zoomer · glisser pour déplacer.</span></div>
-<div class="chaine-map-surface" data-map-surface><svg data-map-svg role="img" aria-labelledby="chaine-map-title" tabindex="0"></svg><div class="chaine-map-labels" data-map-labels aria-hidden="true"></div><div class="chaine-map-tip" data-map-tip hidden></div></div>
-<div class="chaine-map-legend" data-map-legend aria-hidden="true"></div>
-</div></div><?php endif; ?></section>
+<?= uptepMapMarkup('chaine','chaine-map-title','Grade de chaîne','grade','Clic sur un membre pour mesurer une distance'.($mapTimes?' et un temps de trajet':'').' · molette ou +/− pour zoomer · glisser pour déplacer.') ?>
+<?php endif; ?></section>
 <?php $mapSection=ob_get_clean(); ?>
 <?php foreach($groups as $group=>$tablePlayers): $outside=$group==='outside'; ?>
 <section class="users-panel" aria-labelledby="chaine-title-<?= e($group) ?>"><div class="users-panel-heading"><h2 id="chaine-title-<?= e($group) ?>"><?= $outside?'Hors chaîne':'UPTEP · Serveur 5' ?></h2><span class="user-count"><?= count($tablePlayers) ?> membres</span><?php if($latest): ?><span class="chaine-updated">Dernier relevé : <?= e(chaineDate($latest)) ?> <span>(Paris)</span></span><?php endif; ?></div>
