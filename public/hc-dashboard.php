@@ -28,11 +28,6 @@ try{
         'tdp'=>$r['buildings_synced_at']&&$r['research_synced_at']?min($r['buildings_synced_at'],$r['research_synced_at']):null,
         'workers'=>$r['workers_synced_at'],'army'=>$r['army_synced_at'],
     ]];
-    // The game header excludes workers away on a convoy (10 per worker, +5 % per aphid stable level).
-    // A collected figure therefore misses the convoys that were travelling when it was collected.
-    $convoys=[];$nowTs=time();
-    $q=db()->query("SELECT idenvoyeur,nbpomme,nbmateriaux,date_convoi,date_arrivee FROM convois_effectues WHERE annule=false AND date_arrivee>now()-interval '30 days'");
-    foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r)$convoys[(string)$r['idenvoyeur']][]=['res'=>(int)$r['nbpomme']+(int)$r['nbmateriaux'],'from'=>(new DateTimeImmutable($r['date_convoi']))->getTimestamp(),'to'=>(new DateTimeImmutable($r['date_arrivee']))->getTimestamp()];
     $sources=hcDetailSources([]);
     // Base attack per army key (official unit order and values from the combat engine in combat-analyze.cjs).
     $attack=['jsn'=>3,'sn'=>5,'ne'=>7,'js'=>10,'s'=>15,'c'=>1,'ce'=>1,'a'=>30,'ae'=>35,'se'=>24,'t'=>55,'te'=>80,'tu'=>50,'tue'=>55];
@@ -53,21 +48,10 @@ try{
         // Flood capacity: all army units added up, whatever their type (no weapons level needed).
         $cdf=null;
         if(is_array($army)&&$army){$sum=0;foreach(array_keys($attack) as $key){$n=$army[$key]??'0';if(!is_string($n)||!preg_match('/^[0-9]{1,13}$/D',$n)){$sum=null;break;}$sum+=(int)$n;}$cdf=$sum;}
-        $stable=$level($st['buildings']['etable_pucerons']??null)??0;
-        // Capacity per worker is 10*(20+level)/20, so workers needed = ceil(resources*2/(20+level)).
-        $syncAt=($st['_at']['workers']??null)?(new DateTimeImmutable($st['_at']['workers']))->getTimestamp():null;
-        // Workers away when the figure was collected: still travelling now, or already back since.
-        $still=0;$back=0;
-        foreach($convoys[$id]??[] as $c){
-            if($syncAt===null||$c['from']>$syncAt||$c['to']<=$syncAt)continue;
-            $w=intdiv($c['res']*2+19+$stable,20+$stable);
-            if($c['to']>$nowTs)$still+=$w;else $back+=$w;
-        }
-        if(is_string($workers)&&strlen($workers)<=17&&$still+$back>0)$workers=(string)((int)$workers+$still+$back);else{$still=0;$back=0;}
         $rows[]=[
             'id'=>$id,'convoys_out'=>count($sources['convoys_out'][$id]??[]),'convoys_in'=>count($sources['convoys_in'][$id]??[]),'floods_out'=>count($sources['floods_out'][$id]??[]),'floods_in'=>count($sources['floods_in'][$id]??[]),'name'=>$p['pseudo'],'tdp'=>($sol!==null&&$cou!==null&&$tech!==null)?$sol+$cou+$tech:null,'tdp_detail'=>"Solarium $sol + couveuse $cou + technique de ponte $tech",
             'workers'=>is_string($workers)&&preg_match('/^(0|[1-9][0-9]{0,18})$/D',$workers)?$workers:null,
-            'workers_transit'=>$still,'workers_back'=>$back,'weapons'=>$weapons,'shield'=>$shield,'speed'=>$speed,'fdf'=>$fdf,'cdf'=>$cdf,'army_at'=>$st['_at']['army']??null,'tdp_at'=>$st['_at']['tdp']??null,'workers_at'=>$st['_at']['workers']??null,'grade'=>$chain[$id]['grade']??null,'field'=>$p['field']===null?null:(int)$p['field'],
+            'weapons'=>$weapons,'shield'=>$shield,'speed'=>$speed,'fdf'=>$fdf,'cdf'=>$cdf,'army_at'=>$st['_at']['army']??null,'tdp_at'=>$st['_at']['tdp']??null,'workers_at'=>$st['_at']['workers']??null,'grade'=>$chain[$id]['grade']??null,'field'=>$p['field']===null?null:(int)$p['field'],
             'registered'=>$a&&$a['active']?'yes':($a&&$a['pending']?'pending':'no'),
             'script'=>$a&&$a['active']&&$a['script_seen']?$a['script_seen']:null,
         ];
@@ -93,7 +77,7 @@ workspaceStart($u,'HC - Dashboard');
 <td><span class="chaine-badge <?= $r['grade']===null?'is-unassigned':'' ?>" data-grade="<?= e($r['grade']??'') ?>"><?= e($r['grade']??'Non attribué') ?></span></td>
 <td class="hc-field"><?= $r['field']===null?'—':'<span title="'.e(number_format($r['field'],0,',',' ')).'">'.e(hcCompact($r['field'])).'</span>' ?></td>
 <td class="hc-field"><?php if($r['tdp']!==null): ?><span title="<?= e($r['tdp_detail']) ?>"><?= (int)$r['tdp'] ?></span><?php if(hcDate($r['tdp_at'])): ?><span class="hc-status-note"><?= e(hcDate($r['tdp_at'],'d/m/Y')) ?></span><?php endif; ?><?php else: ?><span class="hc-unknown" title="Données UPTEP+ indisponibles">—</span><?php endif; ?></td>
-<td class="hc-field"><?php if($r['workers']!==null): ?><span title="<?= e(strrev(trim(chunk_split(strrev($r['workers']),3,' '))).($r['workers_transit']>0?' · dont '.number_format($r['workers_transit'],0,',',' ').' en convoi':'').($r['workers_back']>0?' · dont '.number_format($r['workers_back'],0,',',' ').' revenus de convoi depuis la récolte':'')) ?>"><?= e(hcCompact($r['workers'])) ?></span><?php if($r['workers_transit']>0): ?><span class="hc-status-note">dont <?= e(hcCompact($r['workers_transit'])) ?> en convoi</span><?php endif; ?><?php if($r['workers_back']>0): ?><span class="hc-status-note">dont <?= e(hcCompact($r['workers_back'])) ?> revenus de convoi</span><?php endif; ?><?php if(hcDate($r['workers_at'])): ?><span class="hc-status-note"><?= e(hcDate($r['workers_at'],'d/m/Y')) ?></span><?php endif; ?><?php else: ?><span class="hc-unknown" title="Données UPTEP+ indisponibles">—</span><?php endif; ?></td>
+<td class="hc-field"><?php if($r['workers']!==null): ?><span title="<?= e(strrev(trim(chunk_split(strrev($r['workers']),3,' ')))) ?>"><?= e(hcCompact($r['workers'])) ?></span><?php if(hcDate($r['workers_at'])): ?><span class="hc-status-note"><?= e(hcDate($r['workers_at'],'d/m/Y')) ?></span><?php endif; ?><?php else: ?><span class="hc-unknown" title="Données UPTEP+ indisponibles">—</span><?php endif; ?></td>
 <?php foreach(['weapons','shield','speed'] as $k): ?><td class="hc-field"><?= $r[$k]===null?'<span class="hc-unknown" title="Données UPTEP+ indisponibles">—</span>':(int)$r[$k] ?></td><?php endforeach; ?>
 <td class="hc-field"><?php if($r['fdf']!==null): ?><span title="<?= e(number_format($r['fdf'],0,',',' ').' · armée × attaque de base × (1 + 10 % × niveau d’armes)') ?>"><?= e(hcCompact($r['fdf'])) ?></span><?php if(hcDate($r['army_at'])): ?><span class="hc-status-note"><?= e(hcDate($r['army_at'],'d/m/Y')) ?></span><?php endif; ?><?php else: ?><span class="hc-unknown" title="Données UPTEP+ indisponibles">—</span><?php endif; ?></td>
 <td class="hc-field"><?php if($r['cdf']!==null): ?><span title="<?= e(number_format($r['cdf'],0,',',' ').' unités · capacité de flood (toutes les unités de l’armée)') ?>"><?= e(hcCompact($r['cdf'])) ?></span><?php if(hcDate($r['army_at'])): ?><span class="hc-status-note"><?= e(hcDate($r['army_at'],'d/m/Y')) ?></span><?php endif; ?><?php else: ?><span class="hc-unknown" title="Données UPTEP+ indisponibles">—</span><?php endif; ?></td>

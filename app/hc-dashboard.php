@@ -114,7 +114,7 @@ function hcDetailHtml(array $row,array $src,?array $chain):string{
         'TDP'=>$row['tdp']!==null?e((string)$row['tdp']).' <span class="hc-detail-note">('.e($row['tdp_detail']).')</span>':hcText(null),
         'FDF'=>$row['fdf']!==null?e(hcGroup($row['fdf'])).' <span class="hc-detail-note">(armée × attaque de base × (1 + 10 % × niveau d’armes))</span>':hcText(null),
         'CDF'=>$row['cdf']!==null?e(hcGroup($row['cdf'])).' <span class="hc-detail-note">(toutes les unités de l’armée)</span>':hcText(null),
-        'Ouvrières'=>$row['workers']!==null?e(hcGroup($row['workers'])).($row['workers_transit']>0?' <span class="hc-detail-note">(dont '.e(hcGroup($row['workers_transit'])).' en convoi)</span>':'').($row['workers_back']>0?' <span class="hc-detail-note">(dont '.e(hcGroup($row['workers_back'])).' revenus de convoi depuis la récolte)</span>':''):hcText(null),
+        'Ouvrières'=>$row['workers']!==null?e(hcGroup($row['workers'])):hcText(null),
     ];
     $html.=hcSection('Valeurs calculées',hcDl($derived));
     $stats=null;
