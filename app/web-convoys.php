@@ -57,7 +57,7 @@ function convoyPrepare(array $m): array {
     return ['overage'=>$excess,'action'=>$action,'id'=>$id,'body'=>$body,'auto_warning'=>$action==='convoi'&&(bool)botDemand(db(),$id)['auto_production'],'expires'=>time()+3600];
 }
 function convoyEvent(PDO $p,string $kind,array $payload): void {
-    $q=$p->prepare('INSERT INTO convoy_web_events(kind,payload) VALUES(?,?::jsonb)');$q->execute([$kind,json_encode($payload,JSON_THROW_ON_ERROR)]);
+    $q=$p->prepare('INSERT INTO convoy_web_events(kind,payload) VALUES(?,?::jsonb)');$q->execute([$kind,json_encode($payload,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE)]);
 }
 function convoyDate(?string $raw): string {
     return $raw?(new DateTimeImmutable($raw))->setTimezone(new DateTimeZone('Europe/Paris'))->format('d/m/Y H:i'):'—';
