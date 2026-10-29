@@ -128,10 +128,16 @@ function resourceBalanceSort(array $rows,string $key,bool $asc):array{
 }
 
 function resourceNumber(float $v):string{return number_format($v,0,',',' ');}
+/** Three significant digits with k, M, G or T ("46,5M", "400k", "−1,5k"); 999 950 rounds up to "1M". */
 function resourceCompact(float $v):string{
-    $a=abs($v);$sign=$v<0?'−':'';
-    foreach([[1e9,'G'],[1e6,'M'],[1e3,'k']] as [$unit,$suffix])if($a>=$unit)return $sign.rtrim(rtrim(number_format($a/$unit,$a/$unit>=100?0:($a/$unit>=10?1:2),',',''),'0'),',').$suffix;
-    return $sign.number_format($a,0,',',' ');
+    $a=abs($v);$sign=$a>=0.5&&$v<0?'−':'';
+    if(round($a)<1000)return $sign.number_format($a,0,',',' ');
+    $suffixes=['k','M','G','T'];$scale=min(4,(int)floor(log10($a)/3));
+    $n=$a/1000**$scale;$decimals=$n>=100?0:($n>=10?1:2);$n=round($n,$decimals);
+    if($n>=1000&&$scale<4){$scale++;$n=round($a/1000**$scale,2);$decimals=2;}
+    $text=number_format($n,$decimals,',',' ');
+    if($decimals>0)$text=rtrim(rtrim($text,'0'),',');
+    return $sign.$text.$suffixes[$scale-1];
 }
 
 /** Server-rendered SVG of the alliance production per hour (presentation attributes only, for the strict CSP). */

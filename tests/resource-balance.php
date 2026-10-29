@@ -54,6 +54,7 @@ $svg=resourceBalanceSvg($data);check(str_contains($svg,'<svg')&&!str_contains($s
 $p->exec('DELETE FROM user_stats');$assumed=resourceBalanceData($p,$p,$now);$beta=array_column($assumed['rows'],null,'pseudo')['Beta'];
 check($assumed['assumed_rates']&&near($beta['taxe_payee'],300.0),'unknown stable level: 20 %');
 $early=resourceBalanceData($p,$p,new DateTimeImmutable('2026-10-10T20:00:00Z'));check($early['cycles']===0&&!$early['rows'],'nothing before the start');
-check(resourceCompact(1093071255.0)==='1,09G'&&resourceCompact(-1500.0)==='−1,5k'&&resourceCompact(42.0)==='42','compact numbers');
+foreach(['1,09G'=>1093071255.0,'−1,5k'=>-1500.0,'42'=>42.0,'400k'=>400000.0,'120k'=>119969.0,'100M'=>1e8,'46,5M'=>46512628.0,'1M'=>999950.0,'1k'=>999.6,'2,5T'=>2.5e12,'1 500T'=>1.5e15,'0'=>-0.2]
+    as $want=>$v)check(resourceCompact($v)===(string)$want,'compact '.$v.' = '.$want.', got '.resourceCompact($v));
 echo "OK: current members only, deduplicated exports, cycles, equal shares, internal colony tax, materials convoys, gaps, entry dates, sorting and chart.\n";
 }finally{$p->rollBack();}

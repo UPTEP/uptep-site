@@ -22,11 +22,12 @@ $th=static function(string $key,string $label)use($sort,$asc):string{
     $aria=$active?' aria-sort="'.($asc?'ascending':'descending').'"':'';
     return '<th scope="col"'.$aria.'><a class="resource-sort" href="?tri='.$key.'&amp;ordre='.$next.'">'.$label.'<span aria-hidden="true">'.($active?($asc?' ↑':' ↓'):' ↕').'</span></a></th>';
 };
-$signed=static fn(float $v)=>($v>0.5?'+':($v<-0.5?'−':'')).resourceNumber(abs($v));
+// Compact amount (k, M, G, T); the exact value stays in the tooltip.
+$amount=static fn(float $v,bool $signed=false)=>'<span title="'.e(($signed&&$v>0.5?'+':'').resourceNumber($v)).'">'.e(($signed&&$v>=500?'+':'').resourceCompact(round($v))).'</span>';
 $verdicts=['convoyer'=>'Doit convoyer','recevoir'=>'Doit recevoir','equilibre'=>'Équilibré','aucun'=>'—'];
 workspaceStart($u,'Gestion des Ressources');
 ?>
-<link rel="stylesheet" href="/assets/ressources.css?v=3">
+<link rel="stylesheet" href="/assets/ressources.css?v=4">
 <section class="resources-page">
 <h1>Gestion des Ressources</h1>
 <p class="admin-intro">Production de matériaux de l’alliance mise en commun et partagée à parts égales, comparée à ce que chaque membre a gardé après colonies et convois.</p>
@@ -37,9 +38,9 @@ workspaceStart($u,'Gestion des Ressources');
 <p>Depuis le <?= e($date($data['start'],'d/m/Y')) ?>, date du premier convoi déclaré, chaque cycle de 30 minutes produit 1 matériau par cm² de terrain, d’après le dernier relevé horaire. La production d’un cycle est additionnée pour l’alliance puis partagée à parts égales entre les membres présents à ce moment. Les anciens membres ne sont pas comptés.</p>
 <p>Une colonie verse à son colonisateur 20 % + 1 point par niveau d’étable à pucerons de celui-ci (100 % au plus), lorsque les deux sont membres.<?= $data['assumed_rates']?' Étable inconnue pour au moins un colonisateur : 20 % retenus.':'' ?> Net = production + colonies − matériaux envoyés + matériaux reçus. Écart = net − part : positif, le membre a gardé plus que sa part et doit convoyer ; négatif, il doit recevoir. Équilibré à ±<?= (int)(RESOURCE_BALANCE_TOLERANCE*100) ?> % de la part.</p></div>
 <div class="resource-summary">
-<div><span>Production de l’alliance</span><strong><?= e(resourceCompact($data['total'])) ?></strong><small><?= e(resourceNumber($data['total'])) ?> matériaux · <?= e(resourceNumber($data['cycles'])) ?> cycles</small></div>
-<div><span>Production actuelle / heure</span><strong><?= e(resourceCompact($data['current'])) ?></strong><small><?= e(resourceNumber($data['current']/$members)) ?> par membre</small></div>
-<div><span>Convois de matériaux</span><strong><?= e(resourceCompact($data['materials'])) ?></strong><small><?= e(resourceNumber($data['convoys'])) ?> convois déclarés</small></div>
+<div><span>Production de l’alliance</span><strong><?= $amount($data['total']) ?></strong><small>matériaux · <?= e(resourceNumber($data['cycles'])) ?> cycles</small></div>
+<div><span>Production actuelle / heure</span><strong><?= $amount($data['current']) ?></strong><small><?= $amount($data['current']/$members) ?> par membre</small></div>
+<div><span>Convois de matériaux</span><strong><?= $amount($data['materials']) ?></strong><small><?= e(resourceNumber($data['convoys'])) ?> convois déclarés</small></div>
 <div><span>Membres · colonies</span><strong><?= $members ?> · <?= (int)$data['colonies'] ?></strong><small>Jusqu’au <?= e($date($data['end'])) ?> (Paris)</small></div>
 </div>
 <?php if($svg=resourceBalanceSvg($data)): ?><section class="users-panel resource-chart-panel"><div class="users-panel-heading"><h2>Production de l’alliance par heure</h2></div><div class="users-scroll"><?= $svg ?></div></section><?php endif; ?>
@@ -50,17 +51,17 @@ workspaceStart($u,'Gestion des Ressources');
 <?php foreach($data['rows'] as $r): ?>
 <tr class="resource-<?= e($r['verdict']) ?>"><th scope="row"><?= e($r['pseudo']) ?></th>
 <td><?= $r['entree']?e($date($r['entree'],'d/m H\h')):'—' ?></td>
-<td><?= e(resourceNumber($r['terrain'])) ?></td>
-<td><?= e(resourceNumber($r['production'])) ?></td>
-<td title="<?= e('Reçu : '.resourceNumber($r['taxe_recue']).' · Versé : '.resourceNumber($r['taxe_payee'])) ?>"><?= e($signed($r['colonie'])) ?></td>
-<td><?= e(resourceNumber($r['part'])) ?></td>
-<td><?= e(resourceNumber($r['envoye'])) ?></td>
-<td><?= e(resourceNumber($r['recu'])) ?></td>
-<td><?= e(resourceNumber($r['net'])) ?></td>
-<td class="resource-gap"><?= e($signed($r['ecart'])) ?></td>
+<td><?= $amount($r['terrain']) ?></td>
+<td><?= $amount($r['production']) ?></td>
+<td title="<?= e('Reçu : '.resourceNumber($r['taxe_recue']).' · Versé : '.resourceNumber($r['taxe_payee'])) ?>"><?= e(($r['colonie']>=500?'+':'').resourceCompact(round($r['colonie']))) ?></td>
+<td><?= $amount($r['part']) ?></td>
+<td><?= $amount($r['envoye']) ?></td>
+<td><?= $amount($r['recu']) ?></td>
+<td><?= $amount($r['net']) ?></td>
+<td class="resource-gap"><?= $amount($r['ecart'],true) ?></td>
 <td><?= $r['ratio']===null?'—':e(number_format($r['ratio']*100,0,',',' ').' %') ?></td>
 <td><span class="resource-verdict"><?= e($verdicts[$r['verdict']]) ?></span></td></tr>
 <?php endforeach; ?></tbody></table></div></section>
-<p class="resource-legend">Envoyés et reçus : convois déclarés non annulés, matériaux uniquement, à leur date de départ.<?= $data['outside']>0?' Dont '.e(resourceNumber($data['outside'])).' échangés avec d’anciens membres : comptés seulement du côté du membre actuel.':'' ?> Survole la colonne Colonies pour le détail versé et reçu.</p>
+<p class="resource-legend">Envoyés et reçus : convois déclarés non annulés, matériaux uniquement, à leur date de départ.<?= $data['outside']>0?' Dont '.$amount($data['outside']).' échangés avec d’anciens membres : comptés seulement du côté du membre actuel.':'' ?> Survole la colonne Colonies pour le détail versé et reçu.</p>
 <?php endif; ?></section>
 <?php workspaceEnd(); ?>
