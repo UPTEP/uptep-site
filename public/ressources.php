@@ -121,9 +121,6 @@ workspaceStart($u,'Statistiques');
 <li><svg width="18" height="14" aria-hidden="true"><line x1="0" x2="18" y1="7" y2="7" stroke="#52514e" stroke-width="1.5" stroke-dasharray="6 4"/></svg>Conso moyenne<?php if($conso['average']!==null): ?> (<?= e(consumptionK($conso['average'])) ?>k/j)<?php endif; ?></li></ul>
 <div class="conso-scroll" tabindex="0" role="region" aria-label="Graphique de consommation, défilant horizontalement"><?= convoyConsumptionSvg($conso) ?></div>
 <p class="daily-note">Nom · TdC moyen, greniers en gras. Production = 48 × TdC par jour (une ressource par cm² et par cycle de 30 min). Taxe de colonie : 20 % de la production de la colonie, + 1 point par niveau d’étable à pucerons du colonisateur quand il est connu<?= $conso['assumed_rates']?' (20 % sinon)':'' ?>. Convois de matériaux déclarés, comptés à leur date de départ. Même graphique que dans Demandes et convois → Statistiques, où les pommes sont aussi comptées.</p>
-<details class="conso-table"><summary>Voir les chiffres</summary><div class="users-panel users-scroll"><table class="users-table"><thead><tr><th scope="col">Joueur</th><th scope="col">TdC moyen</th><?php foreach(CONSUMPTION_LABELS as $label): ?><th scope="col"><?= e($label) ?> / j</th><?php endforeach; ?><th scope="col">Conso / j</th></tr></thead><tbody>
-<?php foreach($conso['rows'] as $r): ?><tr><th scope="row"><?= e($r['pseudo']) ?></th><td><?= $amount($r['tdc']) ?></td><?php foreach(array_keys(CONSUMPTION_LABELS) as $k): ?><td><?= $amount($r[$k]) ?></td><?php endforeach; ?><td><strong><?= $amount($r['conso']) ?></strong></td></tr><?php endforeach; ?>
-</tbody></table></div></details>
 </section>
 <?php endif; ?>
 
