@@ -6,9 +6,9 @@ require '/home/uptep/private/app/resource-balance.php';
 require '/home/uptep/private/app/resource-activity.php';
 require '/home/uptep/private/app/convoy-consumption.php';
 $u=requireUser();
-if ($u['role'] !== 'admin') {
+if ($u['role'] !== 'admin' && empty($u['is_chef'])) {
     http_response_code(403); workspaceStart($u, 'Accès réservé');
-    echo '<h1>Accès réservé</h1><p>Les statistiques de l’alliance sont réservées aux administrateurs.</p>';
+    echo '<h1>Accès réservé</h1><p>Les statistiques de l’alliance sont réservées aux chefs et aux administrateurs.</p>';
     workspaceEnd(); exit;
 }
 $sort=is_string($_GET['tri']??null)&&in_array($_GET['tri'],RESOURCE_BALANCE_SORTS,true)?$_GET['tri']:'ecart';

@@ -76,7 +76,7 @@ Le guide « L’attaque à la 59e seconde » est présenté sur l’accueil apr�
 
 ### Ressources et visualisation des droits
 
-Le menu « Statistiques » et `/ressources.php` sont réservés au rôle `admin`, avec contrôle côté serveur et HTTP403 pour tout autre rôle, même chef ou gestionnaire de chaîne.
+Le menu « Statistiques » et `/ressources.php` sont réservés aux chefs (`is_chef`) et au rôle `admin`, avec contrôle côté serveur et HTTP403 pour tout autre compte, même gestionnaire de chaîne. Les chefs y voient aussi l’entrepôt estimé, issu des relevés de ressources UPTEP+.
 
 La page compare, sur une période choisie (du 11/10/2026, premier convoi déclaré, à maintenant par défaut ; dates `debut` et `fin` incluses, heure de Paris), la production de matériaux de chaque membre actuel à une part égale de la production de l’alliance (`app/resource-balance.php`). Chaque cycle de 30 minutes produit 1 matériau par cm² de terrain d’après le dernier relevé horaire FZZZ ; le total du cycle est partagé entre les membres UPTEP présents dans ce relevé. Les anciens membres ne sont pas comptés. Les colonies entre membres versent 20 % + 1 point par niveau d’étable à pucerons du colonisateur (20 % si inconnu, 100 % au plus). Net = production + colonies − matériaux envoyés + matériaux reçus (convois déclarés non annulés, à leur date de départ) ; écart = net − part, positif pour un membre qui doit convoyer. La colonne « Entrepôt estimé » part du dernier relevé de matériaux UPTEP+ de moins de 48 h, ajoute la production de chaque cycle depuis (colonies comprises), retire les convois envoyés depuis (au départ) et ajoute les convois reçus depuis (à l’arrivée) ; dépenses et capacité d’entrepôt non connues. L’entrepôt estimé est toujours calculé à maintenant, quelle que soit la période. La même période s’applique au graphique de consommation repris de Demandes et convois → Statistiques (convois de matériaux uniquement), aux floods (`app/resource-activity.php` : envoyés, reçus, troupes déclarées, à l’heure d’arrivée ; le terrain pris n’est pas enregistré) et aux chasses relevées par UPTEP+ ou Discord (terrain chassé, en cours). Test : `python3 tests/run-resource-balance.py`.
 
@@ -93,7 +93,7 @@ Appliquer `app/convoy-events.sql` dans la base UPTEP avec propriétaire `uptep`,
 
 Vérification : `php tests/web-convoys.php`, `python3 tests/run-bot-convoys.py` (PostgreSQL local, schéma temporaire), et `npm test` dans le dépôt du bot. Aucune notification Discord réelle n'est nécessaire aux tests.
 
-Le lien de navigation UPTEP+ est temporairement visible uniquement pour les administrateurs, comme Ressources, y compris en mode visualisation membre. Cette restriction porte sur le menu ; les autorisations du userscript restent gérées séparément.
+Le lien de navigation UPTEP+ est temporairement visible uniquement pour les administrateurs, y compris en mode visualisation membre. Cette restriction porte sur le menu ; les autorisations du userscript restent gérées séparément.
 
 ### Outils et calculateur de bonus RC
 
