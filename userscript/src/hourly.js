@@ -26,6 +26,9 @@ function mountHourlyCollection(context,auth){
   win.addEventListener('message',receive);frame.addEventListener('load',send);timeout=win.setTimeout(cleanup,20000);doc.body.append(frame);
  }
  // Web Locks serialize simultaneous tabs; the storage lease is the fallback.
- if(win.navigator.locks?.request){win.navigator.locks.request(key,{ifAvailable:true},lock=>{if(!lock||stopped)return;return new Promise(resolve=>{release=resolve;start();});}).catch(()=>{if(!stopped)start();});}else start();
+ // Under Firefox the page calls the lock callback: it must be exported and return a page promise, or it never runs.
+ let callback=lock=>{if(!lock||stopped)return;return new Promise(resolve=>{release=resolve;start();});};
+ if(typeof exportFunction==='function'&&win.wrappedJSObject){const pageWindow=win.wrappedJSObject;callback=exportFunction(lock=>{if(!lock||stopped)return;return new pageWindow.Promise(exportFunction(resolve=>{release=()=>resolve();start();},pageWindow));},pageWindow);}
+ if(win.navigator.locks?.request){win.navigator.locks.request(key,{ifAvailable:true},callback).catch(()=>{if(!stopped)start();});}else start();
  return cleanup;
 }
