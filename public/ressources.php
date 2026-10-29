@@ -64,7 +64,7 @@ $unavailable='<p class="form-error" role="alert">Cette partie est indisponible p
 workspaceStart($u,'Statistiques');
 ?>
 <link rel="stylesheet" href="/assets/convoy-daily.css?v=9">
-<link rel="stylesheet" href="/assets/ressources.css?v=8">
+<link rel="stylesheet" href="/assets/ressources.css?v=9">
 <section class="resources-page">
 <h1>Statistiques</h1>
 <p class="admin-intro">Ressources, consommation, floods et chasses des membres actuels de l’alliance sur la période choisie.</p>
@@ -89,7 +89,6 @@ workspaceStart($u,'Statistiques');
 <div><span>Convois de matériaux</span><strong><?= $amount($data['materials']) ?></strong><small><?= e(resourceNumber($data['convoys'])) ?> convois déclarés</small></div>
 <div><span>Membres · colonies</span><strong><?= $members ?> · <?= (int)$data['colonies'] ?></strong><small>Du <?= e($date($data['start'],'d/m')) ?> au <?= e($date($data['end']->modify('-1 second'),'d/m')) ?></small></div>
 </div>
-<?php if($svg=resourceBalanceSvg($data)): ?><section class="users-panel resource-chart-panel"><div class="users-panel-heading"><h3>Production de l’alliance par heure</h3></div><div class="users-scroll"><?= $svg ?></div></section><?php endif; ?>
 <section class="users-panel"><div class="users-panel-heading"><h3>Répartition par membre</h3><span class="user-count"><?= $members ?> membres</span></div>
 <div class="users-scroll" tabindex="0" role="region" aria-label="Répartition des matériaux par membre"><table class="users-table resource-table"><thead><tr>
 <?= $th('pseudo','Membre') ?><?= $th('terrain','Terrain<br>actuel') ?><?= $th('stock','Entrepôt<br>estimé') ?><?= $th('production','Production') ?><?= $th('colonie','Colonies') ?><?= $th('envoye','Envoyés') ?><?= $th('recu','Reçus') ?><?= $th('ecart','Écart') ?><?= $th('ratio','Ratio') ?><th scope="col">Verdict</th>

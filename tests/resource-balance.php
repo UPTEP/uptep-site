@@ -71,7 +71,7 @@ check(array_column(resourceBalanceSort($data['rows'],'stock',false),'pseudo')===
 // Period 23:00 → 23:30: one cycle on export 4 and convoy 1 only; the stock stays as of now.
 $period=resourceBalanceData($p,$p,new DateTimeImmutable('2026-10-10T23:00:00Z'),new DateTimeImmutable('2026-10-10T23:30:00Z'),$now);$pr=array_column($period['rows'],null,'pseudo');
 check($period['cycles']===1&&near($period['total'],600.0)&&near($pr['Alpha']['production'],100.0)&&near($pr['Alpha']['part'],200.0)&&near($pr['Alpha']['taxe_recue'],75.0),'period: cycles inside [start, end) only');
-check($period['convoys']===1&&near($pr['Alpha']['recu'],200.0)&&near($pr['<b>Gamma</b>']['envoye'],0.0)&&$period['hours']===[],'period: convoys by departure inside it, cut hour not charted');
+check($period['convoys']===1&&near($pr['Alpha']['recu'],200.0)&&near($pr['<b>Gamma</b>']['envoye'],0.0),'period: convoys by departure inside it');
 check(near($pr['Alpha']['stock'],1725.0)&&near($pr['Beta']['stock'],750.0),'period: estimated stock unchanged');
 $paris=new DateTimeZone('Europe/Paris');$clock=new DateTimeImmutable('2026-10-20T12:00:00',$paris);
 [$f,$e]=resourceBalanceRange([],$clock);check($f->format('Y-m-d H:i')==='2026-10-11 00:00'&&$e==$clock,'range: default from the start to now');
@@ -82,7 +82,6 @@ foreach([['debut'=>'2026-10-10'],['debut'=>'2026-10-14','fin'=>'2026-10-13'],['d
 check(array_column(resourceBalanceSort($data['rows'],'ecart',false),'pseudo')===['Alpha','<b>Gamma</b>','Beta'],'default sort: largest gap first');
 check(array_column(resourceBalanceSort($data['rows'],'unknown',true),'pseudo')===['Alpha','<b>Gamma</b>','Beta'],'unknown sort key falls back');
 check(array_column(resourceBalanceSort($data['rows'],'pseudo',true),'pseudo')===['<b>Gamma</b>','Alpha','Beta'],'name sort');
-$svg=resourceBalanceSvg($data);check(str_contains($svg,'<svg')&&!str_contains($svg,'style='),'chart without inline style');
 $p->exec('DELETE FROM user_stats');$assumed=resourceBalanceData($p,$p,now:$now);$beta=array_column($assumed['rows'],null,'pseudo')['Beta'];
 check($assumed['assumed_rates']&&near($beta['taxe_payee'],300.0),'unknown stable level: 20 %');
 $early=resourceBalanceData($p,$p,now:new DateTimeImmutable('2026-10-10T20:00:00Z'));check($early['cycles']===0&&!$early['rows'],'nothing before the start');
@@ -104,5 +103,5 @@ check($hr['Beta']['chasses']===0&&$hr['Beta']['moyenne']===null&&$hr['Beta']['de
 // Consumption chart with materials convoys only: the apples-only convoy 6 no longer counts.
 $all=array_column(convoyConsumptionData($p,$p,...$window)['rows'],null,'pseudo');$mat=array_column(convoyConsumptionData($p,$p,...[...$window,true])['rows'],null,'pseudo');
 check($all['Alpha']['conv_in']>$mat['Alpha']['conv_in']&&near($mat['Alpha']['conv_in']*($now->getTimestamp()-$window[0]->getTimestamp())/86400,200.0),'consumption: materials only');
-echo "OK: current members only, deduplicated exports, cycles, equal shares, internal colony tax, materials convoys, gaps, periods, sorting, estimated stocks, floods, hunts, materials consumption and chart.\n";
+echo "OK: current members only, deduplicated exports, cycles, equal shares, internal colony tax, materials convoys, gaps, periods, sorting, estimated stocks, floods, hunts and materials consumption.\n";
 }finally{$p->rollBack();}

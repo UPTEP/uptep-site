@@ -49,7 +49,7 @@ function resourceBalanceData(PDO $p,PDO $game,?DateTimeImmutable $from=null,?Dat
     foreach($game->query("SELECT player_id::text,pseudo,field::text FROM players WHERE server='s5' AND upper(alliance_tag)='UPTEP' AND is_present=true") as $r)
         $members[$r['player_id']]=['id'=>$r['player_id'],'pseudo'=>$r['pseudo'],'terrain'=>(float)$r['field'],'production'=>0.0,'taxe_payee'=>0.0,'taxe_recue'=>0.0,'part'=>0.0,'envoye'=>0.0,'recu'=>0.0,'cycles'=>0,
             'releve'=>null,'stock'=>null,'stock_production'=>0.0,'stock_cycles'=>0,'stock_envoye'=>0.0,'stock_recu'=>0.0];
-    $result=['rows'=>[],'start'=>$start,'end'=>$end,'cycles'=>0,'hours'=>[],'total'=>0.0,'current'=>0.0,'convoys'=>0,'materials'=>0.0,'outside'=>0.0,'colonies'=>0,'assumed_rates'=>false];
+    $result=['rows'=>[],'start'=>$start,'end'=>$end,'cycles'=>0,'total'=>0.0,'current'=>0.0,'convoys'=>0,'materials'=>0.0,'outside'=>0.0,'colonies'=>0,'assumed_rates'=>false];
     if(!$members||$end<=$start)return $result;
     $ids=array_keys($members);$marks=implode(',',array_fill(0,count($ids),'?'));
 
@@ -103,7 +103,7 @@ function resourceBalanceData(PDO $p,PDO $game,?DateTimeImmutable $from=null,?Dat
     // Each cycle takes the latest export at or before it; only cycles in [start, end) count for the balance.
     $first=intdiv($begin+RESOURCE_BALANCE_CYCLE-1,RESOURCE_BALANCE_CYCLE)*RESOURCE_BALANCE_CYCLE;
     $periodStart=$start->getTimestamp();$periodEnd=$end->getTimestamp();
-    $last=$now->getTimestamp();$i=-1;$hours=[];
+    $last=$now->getTimestamp();$i=-1;
     for($t=$first;$t<=$last;$t+=RESOURCE_BALANCE_CYCLE){
         while(isset($exports[$i+1])&&$exports[$i+1]['at']<=$t)$i++;
         if($i<0||!$exports[$i]['fields'])continue;
@@ -112,7 +112,6 @@ function resourceBalanceData(PDO $p,PDO $game,?DateTimeImmutable $from=null,?Dat
         if($inPeriod){
             foreach($fields as $id=>$field){$members[$id]['production']+=$field;$members[$id]['part']+=$share;$members[$id]['cycles']++;}
             foreach($exports[$i]['tax'] as $id=>[$master,$tax]){$members[$id]['taxe_payee']+=$tax;$members[$master]['taxe_recue']+=$tax;}
-            $hour=intdiv($t,3600)*3600;$hours[$hour]=($hours[$hour]??0.0)+$pool;
             $result['total']+=$pool;$result['cycles']++;
             $result['current']=$pool*2;$result['colonies']=count($exports[$i]['tax']);
         }
@@ -123,9 +122,6 @@ function resourceBalanceData(PDO $p,PDO $game,?DateTimeImmutable $from=null,?Dat
             if(isset($since[$master])&&$t>$since[$master])$members[$master]['stock_production']+=$tax;
         }
     }
-    // An hour cut by the period end is incomplete: charting it would show a false drop.
-    if($hours&&array_key_last($hours)+3600>$periodEnd)array_pop($hours);
-    $result['hours']=$hours;
 
     $q=$p->prepare("SELECT c.idenvoyeur::text AS sender,d.iddemandeur::text AS receiver,c.nbmateriaux::text AS amount
         FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande
@@ -188,36 +184,4 @@ function resourceCompact(float $v):string{
     $text=number_format($n,$decimals,',',' ');
     if($decimals>0)$text=rtrim(rtrim($text,'0'),',');
     return $sign.$text.$suffixes[$scale-1];
-}
-
-/** Server-rendered SVG of the alliance production per hour (presentation attributes only, for the strict CSP). */
-function resourceBalanceSvg(array $data):string{
-    $hours=$data['hours'];if(count($hours)<2)return '';
-    // Production per hour = sum of the cycle pools in that hour.
-    $W=1100;$H=300;$x0=64;$x1=$W-16;$top=12;$bottom=$H-44;
-    $t0=array_key_first($hours);$t1=array_key_last($hours);$max=max(1.0,max($hours));
-    $raw=$max/5;$mag=10**floor(log10($raw));$step=$mag*(($raw/$mag)<=1.5?1:(($raw/$mag)<=3?2:(($raw/$mag)<=7?5:10)));$hi=ceil($max/$step)*$step;
-    $X=static fn(int $t)=>$x0+($t-$t0)/max(1,$t1-$t0)*($x1-$x0);$Y=static fn(float $v)=>$bottom-$v/$hi*($bottom-$top);
-    $f=static fn(float $n)=>number_format($n,1,'.','');
-    $s='<svg class="resource-chart" viewBox="0 0 '.$W.' '.$H.'" role="img" aria-labelledby="resource-chart-title" xmlns="http://www.w3.org/2000/svg" font-family="inherit">';
-    $s.='<title id="resource-chart-title">Production de matériaux de l’alliance par heure</title>';
-    for($v=0;$v<=$hi+1e-6;$v+=$step){$y=$f($Y($v));
-        $s.='<line x1="'.$x0.'" x2="'.$x1.'" y1="'.$y.'" y2="'.$y.'" stroke="'.($v==0?'#52514e':'#e1e0d9').'" stroke-width="1"/>';
-        $s.='<text x="'.($x0-8).'" y="'.$f($Y($v)+4).'" text-anchor="end" font-size="12" fill="#898781">'.e(resourceCompact($v)).'</text>';}
-    // One tick per Paris day; labels thinned so they never overlap.
-    $zone=new DateTimeZone('Europe/Paris');$day=(new DateTimeImmutable('@'.$t0))->setTimezone($zone)->setTime(0,0)->modify('+1 day');
-    $days=[];for(;$day->getTimestamp()<=$t1;$day=$day->modify('+1 day'))$days[]=$day;
-    $every=max(1,(int)ceil(count($days)*58/($x1-$x0)));
-    foreach($days as $k=>$d){$x=$f($X($d->getTimestamp()));
-        $s.='<line x1="'.$x.'" x2="'.$x.'" y1="'.$bottom.'" y2="'.($bottom+5).'" stroke="#52514e" stroke-width="1"/>';
-        if($k%$every===0)$s.='<text x="'.$x.'" y="'.($bottom+20).'" text-anchor="middle" font-size="12" fill="#898781">'.e($d->format('d/m')).'</text>';}
-    $line='';foreach($hours as $t=>$v)$line.=($line===''?'M':'L').$f($X($t)).','.$f($Y($v));
-    $s.='<path d="'.$line.'L'.$f($X($t1)).','.$bottom.'L'.$f($X($t0)).','.$bottom.'Z" fill="#2a78d6" fill-opacity="0.14"/>';
-    $s.='<path d="'.$line.'" fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round"/>';
-    // Hover bands: one per hour, exact value in the tooltip.
-    $band=($x1-$x0)/max(1,($t1-$t0)/3600);
-    foreach($hours as $t=>$v){$label=(new DateTimeImmutable('@'.$t))->setTimezone($zone)->format('d/m H\h');
-        $s.='<rect x="'.$f($X($t)-$band/2).'" y="'.$top.'" width="'.$f($band).'" height="'.($bottom-$top).'" fill="transparent"><title>'.e($label.' : '.resourceNumber($v).' matériaux').'</title></rect>';}
-    $s.='<text x="'.(($x0+$x1)/2).'" y="'.($H-6).'" text-anchor="middle" font-size="12" fill="#52514e">matériaux produits par heure · heure de Paris</text>';
-    return $s.'</svg>';
 }
