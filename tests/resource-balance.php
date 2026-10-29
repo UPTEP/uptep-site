@@ -37,8 +37,8 @@ INSERT INTO convois_effectues VALUES
  (4,2,3,0,50,'2026-10-10T23:40:00Z',false),(5,3,2,0,999,'2026-10-10T23:40:00Z',false),(6,1,2,500,0,'2026-10-10T23:40:00Z',false),
  (7,1,2,0,999,'2026-10-11T00:10:00Z',false);
 ALTER TABLE convois_effectues ADD COLUMN date_arrivee timestamptz;UPDATE convois_effectues SET date_arrivee='2026-10-10T23:50:00Z' WHERE id=1;");
-$now=new DateTimeImmutable('2026-10-11T00:00:00Z');
-$data=resourceBalanceData($p,$p,$now);$rows=array_column($data['rows'],null,'pseudo');
+$now=new DateTimeImmutable('2026-10-11T00:00:01Z');
+$data=resourceBalanceData($p,$p,now:$now);$rows=array_column($data['rows'],null,'pseudo');
 check(array_keys($rows)===['Alpha','Beta','<b>Gamma</b>'],'current UPTEP members only, case-insensitive tag');
 // Cycles 22:00 and 22:30 use export 2 (Alpha 100, Beta 300 colony of Alpha; Departed left out), 23:00 to 00:00 use corrected export 4.
 check($data['cycles']===5&&near($data['total'],2600.0)&&near($data['current'],1200.0),'five cycles, deduplicated exports, alliance total');
@@ -50,22 +50,32 @@ check(near($rows['Alpha']['recu'],200.0)&&near($rows['Beta']['envoye'],200.0)&&n
 check($data['convoys']===2&&near($data['materials'],250.0)&&near($data['outside'],50.0),'convoy totals, departed counterpart');
 check(near($rows['Alpha']['ecart'],75.0)&&$rows['Alpha']['verdict']==='convoyer'&&near($rows['Beta']['ecart'],-75.0)&&$rows['Beta']['verdict']==='recevoir','gap and verdict');
 check(near(array_sum(array_column($data['rows'],'part')),$data['total'])&&near(array_sum(array_column($data['rows'],'colonie')),0.0),'shares and taxes balance');
-check($rows['Alpha']['entree']->format('Y-m-d H:i')==='2026-10-09 22:00'&&$rows['Beta']['entree']->format('Y-m-d H:i')==='2026-10-10 21:00'&&$rows['<b>Gamma</b>']['entree']->format('Y-m-d H:i')==='2026-10-10 23:00','entry = start of the current UPTEP streak');
 // Alpha: 1000 + 3 cycles × (100 + 75 tax) + 200 arrived at 23:50. Beta: 500 + 2 cycles × (300 − 75) − 200 sent at 23:10.
 check(near($rows['Alpha']['stock'],1725.0)&&$rows['Alpha']['stock_cycles']===3&&near($rows['Alpha']['stock_recu'],200.0),'stock: reading + cycles with colony tax + arrived convoy');
 check(near($rows['Beta']['stock'],750.0)&&near($rows['Beta']['stock_envoye'],200.0)&&$rows['Beta']['releve']['materiaux']===500.0,'stock: convoy sent after the reading, disabled duplicate account ignored');
 check($rows['<b>Gamma</b>']['stock']===null&&$rows['<b>Gamma</b>']['releve']!==null,'stock: reading older than 48 h not estimated');
-$transit=array_column(resourceBalanceData($p,$p,new DateTimeImmutable('2026-10-10T23:45:00Z'))['rows'],null,'pseudo');
+$transit=array_column(resourceBalanceData($p,$p,now:new DateTimeImmutable('2026-10-10T23:45:00Z'))['rows'],null,'pseudo');
 check(near($transit['Alpha']['stock'],1350.0)&&near($transit['Alpha']['stock_recu'],0.0)&&near($transit['Beta']['stock'],525.0),'stock: convoy still travelling not received');
 check(array_column(resourceBalanceSort($data['rows'],'stock',false),'pseudo')===['Alpha','Beta','<b>Gamma</b>'],'stock sort, unknown last');
+// Period 23:00 → 23:30: one cycle on export 4 and convoy 1 only; the stock stays as of now.
+$period=resourceBalanceData($p,$p,new DateTimeImmutable('2026-10-10T23:00:00Z'),new DateTimeImmutable('2026-10-10T23:30:00Z'),$now);$pr=array_column($period['rows'],null,'pseudo');
+check($period['cycles']===1&&near($period['total'],600.0)&&near($pr['Alpha']['production'],100.0)&&near($pr['Alpha']['part'],200.0)&&near($pr['Alpha']['taxe_recue'],75.0),'period: cycles inside [start, end) only');
+check($period['convoys']===1&&near($pr['Alpha']['recu'],200.0)&&near($pr['<b>Gamma</b>']['envoye'],0.0)&&$period['hours']===[],'period: convoys by departure inside it, cut hour not charted');
+check(near($pr['Alpha']['stock'],1725.0)&&near($pr['Beta']['stock'],750.0),'period: estimated stock unchanged');
+$paris=new DateTimeZone('Europe/Paris');$clock=new DateTimeImmutable('2026-10-20T12:00:00',$paris);
+[$f,$e]=resourceBalanceRange([],$clock);check($f->format('Y-m-d H:i')==='2026-10-11 00:00'&&$e==$clock,'range: default from the start to now');
+[$f,$e]=resourceBalanceRange(['debut'=>'2026-10-12','fin'=>'2026-10-13'],$clock);check($f->format('c')==='2026-10-12T00:00:00+02:00'&&$e->format('c')==='2026-10-14T00:00:00+02:00','range: end date included');
+[$f,$e]=resourceBalanceRange(['debut'=>'2026-10-19','fin'=>'2026-10-25'],$clock);check($e==$clock,'range: end capped at now');
+foreach([['debut'=>'2026-10-10'],['debut'=>'2026-10-14','fin'=>'2026-10-13'],['debut'=>'2026-10-21'],['debut'=>'12/10/2026'],['fin'=>'2026-02-30']] as $bad){
+    try{resourceBalanceRange($bad,$clock);$ok=false;}catch(DomainException $ex){$ok=$ex->getCode()===422;}check($ok,'range rejected: '.json_encode($bad));}
 check(array_column(resourceBalanceSort($data['rows'],'ecart',false),'pseudo')===['Alpha','<b>Gamma</b>','Beta'],'default sort: largest gap first');
 check(array_column(resourceBalanceSort($data['rows'],'unknown',true),'pseudo')===['Alpha','<b>Gamma</b>','Beta'],'unknown sort key falls back');
 check(array_column(resourceBalanceSort($data['rows'],'pseudo',true),'pseudo')===['<b>Gamma</b>','Alpha','Beta'],'name sort');
 $svg=resourceBalanceSvg($data);check(str_contains($svg,'<svg')&&!str_contains($svg,'style='),'chart without inline style');
-$p->exec('DELETE FROM user_stats');$assumed=resourceBalanceData($p,$p,$now);$beta=array_column($assumed['rows'],null,'pseudo')['Beta'];
+$p->exec('DELETE FROM user_stats');$assumed=resourceBalanceData($p,$p,now:$now);$beta=array_column($assumed['rows'],null,'pseudo')['Beta'];
 check($assumed['assumed_rates']&&near($beta['taxe_payee'],300.0),'unknown stable level: 20 %');
-$early=resourceBalanceData($p,$p,new DateTimeImmutable('2026-10-10T20:00:00Z'));check($early['cycles']===0&&!$early['rows'],'nothing before the start');
+$early=resourceBalanceData($p,$p,now:new DateTimeImmutable('2026-10-10T20:00:00Z'));check($early['cycles']===0&&!$early['rows'],'nothing before the start');
 foreach(['1,09G'=>1093071255.0,'−1,5k'=>-1500.0,'42'=>42.0,'400k'=>400000.0,'120k'=>119969.0,'100M'=>1e8,'46,5M'=>46512628.0,'1M'=>999950.0,'1k'=>999.6,'2,5T'=>2.5e12,'1 500T'=>1.5e15,'0'=>-0.2]
     as $want=>$v)check(resourceCompact($v)===(string)$want,'compact '.$v.' = '.$want.', got '.resourceCompact($v));
-echo "OK: current members only, deduplicated exports, cycles, equal shares, internal colony tax, materials convoys, gaps, entry dates, sorting, estimated stocks and chart.\n";
+echo "OK: current members only, deduplicated exports, cycles, equal shares, internal colony tax, materials convoys, gaps, periods, sorting, estimated stocks and chart.\n";
 }finally{$p->rollBack();}
