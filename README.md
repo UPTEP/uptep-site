@@ -1,6 +1,6 @@
 # UPTEP — Site et API
 
-Site privé de l’alliance UPTEP sur Fourmizzz, serveur 5 : comptes, chaîne, statistiques, simulateur de ressources, API du userscript et API des convois Discord.
+Site privé de l’alliance UPTEP sur Fourmizzz, serveur 5 : comptes, chaîne, statistiques, répartition des ressources, API du userscript et API des convois Discord.
 
 ## Organisation des sources
 
@@ -77,6 +77,8 @@ Le guide « L’attaque à la 59e seconde » est présenté sur l’accueil apr�
 ### Ressources et visualisation des droits
 
 Le menu et `/ressources.php` sont réservés au rôle `admin`, avec contrôle côté serveur et HTTP403 pour tout autre rôle, même chef ou gestionnaire de chaîne.
+
+La page compare, depuis le 11/10/2026 (premier convoi déclaré), la production de matériaux de chaque membre actuel à une part égale de la production de l’alliance (`app/resource-balance.php`). Chaque cycle de 30 minutes produit 1 matériau par cm² de terrain d’après le dernier relevé horaire FZZZ ; le total du cycle est partagé entre les membres UPTEP présents dans ce relevé. Les anciens membres ne sont pas comptés. Les colonies entre membres versent 20 % + 1 point par niveau d’étable à pucerons du colonisateur (20 % si inconnu, 100 % au plus). Net = production + colonies − matériaux envoyés + matériaux reçus (convois déclarés non annulés, à leur date de départ) ; écart = net − part, positif pour un membre qui doit convoyer. Test : `python3 tests/run-resource-balance.py`.
 
 Dans Administration, « Mode visualisation » propose les profils Membre, Chef, Gestion de chaîne et Chef+Chaîne, avec UPTEP+ autorisé ou désactivé. Ces profils utilisent les données de l’administrateur avec les droits sélectionnés. Le bouton « Voir comme » d’un compte actif affiche ses données et ses droits actuels, relus à chaque page. Les comptes non validés ou désactivés ne peuvent pas être visualisés.
 

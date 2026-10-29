@@ -2,53 +2,65 @@
 declare(strict_types=1);
 require '/home/uptep/private/app/bootstrap.php';
 require '/home/uptep/private/app/view.php';
-require '/home/uptep/private/app/chaine.php';
+require '/home/uptep/private/app/resource-balance.php';
 $u=requireUser();
 if ($u['role'] !== 'admin') {
     http_response_code(403); workspaceStart($u, 'Accès réservé');
     echo '<h1>Accès réservé</h1><p>La gestion des ressources est réservée aux administrateurs.</p>';
     workspaceEnd(); exit;
 }
-$players=[];$latest='';$unavailable=false;
-try {
-    $q=db()->prepare('SELECT player_id,grade,sort_order FROM chaine_members WHERE server=?');
-    $q->execute([CHAINE_SERVER]);$grades=[];
-    foreach($q->fetchAll(PDO::FETCH_ASSOC) as $row)$grades[(string)$row['player_id']]=$row;
-    foreach(chainePlayers() as $player) {
-        $grade=$grades[(string)$player['player_id']]??null;
-        if(!$grade || !in_array($grade['grade'],CHAINE_GRADES,true) || $grade['grade']==='Hors chaîne')continue;
-        $player['chain']=$grade;$players[]=$player;
-        $latest=max($latest,$player['export_version']);
-    }
-    usort($players,static fn($a,$b)=>(array_search($a['chain']['grade'],CHAINE_GRADES,true)<=>array_search($b['chain']['grade'],CHAINE_GRADES,true)) ?: (($a['chain']['sort_order']??PHP_INT_MAX)<=>($b['chain']['sort_order']??PHP_INT_MAX)) ?: strnatcasecmp($a['pseudo'],$b['pseudo']));
-} catch(Throwable $ex) {error_log('UPTEP resources: '.$ex->getMessage());http_response_code(503);$unavailable=true;}
+$sort=is_string($_GET['tri']??null)&&in_array($_GET['tri'],RESOURCE_BALANCE_SORTS,true)?$_GET['tri']:'ecart';
+$asc=($_GET['ordre']??null)==='asc';
+$data=null;
+try {$data=resourceBalanceData(db(),db(true));$data['rows']=resourceBalanceSort($data['rows'],$sort,$asc);}
+catch(Throwable $ex) {error_log('UPTEP resources: '.$ex->getMessage());http_response_code(503);}
+$paris=new DateTimeZone('Europe/Paris');
+$date=static fn(DateTimeImmutable $d,string $f='d/m/Y H:i')=>$d->setTimezone($paris)->format($f);
+// Column header: a GET link sorting on the key; the active column toggles its direction.
+$th=static function(string $key,string $label)use($sort,$asc):string{
+    $active=$key===$sort;$next=$active?($asc?'desc':'asc'):($key==='pseudo'||$key==='entree'?'asc':'desc');
+    $aria=$active?' aria-sort="'.($asc?'ascending':'descending').'"':'';
+    return '<th scope="col"'.$aria.'><a class="resource-sort" href="?tri='.$key.'&amp;ordre='.$next.'">'.$label.'<span aria-hidden="true">'.($active?($asc?' ↑':' ↓'):' ↕').'</span></a></th>';
+};
+$signed=static fn(float $v)=>($v>0.5?'+':($v<-0.5?'−':'')).resourceNumber(abs($v));
+$verdicts=['convoyer'=>'Doit convoyer','recevoir'=>'Doit recevoir','equilibre'=>'Équilibré','aucun'=>'—'];
 workspaceStart($u,'Gestion des Ressources');
 ?>
-<link rel="stylesheet" href="/assets/ressources.css?v=2">
-<script src="/assets/ressources.js?v=2" defer></script>
+<link rel="stylesheet" href="/assets/ressources.css?v=3">
 <section class="resources-page">
 <h1>Gestion des Ressources</h1>
-<p class="admin-intro">Simule la production de bois et sa redistribution entre les membres de la chaîne.</p>
-<?php if($unavailable): ?><p class="form-error" role="alert">Les données sont indisponibles pour le moment. Réessaie dans quelques instants.</p>
-<?php elseif(!$players): ?><p>Aucun membre avec un grade dans la chaîne.</p>
-<?php else: ?>
-<div class="resource-note"><strong>Simulation · TDP fictifs</strong><p>Modifie les niveaux pour essayer différentes répartitions. TDP = technique de ponte + couveuse + solarium ; poids = 1,20<sup>TDP</sup>. Un niveau supplémentaire donne un poids 20 % plus élevé.</p><p>Chaque clic ajoute une heure avec les terrains du relevé ci-dessous. Les modifications de TDP s’appliquent aux heures suivantes. Rien n’est enregistré : recharger la page remet la simulation à zéro.</p></div>
-<div class="resource-summary"><div><span>Production / heure</span><strong id="resource-pool">—</strong></div><div><span>Heures simulées</span><strong id="resource-hours">0</strong></div><div><span>Total des soldes</span><strong id="resource-total">0</strong></div></div>
-<div class="resource-actions"><button id="resource-simulate" class="save-user" type="button" disabled>Simuler une heure</button><button id="resource-reset" type="button">Réinitialiser la simulation</button><span id="resource-status" role="status" aria-live="polite"></span></div>
-<p id="resource-error" class="form-error" role="alert" hidden></p>
-<section class="users-panel"><div class="users-panel-heading"><h2>UPTEP · Serveur 5</h2><span class="user-count"><?= count($players) ?> membres</span><span class="chaine-updated">Dernier relevé : <?= e(chaineDate($latest)) ?> (Paris)</span></div>
-<div class="users-scroll" tabindex="0" role="region" aria-label="Simulation des ressources"><table class="users-table resource-table"><thead><tr><th scope="col">Joueur</th><th scope="col" aria-sort="none"><button class="table-sort" type="button" data-resource-sort="field">Terrain<span aria-hidden="true"> ↕</span></button></th><th scope="col">Technique<br>de ponte</th><th scope="col">Couveuse</th><th scope="col">Solarium</th><th scope="col" aria-sort="none"><button class="table-sort" type="button" data-resource-sort="tdp">TDP total<span aria-hidden="true"> ↕</span></button></th><th scope="col">Production / h</th><th scope="col">Part attribuée / h</th><th scope="col" aria-sort="none"><button class="table-sort" type="button" data-resource-sort="balance">Solde cumulé<span aria-hidden="true"> ↕</span></button></th></tr></thead><tbody>
-<?php foreach($players as $i=>$player): ?>
-<tr data-resource-player="<?= (int)$player['player_id'] ?>" data-field="<?= e((string)($player['field']??'')) ?>"><th scope="row"><span class="user-display-name"><?= e($player['pseudo']) ?></span><span class="user-identifier"><?= e($player['chain']['grade']) ?><?= $player['chain']['sort_order']!==null?' · '.(int)$player['chain']['sort_order']:'' ?></span></th><td><?= $player['field']===null?'Indisponible':number_format((int)$player['field'],0,',',' ') ?></td>
-<?php foreach(['Technique de ponte','Couveuse','Solarium'] as $j=>$label): ?><td><input type="number" min="0" max="999" step="1" value="<?= 5+(($i*3+$j*2)%7) ?>" aria-label="<?= e($label.' fictif de '.$player['pseudo']) ?>"></td><?php endforeach; ?>
-<td data-value="tdp"></td><td data-value="production"></td><td data-value="share"></td><td data-value="balance">0</td></tr>
+<p class="admin-intro">Production de matériaux de l’alliance mise en commun et partagée à parts égales, comparée à ce que chaque membre a gardé après colonies et convois.</p>
+<?php if($data===null): ?><p class="form-error" role="alert">Les données sont indisponibles pour le moment. Réessaie dans quelques instants.</p>
+<?php elseif(!$data['rows']): ?><p>Aucun membre UPTEP dans le dernier relevé.</p>
+<?php else: $members=count($data['rows']); ?>
+<div class="resource-note"><strong>Méthode</strong>
+<p>Depuis le <?= e($date($data['start'],'d/m/Y')) ?>, date du premier convoi déclaré, chaque cycle de 30 minutes produit 1 matériau par cm² de terrain, d’après le dernier relevé horaire. La production d’un cycle est additionnée pour l’alliance puis partagée à parts égales entre les membres présents à ce moment. Les anciens membres ne sont pas comptés.</p>
+<p>Une colonie verse à son colonisateur 20 % + 1 point par niveau d’étable à pucerons de celui-ci (100 % au plus), lorsque les deux sont membres.<?= $data['assumed_rates']?' Étable inconnue pour au moins un colonisateur : 20 % retenus.':'' ?> Net = production + colonies − matériaux envoyés + matériaux reçus. Écart = net − part : positif, le membre a gardé plus que sa part et doit convoyer ; négatif, il doit recevoir. Équilibré à ±<?= (int)(RESOURCE_BALANCE_TOLERANCE*100) ?> % de la part.</p></div>
+<div class="resource-summary">
+<div><span>Production de l’alliance</span><strong><?= e(resourceCompact($data['total'])) ?></strong><small><?= e(resourceNumber($data['total'])) ?> matériaux · <?= e(resourceNumber($data['cycles'])) ?> cycles</small></div>
+<div><span>Production actuelle / heure</span><strong><?= e(resourceCompact($data['current'])) ?></strong><small><?= e(resourceNumber($data['current']/$members)) ?> par membre</small></div>
+<div><span>Convois de matériaux</span><strong><?= e(resourceCompact($data['materials'])) ?></strong><small><?= e(resourceNumber($data['convoys'])) ?> convois déclarés</small></div>
+<div><span>Membres · colonies</span><strong><?= $members ?> · <?= (int)$data['colonies'] ?></strong><small>Jusqu’au <?= e($date($data['end'])) ?> (Paris)</small></div>
+</div>
+<?php if($svg=resourceBalanceSvg($data)): ?><section class="users-panel resource-chart-panel"><div class="users-panel-heading"><h2>Production de l’alliance par heure</h2></div><div class="users-scroll"><?= $svg ?></div></section><?php endif; ?>
+<section class="users-panel"><div class="users-panel-heading"><h2>Répartition par membre</h2><span class="user-count"><?= $members ?> membres</span></div>
+<div class="users-scroll" tabindex="0" role="region" aria-label="Répartition des matériaux par membre"><table class="users-table resource-table"><thead><tr>
+<?= $th('pseudo','Membre') ?><?= $th('entree','Entrée') ?><?= $th('terrain','Terrain<br>actuel') ?><?= $th('production','Production') ?><?= $th('colonie','Colonies') ?><?= $th('part','Part') ?><?= $th('envoye','Envoyés') ?><?= $th('recu','Reçus') ?><?= $th('net','Net') ?><?= $th('ecart','Écart') ?><?= $th('ratio','Ratio') ?><th scope="col">Verdict</th>
+</tr></thead><tbody>
+<?php foreach($data['rows'] as $r): ?>
+<tr class="resource-<?= e($r['verdict']) ?>"><th scope="row"><?= e($r['pseudo']) ?></th>
+<td><?= $r['entree']?e($date($r['entree'],'d/m H\h')):'—' ?></td>
+<td><?= e(resourceNumber($r['terrain'])) ?></td>
+<td><?= e(resourceNumber($r['production'])) ?></td>
+<td title="<?= e('Reçu : '.resourceNumber($r['taxe_recue']).' · Versé : '.resourceNumber($r['taxe_payee'])) ?>"><?= e($signed($r['colonie'])) ?></td>
+<td><?= e(resourceNumber($r['part'])) ?></td>
+<td><?= e(resourceNumber($r['envoye'])) ?></td>
+<td><?= e(resourceNumber($r['recu'])) ?></td>
+<td><?= e(resourceNumber($r['net'])) ?></td>
+<td class="resource-gap"><?= e($signed($r['ecart'])) ?></td>
+<td><?= $r['ratio']===null?'—':e(number_format($r['ratio']*100,0,',',' ').' %') ?></td>
+<td><span class="resource-verdict"><?= e($verdicts[$r['verdict']]) ?></span></td></tr>
 <?php endforeach; ?></tbody></table></div></section>
-<p class="resource-legend"><span class="resource-negative">Solde négatif : bois à envoyer.</span><span class="resource-positive">Solde positif : bois à recevoir.</span> Les arrondis sont répartis pour équilibrer exactement les soldes.</p>
-<section class="users-panel resource-convoy"><div class="users-panel-heading"><h2>Simuler un convoi</h2></div>
-<form id="resource-convoy-form"><label>Expéditeur<select id="convoy-sender" required></select></label><label>Destinataire<select id="convoy-recipient" required></select></label><label>Quantité de bois<input id="convoy-amount" type="text" inputmode="numeric" pattern="[0-9]+" maxlength="30" required placeholder="Ex. : 10000"></label><button class="save-user" type="submit">Simuler le convoi</button></form>
-<p class="resource-convoy-help">Le solde de l’expéditeur augmente du montant envoyé ; celui du destinataire diminue du même montant. Aucun convoi n’est envoyé dans le jeu.</p><p id="convoy-status" role="status" aria-live="polite"></p>
-</section>
-<section class="users-panel resource-convoy"><div class="users-panel-heading"><h2>Historique des convois simulés</h2><span id="convoy-count" class="user-count">0 convoi</span></div><p id="convoy-empty" class="chaine-empty">Aucun convoi simulé.</p><ol id="convoy-history" aria-label="Convois du plus récent au plus ancien"></ol></section>
-<noscript><p>Active JavaScript pour utiliser le simulateur.</p></noscript>
+<p class="resource-legend">Envoyés et reçus : convois déclarés non annulés, matériaux uniquement, à leur date de départ.<?= $data['outside']>0?' Dont '.e(resourceNumber($data['outside'])).' échangés avec d’anciens membres : comptés seulement du côté du membre actuel.':'' ?> Survole la colonne Colonies pour le détail versé et reçu.</p>
 <?php endif; ?></section>
 <?php workspaceEnd(); ?>
