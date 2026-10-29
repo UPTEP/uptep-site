@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/../app/resource-balance.php';
+require __DIR__.'/../app/resource-activity.php';
+require __DIR__.'/../app/convoy-consumption.php';
 function check(bool $ok,string $why):void{if(!$ok)throw new RuntimeException($why);}
 function e(string $s):string{return htmlspecialchars($s,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');}
 function near(float $a,float $b):bool{return abs($a-$b)<1e-6;}
@@ -36,7 +38,16 @@ INSERT INTO convois_effectues VALUES
  (1,1,2,0,200,'2026-10-10T23:10:00Z',false),(2,1,2,0,999,'2026-10-10T23:20:00Z',true),(3,1,2,0,999,'2026-10-10T21:00:00Z',false),
  (4,2,3,0,50,'2026-10-10T23:40:00Z',false),(5,3,2,0,999,'2026-10-10T23:40:00Z',false),(6,1,2,500,0,'2026-10-10T23:40:00Z',false),
  (7,1,2,0,999,'2026-10-11T00:10:00Z',false);
-ALTER TABLE convois_effectues ADD COLUMN date_arrivee timestamptz;UPDATE convois_effectues SET date_arrivee='2026-10-10T23:50:00Z' WHERE id=1;");
+ALTER TABLE convois_effectues ADD COLUMN date_arrivee timestamptz;UPDATE convois_effectues SET date_arrivee='2026-10-10T23:50:00Z' WHERE id=1;
+CREATE TABLE chaine_members(server text,player_id bigint,grade text);INSERT INTO chaine_members VALUES('s5',1,'Grenier');
+CREATE TABLE floods(id bigint,sender_id bigint,target_id bigint,location text,troops text,arrival_at timestamptz);
+INSERT INTO floods VALUES(1,1,2,'Terrain de chasse','15 888 Jeunes Soldates Naines, 627 Soldates Naines.','2026-10-10T23:00:00Z'),
+ (2,1,2,'Terrain de chasse',E'407 Jeunes Soldates Naines.\nArrivée demain à 00h21','2026-10-10T23:30:00Z'),(3,2,1,'Loge',NULL,'2026-10-10T23:40:00Z'),
+ (4,4,3,'Terrain de chasse','371 917 193 000 Jeunes Soldates Naines.','2026-10-10T23:45:00Z'),(5,1,3,'Terrain de chasse','10 Soldates.','2026-10-11T01:00:00Z'),
+ (6,1,2,'Terrain de chasse','99 Soldates.','2026-10-10T20:00:00Z');
+CREATE TABLE script_hunts(id bigint,player_id bigint,area bigint,arrival_at timestamptz,cancelled_at timestamptz);
+INSERT INTO script_hunts VALUES(1,1,1000,'2026-10-10T22:30:00Z',NULL),(2,1,3000,'2026-10-10T23:30:00Z',NULL),(3,1,500,'2026-10-10T23:00:00Z','2026-10-10T22:00:00Z'),
+ (4,1,700,'2026-10-11T02:00:00Z',NULL),(5,2,800,'2026-10-09T10:00:00Z',NULL),(6,4,9999,'2026-10-10T23:00:00Z',NULL);");
 $now=new DateTimeImmutable('2026-10-11T00:00:01Z');
 $data=resourceBalanceData($p,$p,now:$now);$rows=array_column($data['rows'],null,'pseudo');
 check(array_keys($rows)===['Alpha','Beta','<b>Gamma</b>'],'current UPTEP members only, case-insensitive tag');
@@ -77,5 +88,21 @@ check($assumed['assumed_rates']&&near($beta['taxe_payee'],300.0),'unknown stable
 $early=resourceBalanceData($p,$p,now:new DateTimeImmutable('2026-10-10T20:00:00Z'));check($early['cycles']===0&&!$early['rows'],'nothing before the start');
 foreach(['1,09G'=>1093071255.0,'−1,5k'=>-1500.0,'42'=>42.0,'400k'=>400000.0,'120k'=>119969.0,'100M'=>1e8,'46,5M'=>46512628.0,'1M'=>999950.0,'1k'=>999.6,'2,5T'=>2.5e12,'1 500T'=>1.5e15,'0'=>-0.2]
     as $want=>$v)check(resourceCompact($v)===(string)$want,'compact '.$v.' = '.$want.', got '.resourceCompact($v));
-echo "OK: current members only, deduplicated exports, cycles, equal shares, internal colony tax, materials convoys, gaps, periods, sorting, estimated stocks and chart.\n";
+// Floods and hunts over [22:00, now): current members only, troops from the declared text.
+foreach(["407 Jeunes Soldates Naines.\nArrivée demain à 00h21"=>407.0,'15 888 Jeunes Soldates Naines, 627 Soldates Naines.'=>16515.0,'9 999 Jeunes Soldates Naines'=>9999.0,'bla'=>null,'371 917 193 000 Jeunes Soldates Naines.'=>null] as $text=>$want)
+    check(resourceTroops((string)$text)===$want,'troops '.$text);
+check(resourceTroops(null)===null,'troops unknown');
+$names=['1'=>'Alpha','2'=>'Beta','3'=>'<b>Gamma</b>'];$window=[new DateTimeImmutable('2026-10-10T22:00:00Z'),$now];
+$fl=resourceFloodStats($p,$names,...[...$window,$now]);$fr=array_column($fl['rows'],null,'pseudo');
+check($fl['total']['floods']===4&&near($fl['total']['troupes'],16922.0)&&$fl['total']['inconnues']===2&&$fl['total']['loge']===1&&$fl['total']['en_route']===1,'flood totals: period, unreadable and unknown troops, in transit');
+check($fr['Alpha']['envoyes_connus']===2&&$fr['Beta']['envoyes_connus']===0&&$fr['Alpha']['recus']===1&&near($fr['Alpha']['troupes_envoyees'],16922.0)&&$fr['Beta']['recus']===2&&$fr['Beta']['envoyes']===1&&$fr['<b>Gamma</b>']['recus']===1,'floods per member, departed sender left out');
+check($fr['Alpha']['dernier']->setTimezone(new DateTimeZone('UTC'))->format('H:i')==='23:30'&&$fl['rows'][0]['pseudo']==='Alpha','last flood and order');
+$hu=resourceHuntStats($p,$names,...[...$window,$now]);$hr=array_column($hu['rows'],null,'pseudo');
+check(array_keys($hr)===['Alpha','Beta']&&$hu['total']['suivis']===2,'hunts: followed members only');
+check($hr['Alpha']['chasses']===2&&near($hr['Alpha']['terrain'],4000.0)&&near($hr['Alpha']['moyenne'],2000.0)&&$hr['Alpha']['en_cours']===1&&near($hr['Alpha']['terrain_en_cours'],700.0),'hunts: period, cancelled excluded, in progress now');
+check($hr['Beta']['chasses']===0&&$hr['Beta']['moyenne']===null&&$hr['Beta']['derniere']->format('Y-m-d')==='2026-10-09'&&near($hu['total']['terrain'],4000.0),'hunts: followed without hunt in the period');
+// Consumption chart with materials convoys only: the apples-only convoy 6 no longer counts.
+$all=array_column(convoyConsumptionData($p,$p,...$window)['rows'],null,'pseudo');$mat=array_column(convoyConsumptionData($p,$p,...[...$window,true])['rows'],null,'pseudo');
+check($all['Alpha']['conv_in']>$mat['Alpha']['conv_in']&&near($mat['Alpha']['conv_in']*($now->getTimestamp()-$window[0]->getTimestamp())/86400,200.0),'consumption: materials only');
+echo "OK: current members only, deduplicated exports, cycles, equal shares, internal colony tax, materials convoys, gaps, periods, sorting, estimated stocks, floods, hunts, materials consumption and chart.\n";
 }finally{$p->rollBack();}

@@ -6,7 +6,8 @@ require_once __DIR__.'/script-convoy-colonies.php';
  * convoys received) and what goes out (convoys delivered, colony tax paid), per day.
  * Production = 48 × TdC per day (one resource per cm² per 30-minute cycle), from the hourly
  * Fourmizzz exports. Colony tax = 20 % + 1 point per aphid stable level of the colonizer when
- * it is known (capped at 100 %), else 20 %. Convoys are the declared ones, by departure date. */
+ * it is known (capped at 100 %), else 20 %. Convoys are the declared ones, by departure date:
+ * apples and materials together, or materials only when $materialsOnly is set. */
 
 const CONSUMPTION_FIRST_DAY='2026-10-01';
 const CONSUMPTION_MAX_DAYS=92;
@@ -31,7 +32,7 @@ function convoyConsumptionRange(array $get,?DateTimeImmutable $now=null):array{
     return [$from,$end];
 }
 
-function convoyConsumptionData(PDO $p,PDO $game,DateTimeImmutable $from,DateTimeImmutable $end):array{
+function convoyConsumptionData(PDO $p,PDO $game,DateTimeImmutable $from,DateTimeImmutable $end,bool $materialsOnly=false):array{
     $members=[];
     foreach($game->query("SELECT player_id::text,pseudo FROM players WHERE server='s5' AND upper(alliance_tag)='UPTEP' AND is_present=true") as $r)
         $members[$r['player_id']]=['id'=>$r['player_id'],'pseudo'=>$r['pseudo'],'grade'=>null,'snapshots'=>0,'field'=>0.0,'tax_in'=>0.0,'tax_out'=>0.0,'conv_in'=>0.0,'conv_out'=>0.0];
@@ -65,9 +66,9 @@ function convoyConsumptionData(PDO $p,PDO $game,DateTimeImmutable $from,DateTime
         }
         if($colonized&&isset($members[$master]))$members[$master]['tax_in']+=$field*$rate($master)/100;
     }
-    $q=$p->prepare("SELECT c.idenvoyeur::text AS sender,d.iddemandeur::text AS receiver,(c.nbpomme+c.nbmateriaux)::numeric AS amount
+    $q=$p->prepare("SELECT c.idenvoyeur::text AS sender,d.iddemandeur::text AS receiver,".($materialsOnly?'c.nbmateriaux':'(c.nbpomme+c.nbmateriaux)')."::numeric AS amount
         FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande
-        WHERE d.serveur='s5' AND NOT c.annule AND c.date_convoi>=?::timestamptz AND c.date_convoi<?::timestamptz");
+        WHERE d.serveur='s5' AND NOT c.annule".($materialsOnly?' AND c.nbmateriaux>0':'')." AND c.date_convoi>=?::timestamptz AND c.date_convoi<?::timestamptz");
     $q->execute($range);
     foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){
         if(isset($members[$r['sender']]))$members[$r['sender']]['conv_out']+=(float)$r['amount'];

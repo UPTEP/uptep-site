@@ -12,3 +12,6 @@
 @media (max-width:900px){.resource-summary{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:520px){.resource-summary{grid-template-columns:1fr}}
 .resource-period label{flex:0 1 200px;flex-basis:200px}.resource-reset{align-self:center;color:#174c5d;font-size:14px}
+.stats-sections{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}.stats-sections a{padding:8px 14px;border:1px solid #d9e2e5;border-radius:9px;background:#fff;color:#174c5d;font-weight:700;text-decoration:none}.stats-sections a:hover,.stats-sections a:focus-visible{background:#eaf0f2}
+.stats-title{font-family:var(--display);font-size:30px;margin:44px 0 6px;padding-top:14px;border-top:1px solid #dfe4e2;scroll-margin-top:16px}.stats-subtitle{font-size:18px;margin:12px 0 4px}
+.users-panel h3{font-family:var(--display);font-size:25px;line-height:1;margin:0}.stats-table{min-width:720px}
