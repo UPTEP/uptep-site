@@ -74,7 +74,9 @@ check($period['cycles']===1&&near($period['total'],600.0)&&near($pr['Alpha']['pr
 check($period['convoys']===1&&near($pr['Alpha']['recu'],200.0)&&near($pr['<b>Gamma</b>']['envoye'],0.0),'period: convoys by departure inside it');
 check(near($pr['Alpha']['stock'],1725.0)&&near($pr['Beta']['stock'],750.0),'period: estimated stock unchanged');
 $paris=new DateTimeZone('Europe/Paris');$clock=new DateTimeImmutable('2026-10-20T12:00:00',$paris);
-[$f,$e]=resourceBalanceRange([],$clock);check($f->format('Y-m-d H:i')==='2026-10-11 00:00'&&$e==$clock,'range: default from the start to now');
+[$f,$e]=resourceBalanceRange([],$clock);check($f->format('c')==='2026-10-13T00:00:00+02:00'&&$e==$clock,'range: default the last 7 days to now');
+[$f,$e]=resourceBalanceRange([],new DateTimeImmutable('2026-10-14T09:00:00',$paris));check($f->format('Y-m-d H:i')==='2026-10-11 00:00','range: default never before the start');
+[$f,$e]=resourceBalanceRange(['fin'=>'2026-10-25'],$clock);check($f->format('Y-m-d')==='2026-10-18'&&$e==$clock,'range: default start follows the end day');
 [$f,$e]=resourceBalanceRange(['debut'=>'2026-10-12','fin'=>'2026-10-13'],$clock);check($f->format('c')==='2026-10-12T00:00:00+02:00'&&$e->format('c')==='2026-10-14T00:00:00+02:00','range: end date included');
 [$f,$e]=resourceBalanceRange(['debut'=>'2026-10-19','fin'=>'2026-10-25'],$clock);check($e==$clock,'range: end capped at now');
 foreach([['debut'=>'2026-10-10'],['debut'=>'2026-10-14','fin'=>'2026-10-13'],['debut'=>'2026-10-21'],['debut'=>'12/10/2026'],['fin'=>'2026-02-30']] as $bad){

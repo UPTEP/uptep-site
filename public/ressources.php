@@ -72,8 +72,8 @@ workspaceStart($u,'Statistiques');
 <form method="get" class="convoy-filters resource-period"><?php if($sort!=='ecart'||$asc): ?><input type="hidden" name="tri" value="<?= e($sort) ?>"><input type="hidden" name="ordre" value="<?= $asc?'asc':'desc' ?>"><?php endif; ?>
 <label>Du<input type="date" name="debut" min="<?= e($firstDay) ?>" max="<?= e($today) ?>" value="<?= e($rangeError===null?$date($from,'Y-m-d'):$input('debut')) ?>"></label>
 <label>Au<input type="date" name="fin" min="<?= e($firstDay) ?>" max="<?= e($today) ?>" value="<?= e($rangeError===null?$date($end->modify('-1 second'),'Y-m-d'):$input('fin')) ?>"></label>
-<button class="save-user" type="submit">Afficher</button><?php if($filtered||$rangeError!==null): ?><a class="resource-reset" href="/ressources.php">Toute la période</a><?php endif; ?></form>
-<?php if($rangeError!==null): ?><p class="form-error" role="alert"><?= e($rangeError) ?> Affichage de toute la période.</p><?php endif; ?>
+<button class="save-user" type="submit">Afficher</button><?php if($filtered||$rangeError!==null): ?><a class="resource-reset" href="/ressources.php">7 derniers jours</a><?php endif; ?><?php if($input('debut')!==RESOURCE_BALANCE_START||$input('fin')!==''): ?><a class="resource-reset" href="/ressources.php?debut=<?= e(RESOURCE_BALANCE_START) ?>">Depuis le <?= e($date(new DateTimeImmutable(RESOURCE_BALANCE_START,$paris),'d/m')) ?></a><?php endif; ?></form>
+<?php if($rangeError!==null): ?><p class="form-error" role="alert"><?= e($rangeError) ?> Affichage des 7 derniers jours.</p><?php endif; ?>
 <nav class="stats-sections" aria-label="Parties de la page"><a href="#ressources">Ressources</a><a href="#consommation">Consommation</a><a href="#flood">Flood</a><a href="#chasse">Chasse</a></nav>
 <?php if($data===null): ?><p class="form-error" role="alert">Les données sont indisponibles pour le moment. Réessaie dans quelques instants.</p>
 <?php elseif(!$data['rows']): ?><p>Aucun membre UPTEP dans le dernier relevé.</p>

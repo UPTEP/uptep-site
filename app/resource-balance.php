@@ -24,7 +24,8 @@ const RESOURCE_BALANCE_TOLERANCE=0.05; // Within ±5 % of the share: balanced.
 const RESOURCE_BALANCE_SORTS=['pseudo','terrain','stock','production','colonie','envoye','recu','ecart','ratio'];
 const RESOURCE_STOCK_MAX_AGE=172800; // 48 h: an older reading is too far off to estimate a stock.
 
-/** Reads the debut / fin date inputs (Y-m-d, Paris; fin inclusive). Default: from the start to now. */
+/** Reads the debut / fin date inputs (Y-m-d, Paris; fin inclusive). Default: the last 7 days up to now
+ * (from midnight 7 days before the end day), never before the first declared convoy. */
 function resourceBalanceRange(array $get,?DateTimeImmutable $now=null):array{
     $zone=new DateTimeZone('Europe/Paris');$now=$now??new DateTimeImmutable();
     $first=new DateTimeImmutable(RESOURCE_BALANCE_START,$zone);
@@ -34,7 +35,8 @@ function resourceBalanceRange(array $get,?DateTimeImmutable $now=null):array{
         if(!$d||$d->format('Y-m-d')!==$value)throw new DomainException('Date invalide : utilise le sélecteur de dates.',422);
         return $d;
     };
-    $from=$day($get['debut']??null)??$first;$to=$day($get['fin']??null);
+    $to=$day($get['fin']??null);
+    $from=$day($get['debut']??null)??max($first,($to??$now->setTimezone($zone))->setTime(0,0)->modify('-7 days'));
     $end=$to?$to->modify('+1 day'):$now;if($end>$now)$end=$now;
     if($from<$first)throw new DomainException('Les convois déclarés commencent le '.$first->format('d/m/Y').' : choisis une date de début à partir de ce jour.',422);
     if($from>=$end)throw new DomainException('La date de début doit précéder la date de fin et ne pas être dans le futur.',422);
