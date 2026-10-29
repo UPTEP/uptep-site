@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /* Flood and hunt statistics of the current UPTEP members over a period [from, end).
- * Floods: declared floods (bot, UPTEP+) by arrival date; troops are summed from the declared
+ * Floods: declared floods (bot, UPTEP+) by arrival date, per member; the alliance troops are summed from the declared
  * text ("15 888 Jeunes Soldates Naines, 627 Soldates Naines."), unknown when it was not given or
  * unreadable (a unit count above RESOURCE_TROOPS_MAX comes from a mangled Discord paste).
  * The terrain taken by a flood is not recorded. Hunts: hunts read by UPTEP+ or pasted on Discord,
@@ -26,7 +26,7 @@ function resourceTroops(?string $text):?float{
 /** @param array<string,string> $members player id => pseudo */
 function resourceFloodStats(PDO $p,array $members,DateTimeImmutable $from,DateTimeImmutable $end,?DateTimeImmutable $now=null):array{
     $now=$now??new DateTimeImmutable();
-    $rows=[];foreach($members as $id=>$pseudo)$rows[$id]=['id'=>$id,'pseudo'=>$pseudo,'envoyes'=>0,'recus'=>0,'envoyes_connus'=>0,'troupes_envoyees'=>0.0,'troupes_recues'=>0.0,'dernier'=>null];
+    $rows=[];foreach($members as $id=>$pseudo)$rows[$id]=['id'=>$id,'pseudo'=>$pseudo,'envoyes'=>0,'recus'=>0,'dernier'=>null];
     $total=['floods'=>0,'troupes'=>0.0,'inconnues'=>0,'loge'=>0,'en_route'=>0];
     $q=$p->prepare("SELECT sender_id::text AS sender,target_id::text AS target,location,troops,arrival_at::text AS arrival FROM floods WHERE arrival_at>=?::timestamptz AND arrival_at<?::timestamptz");
     $q->execute([$from->format('c'),$end->format('c')]);
@@ -34,8 +34,8 @@ function resourceFloodStats(PDO $p,array $members,DateTimeImmutable $from,DateTi
         $troops=resourceTroops($f['troops']);$arrival=new DateTimeImmutable($f['arrival']);
         $total['floods']++;if($troops===null)$total['inconnues']++;else $total['troupes']+=$troops;
         if($f['location']!=='Terrain de chasse')$total['loge']++;
-        if(isset($rows[$f['sender']])){$r=&$rows[$f['sender']];$r['envoyes']++;if($troops!==null){$r['envoyes_connus']++;$r['troupes_envoyees']+=$troops;}if($r['dernier']===null||$arrival>$r['dernier'])$r['dernier']=$arrival;unset($r);}
-        if(isset($rows[$f['target']])){$rows[$f['target']]['recus']++;$rows[$f['target']]['troupes_recues']+=$troops??0.0;}
+        if(isset($rows[$f['sender']])){$r=&$rows[$f['sender']];$r['envoyes']++;if($r['dernier']===null||$arrival>$r['dernier'])$r['dernier']=$arrival;unset($r);}
+        if(isset($rows[$f['target']]))$rows[$f['target']]['recus']++;
     }
     $q=$p->prepare('SELECT count(*) FROM floods WHERE arrival_at>?::timestamptz');$q->execute([$now->format('c')]);$total['en_route']=(int)$q->fetchColumn();
     $rows=array_values($rows);

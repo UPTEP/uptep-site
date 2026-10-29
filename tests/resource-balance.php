@@ -96,7 +96,7 @@ check(resourceTroops(null)===null,'troops unknown');
 $names=['1'=>'Alpha','2'=>'Beta','3'=>'<b>Gamma</b>'];$window=[new DateTimeImmutable('2026-10-10T22:00:00Z'),$now];
 $fl=resourceFloodStats($p,$names,...[...$window,$now]);$fr=array_column($fl['rows'],null,'pseudo');
 check($fl['total']['floods']===4&&near($fl['total']['troupes'],16922.0)&&$fl['total']['inconnues']===2&&$fl['total']['loge']===1&&$fl['total']['en_route']===1,'flood totals: period, unreadable and unknown troops, in transit');
-check($fr['Alpha']['envoyes_connus']===2&&$fr['Beta']['envoyes_connus']===0&&$fr['Alpha']['recus']===1&&near($fr['Alpha']['troupes_envoyees'],16922.0)&&$fr['Beta']['recus']===2&&$fr['Beta']['envoyes']===1&&$fr['<b>Gamma</b>']['recus']===1,'floods per member, departed sender left out');
+check($fr['Alpha']['envoyes']===2&&$fr['Alpha']['recus']===1&&$fr['Beta']['recus']===2&&$fr['Beta']['envoyes']===1&&$fr['<b>Gamma</b>']['recus']===1,'floods per member, departed sender left out');
 check($fr['Alpha']['dernier']->setTimezone(new DateTimeZone('UTC'))->format('H:i')==='23:30'&&$fl['rows'][0]['pseudo']==='Alpha','last flood and order');
 $hu=resourceHuntStats($p,$names,...[...$window,$now]);$hr=array_column($hu['rows'],null,'pseudo');
 check(array_keys($hr)===['Alpha','Beta']&&$hu['total']['suivis']===2,'hunts: followed members only');
