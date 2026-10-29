@@ -10,21 +10,26 @@ declare(strict_types=1);
  * colonizer (current level, 20 % when unknown, capped at 100 %) when both are counted members in
  * that export, as in the convoy estimates: an internal transfer, so the alliance total is unchanged.
  * Convoys are the declared, non-cancelled ones (materials only), counted at their departure date.
- * Net = production − colony tax paid + colony tax received − sent + received; gap = net − share. */
+ * Net = production − colony tax paid + colony tax received − sent + received; gap = net − share.
+ * Estimated stock: the member's last UPTEP+ materials reading (at most 48 h old), plus the same
+ * production and colony taxes for each cycle after it, minus convoys sent since (departure) plus
+ * convoys received since (arrival). Spending and the warehouse capacity are not known. */
 
 require_once __DIR__.'/script-convoy-colonies.php';
 
 const RESOURCE_BALANCE_START='2026-10-11'; // Paris. The first declared convoy dates from 11/10 14:56.
 const RESOURCE_BALANCE_CYCLE=1800;
 const RESOURCE_BALANCE_TOLERANCE=0.05; // Within ±5 % of the share: balanced.
-const RESOURCE_BALANCE_SORTS=['pseudo','entree','terrain','production','colonie','part','envoye','recu','net','ecart','ratio'];
+const RESOURCE_BALANCE_SORTS=['pseudo','entree','terrain','production','colonie','part','envoye','recu','net','ecart','ratio','stock'];
+const RESOURCE_STOCK_MAX_AGE=172800; // 48 h: an older reading is too far off to estimate a stock.
 
 function resourceBalanceData(PDO $p,PDO $game,?DateTimeImmutable $now=null):array{
     $start=new DateTimeImmutable(RESOURCE_BALANCE_START,new DateTimeZone('Europe/Paris'));
     $now=$now??new DateTimeImmutable();
     $members=[];
     foreach($game->query("SELECT player_id::text,pseudo,field::text FROM players WHERE server='s5' AND upper(alliance_tag)='UPTEP' AND is_present=true") as $r)
-        $members[$r['player_id']]=['id'=>$r['player_id'],'pseudo'=>$r['pseudo'],'terrain'=>(float)$r['field'],'entree'=>null,'production'=>0.0,'taxe_payee'=>0.0,'taxe_recue'=>0.0,'part'=>0.0,'envoye'=>0.0,'recu'=>0.0,'cycles'=>0];
+        $members[$r['player_id']]=['id'=>$r['player_id'],'pseudo'=>$r['pseudo'],'terrain'=>(float)$r['field'],'entree'=>null,'production'=>0.0,'taxe_payee'=>0.0,'taxe_recue'=>0.0,'part'=>0.0,'envoye'=>0.0,'recu'=>0.0,'cycles'=>0,
+            'releve'=>null,'stock'=>null,'stock_production'=>0.0,'stock_cycles'=>0,'stock_envoye'=>0.0,'stock_recu'=>0.0];
     $result=['rows'=>[],'start'=>$start,'end'=>$now,'cycles'=>0,'hours'=>[],'total'=>0.0,'current'=>0.0,'convoys'=>0,'materials'=>0.0,'outside'=>0.0,'colonies'=>0,'assumed_rates'=>false];
     if(!$members||$now<=$start)return $result;
     $ids=array_keys($members);$marks=implode(',',array_fill(0,count($ids),'?'));
@@ -41,6 +46,18 @@ function resourceBalanceData(PDO $p,PDO $game,?DateTimeImmutable $now=null):arra
       WHERE r.uptep AND (o.last_out IS NULL OR r.exported_at>o.last_out) GROUP BY r.player_id");
     $q->execute($ids);
     foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r)$members[$r['player_id']]['entree']=new DateTimeImmutable($r['entree'],new DateTimeZone('UTC'));
+
+    // Last UPTEP+ materials reading, for accounts linked to exactly one active user.
+    $q=$p->query("SELECT u.game_player_id::text AS player_id,s.data->'resources'->>'materiaux' AS materiaux,s.resources_synced_at::text AS at
+        FROM users u JOIN user_stats s ON s.user_id=u.id
+        WHERE u.status='active' AND u.game_player_id IS NOT NULL AND s.resources_synced_at IS NOT NULL
+          AND (SELECT count(*) FROM users other WHERE other.game_player_id=u.game_player_id AND other.status='active')=1");
+    $since=[];
+    foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){
+        if(!isset($members[$r['player_id']])||!is_string($r['materiaux'])||!preg_match('/\A[0-9]{1,18}\z/',$r['materiaux']))continue;
+        $at=new DateTimeImmutable($r['at']);$members[$r['player_id']]['releve']=['at'=>$at,'materiaux'=>(float)$r['materiaux']];
+        if($at<=$now&&$now->getTimestamp()-$at->getTimestamp()<=RESOURCE_STOCK_MAX_AGE)$since[$r['player_id']]=$at->getTimestamp();
+    }
 
     // One snapshot per export version (latest corrected import), from the one in force at the start.
     $from=$start->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');$to=$now->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
@@ -84,6 +101,12 @@ function resourceBalanceData(PDO $p,PDO $game,?DateTimeImmutable $now=null):arra
         $fields=$exports[$i]['fields'];$pool=array_sum($fields);$share=$pool/count($fields);
         foreach($fields as $id=>$field){$members[$id]['production']+=$field;$members[$id]['part']+=$share;$members[$id]['cycles']++;}
         foreach($exports[$i]['tax'] as $id=>[$master,$tax]){$members[$id]['taxe_payee']+=$tax;$members[$master]['taxe_recue']+=$tax;}
+        // Estimated stocks: only the cycles after each member's reading.
+        foreach($since as $id=>$at)if($t>$at&&isset($fields[$id])){$members[$id]['stock_production']+=$fields[$id];$members[$id]['stock_cycles']++;}
+        foreach($exports[$i]['tax'] as $id=>[$master,$tax]){
+            if(isset($since[$id])&&$t>$since[$id])$members[$id]['stock_production']-=$tax;
+            if(isset($since[$master])&&$t>$since[$master])$members[$master]['stock_production']+=$tax;
+        }
         $hour=intdiv($t,3600)*3600;$hours[$hour]=($hours[$hour]??0.0)+$pool;
         $result['total']+=$pool;$result['cycles']++;
         $result['current']=$pool*2;$result['colonies']=count($exports[$i]['tax']);
@@ -104,11 +127,26 @@ function resourceBalanceData(PDO $p,PDO $game,?DateTimeImmutable $now=null):arra
         $result['convoys']++;$result['materials']+=$amount;
         if(!isset($members[$r['sender']],$members[$r['receiver']]))$result['outside']+=$amount;
     }
+    if($since){
+        // Sent materials leave the warehouse at departure; received ones enter it on arrival.
+        $oldest=(new DateTimeImmutable('@'.min($since)))->format('c');
+        $q=$p->prepare("SELECT c.idenvoyeur::text AS sender,d.iddemandeur::text AS receiver,c.nbmateriaux::text AS amount,
+                c.date_convoi::text AS depart,coalesce(c.date_arrivee,c.date_convoi)::text AS arrivee
+            FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande
+            WHERE d.serveur='s5' AND NOT c.annule AND c.nbmateriaux>0 AND (c.date_convoi>?::timestamptz OR coalesce(c.date_arrivee,c.date_convoi)>?::timestamptz)");
+        $q->execute([$oldest,$oldest]);$end=$now->getTimestamp();
+        foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){
+            $depart=(new DateTimeImmutable($r['depart']))->getTimestamp();$arrival=(new DateTimeImmutable($r['arrivee']))->getTimestamp();
+            if(isset($since[$r['sender']])&&$depart>$since[$r['sender']]&&$depart<=$end)$members[$r['sender']]['stock_envoye']+=(float)$r['amount'];
+            if(isset($since[$r['receiver']])&&$arrival>$since[$r['receiver']]&&$arrival<=$end)$members[$r['receiver']]['stock_recu']+=(float)$r['amount'];
+        }
+    }
 
     foreach($members as $m){
         $m['colonie']=$m['taxe_recue']-$m['taxe_payee'];
         $m['net']=$m['production']+$m['colonie']-$m['envoye']+$m['recu'];$m['ecart']=$m['net']-$m['part'];
         $m['ratio']=$m['part']>0?$m['net']/$m['part']:null;
+        if(isset($since[$m['id']]))$m['stock']=max(0.0,$m['releve']['materiaux']+$m['stock_production']-$m['stock_envoye']+$m['stock_recu']);
         $m['verdict']=$m['ratio']===null?'aucun':(abs($m['ratio']-1)<=RESOURCE_BALANCE_TOLERANCE?'equilibre':($m['ecart']>0?'convoyer':'recevoir'));
         $result['rows'][]=$m;
     }

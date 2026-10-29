@@ -13,7 +13,7 @@ $p->exec("CREATE TABLE players(server text,player_id bigint,pseudo text,alliance
 CREATE TABLE historique_exports(id bigint,server text,export_type text,export_version text,exported_at timestamp);
 CREATE TABLE historique_players(export_id bigint,player_id bigint,alliance_tag text,field bigint,master_player_id bigint);
 CREATE TABLE users(id bigint,status text,game_player_id bigint);
-CREATE TABLE user_stats(user_id bigint,data jsonb);
+CREATE TABLE user_stats(user_id bigint,data jsonb,resources_synced_at timestamptz);
 CREATE TABLE demandes_convois(id bigint,serveur text,iddemandeur bigint);
 CREATE TABLE convois_effectues(id bigint,iddemande bigint,idenvoyeur bigint,nbpomme bigint,nbmateriaux bigint,date_convoi timestamptz,annule boolean);
 INSERT INTO players VALUES('s5',1,'Alpha','UPTEP',100,true),('s5',2,'Beta','uptep',300,true),('s5',3,'<b>Gamma</b>','UPTEP',200,true),
@@ -27,12 +27,16 @@ INSERT INTO historique_players VALUES
  (3,1,'UPTEP',999,0),(3,2,'UPTEP',999,1),(3,3,'OTHER',999,0),
  (4,1,'UPTEP',100,1),(4,2,'UPTEP',300,1),(4,3,'UPTEP',200,4),(4,4,'OTHER',1000,0),
  (6,1,'UPTEP',5000,0);
-INSERT INTO users VALUES(10,'active',1);INSERT INTO user_stats VALUES(10,'{\"buildings\":{\"etable_pucerons\":\"5\"}}');
+INSERT INTO users VALUES(10,'active',1),(11,'active',2),(12,'active',3),(13,'disabled',2);
+-- Readings: Alpha 22:40 and Beta 23:05 (recent), Gamma 08/10 (older than 48 h).
+INSERT INTO user_stats VALUES(10,'{\"buildings\":{\"etable_pucerons\":\"5\"},\"resources\":{\"materiaux\":\"1000\"}}','2026-10-10T22:40:00Z'),
+ (11,'{\"resources\":{\"materiaux\":\"500\"}}','2026-10-10T23:05:00Z'),(12,'{\"resources\":{\"materiaux\":\"9999\"}}','2026-10-08T00:00:00Z'),(13,'{\"resources\":{\"materiaux\":\"1\"}}','2026-10-10T23:59:00Z');
 INSERT INTO demandes_convois VALUES(1,'s5',1),(2,'s5',4),(3,'s1',1);
 INSERT INTO convois_effectues VALUES
  (1,1,2,0,200,'2026-10-10T23:10:00Z',false),(2,1,2,0,999,'2026-10-10T23:20:00Z',true),(3,1,2,0,999,'2026-10-10T21:00:00Z',false),
  (4,2,3,0,50,'2026-10-10T23:40:00Z',false),(5,3,2,0,999,'2026-10-10T23:40:00Z',false),(6,1,2,500,0,'2026-10-10T23:40:00Z',false),
- (7,1,2,0,999,'2026-10-11T00:10:00Z',false);");
+ (7,1,2,0,999,'2026-10-11T00:10:00Z',false);
+ALTER TABLE convois_effectues ADD COLUMN date_arrivee timestamptz;UPDATE convois_effectues SET date_arrivee='2026-10-10T23:50:00Z' WHERE id=1;");
 $now=new DateTimeImmutable('2026-10-11T00:00:00Z');
 $data=resourceBalanceData($p,$p,$now);$rows=array_column($data['rows'],null,'pseudo');
 check(array_keys($rows)===['Alpha','Beta','<b>Gamma</b>'],'current UPTEP members only, case-insensitive tag');
@@ -47,6 +51,13 @@ check($data['convoys']===2&&near($data['materials'],250.0)&&near($data['outside'
 check(near($rows['Alpha']['ecart'],75.0)&&$rows['Alpha']['verdict']==='convoyer'&&near($rows['Beta']['ecart'],-75.0)&&$rows['Beta']['verdict']==='recevoir','gap and verdict');
 check(near(array_sum(array_column($data['rows'],'part')),$data['total'])&&near(array_sum(array_column($data['rows'],'colonie')),0.0),'shares and taxes balance');
 check($rows['Alpha']['entree']->format('Y-m-d H:i')==='2026-10-09 22:00'&&$rows['Beta']['entree']->format('Y-m-d H:i')==='2026-10-10 21:00'&&$rows['<b>Gamma</b>']['entree']->format('Y-m-d H:i')==='2026-10-10 23:00','entry = start of the current UPTEP streak');
+// Alpha: 1000 + 3 cycles × (100 + 75 tax) + 200 arrived at 23:50. Beta: 500 + 2 cycles × (300 − 75) − 200 sent at 23:10.
+check(near($rows['Alpha']['stock'],1725.0)&&$rows['Alpha']['stock_cycles']===3&&near($rows['Alpha']['stock_recu'],200.0),'stock: reading + cycles with colony tax + arrived convoy');
+check(near($rows['Beta']['stock'],750.0)&&near($rows['Beta']['stock_envoye'],200.0)&&$rows['Beta']['releve']['materiaux']===500.0,'stock: convoy sent after the reading, disabled duplicate account ignored');
+check($rows['<b>Gamma</b>']['stock']===null&&$rows['<b>Gamma</b>']['releve']!==null,'stock: reading older than 48 h not estimated');
+$transit=array_column(resourceBalanceData($p,$p,new DateTimeImmutable('2026-10-10T23:45:00Z'))['rows'],null,'pseudo');
+check(near($transit['Alpha']['stock'],1350.0)&&near($transit['Alpha']['stock_recu'],0.0)&&near($transit['Beta']['stock'],525.0),'stock: convoy still travelling not received');
+check(array_column(resourceBalanceSort($data['rows'],'stock',false),'pseudo')===['Alpha','Beta','<b>Gamma</b>'],'stock sort, unknown last');
 check(array_column(resourceBalanceSort($data['rows'],'ecart',false),'pseudo')===['Alpha','<b>Gamma</b>','Beta'],'default sort: largest gap first');
 check(array_column(resourceBalanceSort($data['rows'],'unknown',true),'pseudo')===['Alpha','<b>Gamma</b>','Beta'],'unknown sort key falls back');
 check(array_column(resourceBalanceSort($data['rows'],'pseudo',true),'pseudo')===['<b>Gamma</b>','Alpha','Beta'],'name sort');
@@ -56,5 +67,5 @@ check($assumed['assumed_rates']&&near($beta['taxe_payee'],300.0),'unknown stable
 $early=resourceBalanceData($p,$p,new DateTimeImmutable('2026-10-10T20:00:00Z'));check($early['cycles']===0&&!$early['rows'],'nothing before the start');
 foreach(['1,09G'=>1093071255.0,'−1,5k'=>-1500.0,'42'=>42.0,'400k'=>400000.0,'120k'=>119969.0,'100M'=>1e8,'46,5M'=>46512628.0,'1M'=>999950.0,'1k'=>999.6,'2,5T'=>2.5e12,'1 500T'=>1.5e15,'0'=>-0.2]
     as $want=>$v)check(resourceCompact($v)===(string)$want,'compact '.$v.' = '.$want.', got '.resourceCompact($v));
-echo "OK: current members only, deduplicated exports, cycles, equal shares, internal colony tax, materials convoys, gaps, entry dates, sorting and chart.\n";
+echo "OK: current members only, deduplicated exports, cycles, equal shares, internal colony tax, materials convoys, gaps, entry dates, sorting, estimated stocks and chart.\n";
 }finally{$p->rollBack();}
