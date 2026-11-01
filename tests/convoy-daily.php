@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/../app/convoy-daily.php';
+require __DIR__.'/../app/convoy-consumption.php';
 function check(bool $ok,string $why):void{if(!$ok)throw new RuntimeException($why);}
 function e(string $s):string{return htmlspecialchars($s,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');}
 function botSiteReportAccess(PDO $p,PDO $g,array $q,array $u):void{if(($u['role']??'')!=='admin')throw new DomainException('Forbidden',403);}
@@ -13,7 +14,9 @@ $p->exec("CREATE TABLE chaine_members(server text,player_id bigint,pseudo text);
 CREATE TABLE demandes_convois(id bigint,serveur text,iddemandeur bigint,pseudo_demandeur text);
 CREATE TABLE convois_effectues(id bigint,iddemande bigint,idenvoyeur bigint,pseudo_envoyeur text,nbpomme bigint,nbmateriaux bigint,date_convoi timestamptz,annule boolean);
 CREATE TABLE historique_exports(id bigint,export_version text,exported_at timestamp,server text,export_type text);
-CREATE TABLE historique_players(export_id bigint,player_id bigint,field bigint);
+CREATE TABLE historique_players(export_id bigint,player_id bigint,field bigint,master_player_id bigint,alliance_tag text);
+CREATE TABLE users(id bigint,status text,game_player_id bigint);
+CREATE TABLE user_stats(user_id bigint,data jsonb);
 INSERT INTO chaine_members VALUES('s5',1,'Alpha'),('s5',2,'Beta'),('s5',3,'<script>Zero</script>'),('s1',99,'Wrong server');
 INSERT INTO demandes_convois VALUES(1,'s5',2,'Beta'),(2,'s1',99,'Wrong server');
 INSERT INTO convois_effectues VALUES
@@ -31,29 +34,30 @@ INSERT INTO historique_exports VALUES
 (3,'v2','2026-10-15 10:00:00','s5','players'),
 (4,'future','2026-10-15 15:00:00','s5','players'),
 (5,'other','2026-10-15 10:00:00','s1','players');
-INSERT INTO historique_players VALUES(1,1,900),(2,1,100),(3,1,300),(4,1,9999),(5,1,9999);");
+INSERT INTO historique_players(export_id,player_id,field) VALUES(1,1,900),(2,1,100),(3,1,300),(4,1,9999),(5,1,9999);");
 $now=new DateTimeImmutable('2026-10-15T12:00:00Z');
-$data=convoyDailyData($p,$p,[],$now);$a=$data['rows'][0];
+check(convoyDailyData($p,$p,[],$now)['resource']==='materiaux','materials by default');
+$data=convoyDailyData($p,$p,['ressource'=>'pommes'],$now);$a=$data['rows'][0];
 check(count($data['days'])===7&&$data['days'][6]['date']==='2026-10-09','seven Paris dates');
 check(count($data['rows'])===3,'include zero members, exclude other server');
 check($a['total_count']==='3'&&$a['total_quantity']==='1000'&&$a['daily_average']==='142.86','totals, exclude cancelled/future/outside period');
 check($a['days']['2026-10-15']['quantity']==='300'&&$a['days']['2026-10-15']['count']==='2','Paris midnight and mixed convoy');
-check($a['days']['2026-10-15']['tdc']==='200.00'&&$a['days']['2026-10-15']['samples']===2,'TdC dedup and daily mean');
+check($a['days']['2026-10-15']['tdc']==='200'&&$a['days']['2026-10-15']['tdc_colonies']==='200'&&$a['days']['2026-10-15']['samples']===2,'TdC dedup and daily mean');
 check($a['days']['2026-10-14']['tdc']===null&&$a['days']['2026-10-14']['count']==='0','unknown TdC distinct from zero activity');
-$wood=convoyDailyData($p,$p,['ressource'=>'materiaux'],$now)['rows'][0];check($wood['total_quantity']==='900'&&$wood['total_count']==='2','resource-only shipments');
-$in=convoyDailyData($p,$p,['sens'=>'receptions'],$now)['rows'][0];check($in['player_id']==='2'&&$in['total_quantity']==='1000','recipient grouping');
+$wood=convoyDailyData($p,$p,[],$now)['rows'][0];check($wood['total_quantity']==='900'&&$wood['total_count']==='2','resource-only shipments');
+$in=convoyDailyData($p,$p,['ressource'=>'pommes','sens'=>'receptions'],$now)['rows'][0];check($in['player_id']==='2'&&$in['total_quantity']==='1000','recipient grouping');
 check(count(convoyDailyData($p,$p,['joueur'=>'pha'],$now)['rows'])===1,'name filter');
 check(count(convoyDailyData($p,$p,['joueur'=>'%'],$now)['rows'])===0,'escaped wildcard');
 foreach([['sens'=>'bad'],['ressource'=>'DROP'],['joueur'=>[]]] as $q){try{convoyDailyData($p,$p,$q,$now);throw new RuntimeException('invalid filter accepted');}catch(DomainException $e){}}
 try{convoyDailyStatistics($p,$p,[],['role'=>'member']);throw new RuntimeException('access bypass');}catch(DomainException $e){check($e->getCode()===403,'access guard');}
-ob_start();require __DIR__.'/../app/convoy-daily-view.php';$html=ob_get_clean();check(!str_contains($html,'<script>Zero')&&str_contains($html,'&lt;script&gt;'),'escaped pseudo');check(substr_count($html,'scope="col"')===9,'nine column table');
+ob_start();require __DIR__.'/../app/convoy-daily-view.php';$html=ob_get_clean();check(!str_contains($html,'<script>Zero')&&str_contains($html,'&lt;script&gt;'),'escaped pseudo');check(substr_count($html,'scope="col"')===11,'eleven column table');
 $p->exec("INSERT INTO convois_effectues VALUES(9,1,1,'Alpha',9007199254740993,0,'2026-10-15T11:00:00Z',false)");
-$large=convoyDailyData($p,$p,[],$now)['rows'][0];check($large['total_quantity']==='9007199254741993','large integer precision');check(convoyStatNumber($large['total_quantity'])==='9 007 199 254 741 993','exact formatted total');
+$large=convoyDailyData($p,$p,['ressource'=>'pommes'],$now)['rows'][0];check($large['total_quantity']==='9007199254741993','large integer precision');check(convoyStatNumber($large['total_quantity'])==='9 007 199 254 741 993','exact formatted total');
 $p->exec("INSERT INTO convois_effectues VALUES(10,1,1,'Alpha',1,0,'2026-10-25T00:30:00Z',false),(11,1,1,'Alpha',2,0,'2026-10-25T01:30:00Z',false)");
-$dst=convoyDailyData($p,$p,[],new DateTimeImmutable('2026-10-26T12:00:00Z'));check($dst['rows'][0]['days']['2026-10-25']['quantity']==='3','DST repeated hour stays in same day');
+$dst=convoyDailyData($p,$p,['ressource'=>'pommes'],new DateTimeImmutable('2026-10-26T12:00:00Z'));check($dst['rows'][0]['days']['2026-10-25']['quantity']==='3','DST repeated hour stays in same day');
 check($data['totals']['total_quantity']==='1000'&&$data['totals']['total_count']==='3','grand total per member, not repeated per day');
 check($data['totals']['days']['2026-10-15']['quantity']==='300','daily grand total');
-check($data['totals']['days']['2026-10-15']['tdc']==='200.00'&&$data['totals']['days']['2026-10-15']['covered']===1,'partial TdC sum and coverage');
+check($data['totals']['days']['2026-10-15']['tdc']==='200'&&$data['totals']['days']['2026-10-15']['covered']===1,'partial TdC sum and coverage');
 check($data['totals']['days']['2026-10-14']['tdc']===null,'missing TdC not zero');
 check(str_contains($html,'daily-grand-total')&&str_contains($html,'3 joueurs affichés'),'total row rendered first');
 $empty=convoyDailyData($p,$p,['joueur'=>'absent'],$now);check($empty['totals']['members']===0&&$empty['totals']['total_quantity']==='0','empty filtered total');
@@ -62,5 +66,14 @@ $fixtureRow=['days'=>['2026-10-15'=>['count'=>'1','quantity'=>'1','tdc'=>'0.10']
 $exact=convoyDailyTotals($p,[$fixtureRow,$fixtureRow],$data['days']);check($exact['daily_average']==='0.29'&&$exact['days']['2026-10-15']['tdc']==='0.20','mean from total, exact decimals');
 $fixtureRow['total_quantity']='9223372036854775807';$fixtureRow['days']['2026-10-15']['quantity']='9223372036854775807';
 $huge=convoyDailyTotals($p,[$fixtureRow,$fixtureRow],$data['days']);check($huge['total_quantity']==='18446744073709551614'&&$huge['days']['2026-10-15']['quantity']==='18446744073709551614','totals above bigint remain exact');
-echo "OK: seven days, Paris/DST boundaries, four resource/direction views, zero days, cancelled/future exclusion, TdC averages/dedup, exact large totals, escaping and access guard.\n";
+// Colonies: Beta (stable 5) takes 25 % of Alpha; Alpha (stable unknown) takes 20 % of Zero; a non-UPTEP colony pays nothing.
+$p->exec("INSERT INTO users VALUES(10,'active',2),(11,'active',1);INSERT INTO user_stats VALUES(10,'{\"buildings\":{\"etable_pucerons\":\"5\"}}'),(11,'{}');
+INSERT INTO historique_exports VALUES(6,'v6','2026-10-20 10:00:00','s5','players');
+INSERT INTO historique_players VALUES(6,1,1000,2,'UPTEP'),(6,2,400,NULL,'UPTEP'),(6,3,500,1,'UPTEP'),(6,4,800,2,'OTHER');");
+$col=convoyDailyData($p,$p,[],new DateTimeImmutable('2026-10-20T12:00:00Z'));$byId=array_column($col['rows'],null,'player_id');
+check($byId['1']['days']['2026-10-20']['tdc']==='1000'&&$byId['1']['days']['2026-10-20']['tdc_colonies']==='850','colonised colonizer: minus 25 %, plus 20 %');
+check($byId['2']['days']['2026-10-20']['tdc_colonies']==='650'&&$byId['3']['days']['2026-10-20']['tdc_colonies']==='400','internal colony taxes only');
+check($col['totals']['days']['2026-10-20']['tdc_colonies']==='1900'&&convoyProduction($byId['1']['days']['2026-10-20']['tdc_colonies'])==='40800','colony total and production');
+ob_start();$data=$col;require __DIR__.'/../app/convoy-daily-view.php';$html=ob_get_clean();check(str_contains($html,'Prod. / jour (colonies)')&&substr_count($html,'data-metric="production_colonies"')===4,'colony production row rendered');
+echo "OK: seven days, Paris/DST boundaries, four resource/direction views, zero days, cancelled/future exclusion, TdC averages/dedup, exact large totals, colony taxes, escaping and access guard.\n";
 }finally{$p->rollBack();}

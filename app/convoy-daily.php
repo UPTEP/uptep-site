@@ -1,12 +1,13 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/script-convoy-colonies.php';
 
 function convoyDailyStatistics(PDO $p,PDO $game,array $query,array $user): array {
     botSiteReportAccess($p,$game,$query,$user);
     return convoyDailyData($p,$game,$query);
 }
 function convoyDailyData(PDO $p,PDO $game,array $query,?DateTimeImmutable $now=null): array {
-    $resource=$query['ressource']??'pommes';$direction=$query['sens']??'envois';$player=$query['joueur']??'';
+    $resource=$query['ressource']??'materiaux';$direction=$query['sens']??'envois';$player=$query['joueur']??'';
     if(!in_array($resource,['pommes','materiaux'],true)||!in_array($direction,['envois','receptions'],true)||!is_string($player)||mb_strlen($player)>100)throw new DomainException('Filtres de statistiques invalides.',422);
     $now=($now??new DateTimeImmutable())->setTimezone(new DateTimeZone('Europe/Paris'));
     $today=$now->setTime(0,0);$start=$today->modify('-6 days');$days=[];
@@ -41,35 +42,70 @@ function convoyDailyData(PDO $p,PDO $game,array $query,?DateTimeImmutable $now=n
     foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){
         $key=$r['player_id'];
         if(!isset($rows[$key])){
-            $daily=[];foreach($days as $day)$daily[$day['date']]=['count'=>'0','quantity'=>'0','tdc'=>null,'samples'=>0];
+            $daily=[];foreach($days as $day)$daily[$day['date']]=['count'=>'0','quantity'=>'0','tdc'=>null,'tdc_colonies'=>null,'samples'=>0];
             $rows[$key]=['player_id'=>$key,'pseudo'=>$r['pseudo'],'days'=>$daily,'total_count'=>$r['total_count'],'total_quantity'=>$r['total_quantity'],'daily_average'=>$r['daily_average']];
         }
-        if($r['day']!==null)$rows[$key]['days'][$r['day']]=['count'=>$r['shipments'],'quantity'=>$r['quantity'],'tdc'=>null,'samples'=>0];
+        if($r['day']!==null)$rows[$key]['days'][$r['day']]=['count'=>$r['shipments'],'quantity'=>$r['quantity'],'tdc'=>null,'tdc_colonies'=>null,'samples'=>0];
     }
     if($rows){
+        $levels=scriptConvoyCurrentColonyLevels($p);
         // FZZZ export timestamps are stored without zone (UTC, as in the observatory).
         // Retain the latest corrected export per version, not repeated imports of the same snapshot.
         $sql="WITH exports AS (
-            SELECT DISTINCT ON (export_version) id,exported_at FROM historique_exports
+            SELECT DISTINCT ON (export_version) id,
+                   ((exported_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Paris')::date::text AS day
+            FROM historique_exports
             WHERE server='s5' AND export_type='players'
               AND exported_at>=(?::timestamptz AT TIME ZONE 'UTC') AND exported_at<=(?::timestamptz AT TIME ZONE 'UTC')
             ORDER BY export_version,id DESC
         )
-        SELECT h.player_id::text,((e.exported_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Paris')::date::text AS day,
-               round(avg(h.field::numeric),2)::text AS tdc,count(h.field)::int AS samples
+        SELECT e.id AS export_id,e.day,h.player_id::text,h.field::text,h.master_player_id::text,h.alliance_tag
         FROM historique_players h JOIN exports e ON e.id=h.export_id
-        WHERE h.player_id IN (".implode(',',array_fill(0,count($rows),'?')).")
-        GROUP BY h.player_id,day";
+        WHERE upper(h.alliance_tag)='UPTEP' OR h.player_id IN (".implode(',',array_fill(0,count($rows),'?')).")";
         $q=$game->prepare($sql);$q->execute(array_merge([$start->format('c'),$now->format('c')],array_keys($rows)));
-        foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){if(isset($rows[$r['player_id']]['days'][$r['day']])){$rows[$r['player_id']]['days'][$r['day']]['tdc']=$r['tdc'];$rows[$r['player_id']]['days'][$r['day']]['samples']=(int)$r['samples'];}}
+        $exports=[];
+        foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){
+            $exports[$r['export_id']]['day']=$r['day'];
+            $exports[$r['export_id']]['players'][$r['player_id']]=[
+                'field'=>$r['field'],
+                'master_player_id'=>$r['master_player_id'],
+                'alliance_tag'=>$r['alliance_tag']
+            ];
+        }
+        $acc=[];
+        foreach($exports as $exp){
+            $day=$exp['day'];$snapshot=$exp['players'];
+            foreach($rows as $playerId=>$playerRow){
+                if(!isset($snapshot[$playerId])||!isset($playerRow['days'][$day]))continue;
+                $own=(float)$snapshot[$playerId]['field'];
+                $net=$own;
+                $cap=scriptConvoyColonyCapacity((string)$playerId,$snapshot,$levels,true);
+                if($cap!==null){
+                    if($cap['loss']!==null)$net-=floor($own*$cap['loss']['percent']/100);
+                    foreach($cap['gains'] as $g)$net+=floor((float)$g['terrain']*$g['percent']/100);
+                }
+                if(!isset($acc[$playerId][$day]))$acc[$playerId][$day]=['tdc'=>0.0,'tdc_colonies'=>0.0,'samples'=>0];
+                $acc[$playerId][$day]['tdc']+=$own;
+                $acc[$playerId][$day]['tdc_colonies']+=$net;
+                $acc[$playerId][$day]['samples']++;
+            }
+        }
+        foreach($acc as $playerId=>$playerDays){
+            foreach($playerDays as $day=>$vals){
+                $s=$vals['samples'];
+                $rows[$playerId]['days'][$day]['tdc']=(string)round($vals['tdc']/$s,2);
+                $rows[$playerId]['days'][$day]['tdc_colonies']=(string)round($vals['tdc_colonies']/$s,2);
+                $rows[$playerId]['days'][$day]['samples']=$s;
+            }
+        }
     }
     return ['totals'=>convoyDailyTotals($p,array_values($rows),$days),'rows'=>array_values($rows),'days'=>$days,'resource'=>$resource,'direction'=>$direction,'player'=>$player,'start'=>$start->format('d/m/Y'),'end'=>$today->format('d/m/Y')];
 }
 /** Theoretical production per day: one resource per cm² of hunting ground per 30-minute cycle, i.e. 48 cycles. */
 function convoyProduction(?string $tdc): ?string { return $tdc===null||!is_numeric($tdc)?null:(string)round((float)$tdc*48); }
 /** Mean of the daily TdC values that have at least one export. */
-function convoyTdcAverage(array $days): ?string {
-    $values=[];foreach($days as $d)if(isset($d['tdc'])&&is_numeric($d['tdc']))$values[]=(float)$d['tdc'];
+function convoyTdcAverage(array $days,string $key='tdc'): ?string {
+    $values=[];foreach($days as $d)if(isset($d[$key])&&is_numeric($d[$key]))$values[]=(float)$d[$key];
     return $values?(string)round(array_sum($values)/count($values),2):null;
 }
 /** Compact figure (3 significant digits, k/M/G/T/P) whose exact value is shown on hover. Returns escaped HTML. */
@@ -92,7 +128,7 @@ function convoyStatNumber(?string $value): string {
 
 // Aggregate the displayed rows using numeric arithmetic, including totals above bigint.
 function convoyDailyTotals(PDO $p,array $rows,array $days): array {
-    $daily=[];foreach($days as $day)$daily[$day['date']]=['count'=>'0','quantity'=>'0','tdc'=>null,'covered'=>0];
+    $daily=[];foreach($days as $day)$daily[$day['date']]=['count'=>'0','quantity'=>'0','tdc'=>null,'tdc_colonies'=>null,'covered'=>0];
     $result=['pseudo'=>'Total','days'=>$daily,'total_count'=>'0','total_quantity'=>'0','daily_average'=>'0','members'=>count($rows)];
     if(!$rows)return $result;
     $q=$p->prepare("WITH people AS (
@@ -104,12 +140,13 @@ function convoyDailyTotals(PDO $p,array $rows,array $days): array {
     SELECT d.key AS day,sum((d.value->>'count')::numeric)::text AS count,
            sum((d.value->>'quantity')::numeric)::text AS quantity,
            sum((d.value->>'tdc')::numeric)::text AS tdc,
+           sum((d.value->>'tdc_colonies')::numeric)::text AS tdc_colonies,
            count(d.value->>'tdc')::int AS covered,s.total_count,s.total_quantity,s.daily_average
     FROM people CROSS JOIN LATERAL jsonb_each(people.days) d CROSS JOIN summary s
     GROUP BY d.key,s.total_count,s.total_quantity,s.daily_average");
     $q->execute([json_encode($rows,JSON_THROW_ON_ERROR)]);
     foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){
-        $result['days'][$r['day']]=['count'=>$r['count'],'quantity'=>$r['quantity'],'tdc'=>$r['tdc'],'covered'=>(int)$r['covered']];
+        $result['days'][$r['day']]=['count'=>$r['count'],'quantity'=>$r['quantity'],'tdc'=>$r['tdc'],'tdc_colonies'=>$r['tdc_colonies'],'covered'=>(int)$r['covered']];
         foreach(['total_count','total_quantity','daily_average'] as $key)$result[$key]=$r[$key];
     }
     return $result;
