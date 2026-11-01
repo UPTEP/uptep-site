@@ -74,6 +74,6 @@ $col=convoyDailyData($p,$p,[],new DateTimeImmutable('2026-10-20T12:00:00Z'));$by
 check($byId['1']['days']['2026-10-20']['tdc']==='1000'&&$byId['1']['days']['2026-10-20']['tdc_colonies']==='850','colonised colonizer: minus 25 %, plus 20 %');
 check($byId['2']['days']['2026-10-20']['tdc_colonies']==='650'&&$byId['3']['days']['2026-10-20']['tdc_colonies']==='400','internal colony taxes only');
 check($col['totals']['days']['2026-10-20']['tdc_colonies']==='1900'&&convoyProduction($byId['1']['days']['2026-10-20']['tdc_colonies'])==='40800','colony total and production');
-ob_start();$data=$col;require __DIR__.'/../app/convoy-daily-view.php';$html=ob_get_clean();check(str_contains($html,'Prod. / jour (colonies)')&&substr_count($html,'data-metric="production_colonies"')===4,'colony production row rendered');
+ob_start();$data=$col;require __DIR__.'/../app/convoy-daily-view.php';$html=ob_get_clean();check(str_contains($html,'Prod. / jour (colonies)')&&substr_count($html,'data-metric="production_colonies"')===3&&!str_contains($html,'daily-grand-total" data-metric="production_colonies"'),'colony row per player, not on the unchanged total');
 echo "OK: seven days, Paris/DST boundaries, four resource/direction views, zero days, cancelled/future exclusion, TdC averages/dedup, exact large totals, colony taxes, escaping and access guard.\n";
 }finally{$p->rollBack();}
