@@ -31,7 +31,7 @@
 <label>Pseudo<input name="joueur" maxlength="100" value="<?=e($data['player'])?>" placeholder="Tous les joueurs"></label><button class="save-user" type="submit">Afficher</button></form>
 <p>Du <?=e($data['start'])?> au <?=e($data['end'])?> · heure de Paris. <strong>Aujourd’hui est une journée en cours.</strong></p>
 <p class="daily-note">Les envois et réceptions déclarés sont regroupés par date de départ du convoi. Seuls les convois non annulés contenant la ressource choisie sont comptés. La moyenne par jour est le total divisé par 7, jours sans convoi inclus.</p>
-<p class="daily-note">Production : calculée à partir du TdC des exports Fourmizzz, à raison d’une ressource par cm² de terrain de chasse et par cycle de 30 minutes, soit TdC × 48 par jour (nourriture et matériaux confondus). La ligne « Prod. / jour (colonies) » déduit la taxe versée par un joueur colonisé et ajoute les taxes perçues par un colonisateur au sein d’UPTEP (20 % + 1 % par niveau d’étable à pucerons du colonisateur). Ces taxes passent d’un membre à l’autre : cette ligne n’apparaît pas sur le total de l’alliance, qui ne change pas. La production moyenne sur 7 jours utilise les jours qui ont au moins un relevé.</p>
+<p class="daily-note">Production : calculée à partir du TdC des exports Fourmizzz, à raison d’une ressource par cm² de terrain de chasse et par cycle de 30 minutes, soit TdC × 48 par jour (nourriture et matériaux confondus). La ligne « Production brute / jour » ne tient pas compte des colonies ; la ligne « Prod. après colonies / jour » déduit la taxe versée par un joueur colonisé et ajoute les taxes perçues par un colonisateur au sein d’UPTEP (20 % + 1 % par niveau d’étable à pucerons du colonisateur). Ces taxes passent d’un membre à l’autre : cette ligne n’apparaît pas sur le total de l’alliance, qui ne change pas. La production moyenne sur 7 jours utilise les jours qui ont au moins un relevé.</p>
 <p class="daily-note">TdC : moyenne des relevés disponibles pour le joueur ce jour-là ; survole la valeur pour voir leur nombre. Pour le total de l’alliance, une valeur en italique est partielle : certains joueurs n’ont pas de relevé ce jour-là. « — » signifie qu’aucune donnée n’est disponible. Le TdC n’a pas de total sur 7 jours, seulement une moyenne.</p>
 <div class="users-panel users-scroll daily-scroll" tabindex="0" role="region" aria-label="Statistiques quotidiennes, tableau défilant horizontalement">
 <?php
@@ -39,8 +39,8 @@
 $isSend=$data['direction']==='envois';
 $metrics=[
     ['tdc','TdC moyen'],
-    ['production','Production / jour'],
-    ['production_colonies','Prod. / jour (colonies)'],
+    ['production','Production brute / jour'],
+    ['production_colonies','Prod. après colonies / jour'],
     ['count',$isSend?'Envois':'Réceptions'],
     ['quantity',$isSend?'Total livré':'Total reçu']
 ];
