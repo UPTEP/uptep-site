@@ -59,6 +59,7 @@ const title=doc.createElement('a');title.className='titre_colonne_cliquable';tit
 const content=doc.createElement('div');content.className='contenu_boite_compte_plus';
 const link=doc.createElement('a');link.href='https://uptep.top/';link.target='_blank';link.rel='noopener noreferrer';link.textContent='Accéder au site';link.style.cssText='display:block;padding:8px 10px 10px;text-decoration:none;';
 content.appendChild(link);panel.append(title,content);
+let scrolledHost=null;
 function position(){
  mountPortal();
  const host=doc.getElementById('menuBoite');
@@ -66,15 +67,25 @@ function position(){
  if(!host||!anchor||!host.contains(anchor)){panel.remove();return;}
  if(panel.parentNode!==host)host.appendChild(panel);
  const parentRect=host.getBoundingClientRect(),anchorRect=anchor.getBoundingClientRect();
- // Native boxes contain absolutely positioned children, so their own height may be zero.
- let bottom=anchorRect.bottom;
- for(const node of anchor.querySelectorAll('*')){
-  if(node.getClientRects().length && win.getComputedStyle(node).visibility!=='hidden')bottom=Math.max(bottom,node.getBoundingClientRect().bottom);
- }
+ // Native boxes, ours included, contain absolutely positioned children, so their own height may be zero.
+ const boxBottom=box=>{
+  let bottom=box.getBoundingClientRect().bottom;
+  for(const node of box.querySelectorAll('*')){
+   if(node.getClientRects().length && win.getComputedStyle(node).visibility!=='hidden')bottom=Math.max(bottom,node.getBoundingClientRect().bottom);
+  }
+  return bottom;
+ };
  const left=(anchorRect.left-parentRect.left+host.scrollLeft)+'px';
- const top=(bottom-parentRect.top+host.scrollTop+20)+'px';
+ const top=(boxBottom(anchor)-parentRect.top+host.scrollTop+20)+'px';
  if(panel.style.left!==left)panel.style.left=left;
  if(panel.style.top!==top)panel.style.top=top;
+ // #menuBoite is fixed to the viewport, so a panel ending below the window could never be reached.
+ // Then let the column scroll with the page, as Fourmizzz does on narrow screens. Every size here is
+ // relative to the host, so switching its position cannot flip the result back and forth.
+ const panelHeight=boxBottom(panel)-panel.getBoundingClientRect().top;
+ const overflow=(parseFloat(win.getComputedStyle(host).top)||0)+parseFloat(top)+panelHeight+10>win.innerHeight;
+ if(overflow&&host.style.position!=='absolute'){host.style.position='absolute';scrolledHost=host;}
+ else if(!overflow&&scrolledHost===host){host.style.removeProperty('position');scrolledHost=null;}
 }
 const collectionStatus=doc.createElement('div');collectionStatus.className='uptep-collection-status';collectionStatus.style.cssText='font-size:11px;padding:6px;color:#e5edce;';
 // Ressources.php without any hunt shown stays silent: there is simply nothing to record.
@@ -104,4 +115,4 @@ const cleanupMemberReport=preferences.playerProfile===false||typeof uptepMemberR
 position();
 const timer=win.setInterval(position,1000);
 win.addEventListener('resize',position);
-return ()=>{win.clearTimeout(huntTimeout);huntBadges?.remove();cleanupMemberReport();cleanupPlayerProfile();cleanupFloodDeclarations();cleanupConstructionDemands();cleanupConvoys();cleanupMultiflood();cleanupTraffic();cleanupLaboratory();cleanupHourly();win.clearTimeout(armyTimeout);armyTools.remove();cleanupClock();cleanupChaine();win.removeEventListener('message',receivePortal);frame.removeEventListener('load',sendAuth);win.clearInterval(timer);win.removeEventListener('resize',position);panel.remove();entry.remove();movesEntry.remove();portal.remove();for(const [element,[value,priority]] of savedDisplay){if(value)element.style.setProperty('display',value,priority);else element.style.removeProperty('display');}savedDisplay.clear();if(centrePadding){const [element,value,priority]=centrePadding;if(value)element.style.setProperty('padding-top',value,priority);else element.style.removeProperty('padding-top');}};
+return ()=>{win.clearTimeout(huntTimeout);huntBadges?.remove();cleanupMemberReport();cleanupPlayerProfile();cleanupFloodDeclarations();cleanupConstructionDemands();cleanupConvoys();cleanupMultiflood();cleanupTraffic();cleanupLaboratory();cleanupHourly();win.clearTimeout(armyTimeout);armyTools.remove();cleanupClock();cleanupChaine();win.removeEventListener('message',receivePortal);frame.removeEventListener('load',sendAuth);win.clearInterval(timer);win.removeEventListener('resize',position);scrolledHost?.style.removeProperty('position');panel.remove();entry.remove();movesEntry.remove();portal.remove();for(const [element,[value,priority]] of savedDisplay){if(value)element.style.setProperty('display',value,priority);else element.style.removeProperty('display');}savedDisplay.clear();if(centrePadding){const [element,value,priority]=centrePadding;if(value)element.style.setProperty('padding-top',value,priority);else element.style.removeProperty('padding-top');}};

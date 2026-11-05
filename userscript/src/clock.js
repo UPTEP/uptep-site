@@ -26,6 +26,27 @@ function estimateClock(samples){
   const feedback=el('div');feedback.className='clock-sync-status';feedback.setAttribute('role','status');feedback.style.cssText='font-size:10px;color:#e5edce;min-height:13px;margin-top:4px;';
   const icon=el('span','↻');icon.className='clock-sync-icon';icon.setAttribute('aria-hidden','true');resync.replaceChildren(icon);
   const animation=el('style');animation.textContent='@keyframes uptep-clock-spin{to{transform:rotate(360deg)}}.uptep-s5-clock .clock-sync-icon{display:inline-block}.uptep-s5-clock button[aria-busy="true"]{cursor:wait}.uptep-s5-clock button[aria-busy="true"] .clock-sync-icon{animation:uptep-clock-spin .8s linear infinite}@media(prefers-reduced-motion:reduce){.uptep-s5-clock button[aria-busy="true"] .clock-sync-icon{animation:none}}';clock.append(feedback,animation);
+  // Floating copy of the digits, shown only while the panel clock is off screen: sidebar hidden by
+  // Fourmizzz on narrow windows, or scrolled away. It mirrors the panel and is skipped by screen readers.
+  // Checks run on a timeout: the runtime places the panel only after mounting the clock.
+  const floating=el('div');floating.className='uptep-s5-clock-float';floating.setAttribute('aria-hidden','true');floating.title='Heure S5 (Paris)';floating.style.cssText='position:fixed;right:12px;bottom:12px;z-index:1000;display:none;box-sizing:border-box;padding:5px 10px;border:1px solid #898d70;border-radius:6px;background:rgba(58,61,44,.94);box-shadow:0 2px 8px rgba(0,0,0,.35);color:#e5edce;font:700 17px Verdana,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:1px;pointer-events:none';
+  const floatingLabel=el('small','S5 ');floatingLabel.style.cssText='font-size:10px;font-weight:400;color:#b7cd99;letter-spacing:0';const floatingDigits=el('span',digits.textContent);floating.append(floatingLabel,floatingDigits);document.body.append(floating);
+  const placeFloating=()=>{
+   if(floatingDigits.textContent!==digits.textContent)floatingDigits.textContent=digits.textContent;
+   const r=digits.getBoundingClientRect();
+   const shown=digits.isConnected&&r.height>0&&r.top>=0&&r.bottom<=win.innerHeight&&r.right>0&&r.left<win.innerWidth;
+   const mode=shown?'none':'block';if(floating.style.display!==mode)floating.style.display=mode;
+   if(shown)return;
+   // On narrow windows the "Attaques & convois" box takes this corner: stand to its left, or above it without room.
+   let right=12,bottom=12;const traffic=document.getElementById('uptep-traffic')?.getBoundingClientRect();
+   if(traffic&&traffic.height>0&&traffic.bottom>win.innerHeight-bottom-floating.offsetHeight&&traffic.right>win.innerWidth-right-floating.offsetWidth){
+    right=win.innerWidth-traffic.left+8;
+    if(right+floating.offsetWidth>win.innerWidth-8){right=12;bottom=win.innerHeight-traffic.top+8;}
+   }
+   if(floating.style.right!==right+'px')floating.style.right=right+'px';
+   if(floating.style.bottom!==bottom+'px')floating.style.bottom=bottom+'px';
+  };
+  win.addEventListener('scroll',placeFloating,{passive:true});win.addEventListener('resize',placeFloating);
   let model=null,busy=false,tick=null,lastSync=0,lastWall=0,disposed=false;
   const formatter=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
   const cacheKey='uptep_s5_clock_cache_v1';
@@ -53,7 +74,7 @@ function estimateClock(samples){
 
   function display(){
    clearTimeout(tick);if(disposed||!model)return;
-   const now=performance.now()+model.offset;digits.textContent=(model.consistent?'':'≈ ')+formatter.format(now);
+   const now=performance.now()+model.offset;digits.textContent=(model.consistent?'':'≈ ')+formatter.format(now);setTimeout(placeFloating);
    const drift=Math.max(0,performance.now()-lastSync)*.0001;
    accuracy.textContent=model.consistent?`RTT ${Math.round(model.rtt)} ms · ±${Math.ceil(model.uncertainty+drift)} ms estimés`:`RTT ${Math.round(model.rtt)} ms · source instable`;
    clock.title=`Source : Date HTTP de S5. ${model.samples} mesures. ${model.consistent?'Intervalles cohérents.':'Réponses incohérentes : approximation sur la réponse la plus rapide.'} Incertitude estimée, pas une garantie sur l’horloge du moteur du jeu. Écart estimé au PC : ${Math.round(now-Date.now())} ms. Cliquer ↻ pour resynchroniser.`;
@@ -70,14 +91,14 @@ function estimateClock(samples){
      if(i<count-1)await new Promise(r=>setTimeout(r,140));
     }
     model=estimateClock(samples);lastSync=performance.now();lastWall=Date.now();saveClock();display();feedback.textContent='✓ Heure synchronisée';
-   }catch(e){if(disposed)return;feedback.textContent=model?'Échec · dernière synchronisation conservée':'Échec de la synchronisation';if(!model){digits.textContent='Indisponible';accuracy.textContent=e.message;}else{display();accuracy.textContent+=' · ancien relevé';}}
+   }catch(e){if(disposed)return;feedback.textContent=model?'Échec · dernière synchronisation conservée':'Échec de la synchronisation';if(!model){digits.textContent='Indisponible';accuracy.textContent=e.message;setTimeout(placeFloating);}else{display();accuracy.textContent+=' · ancien relevé';}}
    finally{busy=false;resync.disabled=false;resync.setAttribute('aria-busy','false');resync.setAttribute('aria-label','Resynchroniser l’heure S5');}
   }
   resync.onclick=synchronize;
   const onVisibility=()=>{if(!document.hidden){restoreClock();display();if(!model||performance.now()-lastSync>=300000||Math.abs((Date.now()-lastWall)-(performance.now()-lastSync))>2000)synchronize();}};document.addEventListener('visibilitychange',onVisibility);
   const syncTimer=setInterval(()=>{if(!document.hidden){restoreClock();if(!model||performance.now()-lastSync>=300000)synchronize();}},60000);
-  cleanup=()=>{disposed=true;controller?.abort();clearTimeout(tick);clearInterval(syncTimer);document.removeEventListener('visibilitychange',onVisibility);clock.remove();};
-  restoreClock();
+  cleanup=()=>{disposed=true;controller?.abort();clearTimeout(tick);clearInterval(syncTimer);document.removeEventListener('visibilitychange',onVisibility);win.removeEventListener('scroll',placeFloating);win.removeEventListener('resize',placeFloating);floating.remove();clock.remove();};
+  restoreClock();setTimeout(placeFloating);
   if(!model||performance.now()-lastSync>=300000)synchronize();
  }
 
