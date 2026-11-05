@@ -274,7 +274,7 @@ function statsTdpSvg(array $tdpData):string{
     $xOf=static fn(int $i):float=>$padL+($nDays>1?$i*($plotW/($nDays-1)):$plotW/2);
     $yOf=static fn(float $v):float=>$padT+$plotH-(($v-$minY)/($maxY-$minY))*$plotH;
     $palette=['#153e50','#985e29','#4f6536','#7e503a','#655975','#2b6cb0','#b7791f','#2f855a','#9b2c2c','#4a5568','#c05621','#2c7a7b'];
-    $svg='<svg viewBox="0 0 '.$w.' '.$h.'" width="100%" height="'.$h.'" role="img" aria-label="Évolution des TdP des membres">';
+    $svg='<svg viewBox="0 0 '.$w.' '.$h.'" width="100%" height="'.$h.'" role="group" aria-label="Évolution des TdP des membres, détail par jour au survol">';
     $steps=5;
     for($s=0;$s<=$steps;$s++){
         $val=$minY+($maxY-$minY)*($s/$steps);
@@ -290,6 +290,8 @@ function statsTdpSvg(array $tdpData):string{
         $svg.='<line x1="'.$x.'" x2="'.$x.'" y1="'.($padT+$plotH).'" y2="'.($padT+$plotH+5).'" stroke="#8c8a84"/>';
         $svg.='<text x="'.$x.'" y="'.($h-12).'" text-anchor="middle" font-size="11" fill="#52514e">'.e($lbl).'</text>';
     }
+    // Many members share a TdP: names go in a per-day tooltip (assets/stats-tdp.js), not on the lines.
+    $lastByValue=[];
     foreach($series as $idx=>$s){
         $color=$palette[$idx%count($palette)];
         $coords=[];$circles='';$lastPt=null;
@@ -298,37 +300,50 @@ function statsTdpSvg(array $tdpData):string{
             if($v===null)continue;
             $px=round($xOf($i),1);$py=round($yOf((float)$v),1);
             $coords[]=$px.','.$py;
-            $lblDate=substr($dStr,8,2).'/'.substr($dStr,5,2).'/'.substr($dStr,0,4);
-            $circles.='<circle cx="'.$px.'" cy="'.$py.'" r="3.2" fill="'.$color.'"><title>'.e($s['pseudo'].' · TdP '.$v.' ('.$lblDate.')').'</title></circle>';
+            $circles.='<circle cx="'.$px.'" cy="'.$py.'" r="3.2" fill="'.$color.'"/>';
             $lastPt=[$px,$py,$v];
         }
         if(count($coords)>1){
-            $svg.='<polyline fill="none" stroke="'.$color.'" stroke-width="2" stroke-opacity="0.82" points="'.implode(' ',$coords).'"><title>'.e($s['pseudo']).'</title></polyline>';
+            $svg.='<polyline fill="none" stroke="'.$color.'" stroke-width="2" stroke-opacity="0.82" points="'.implode(' ',$coords).'"/>';
         }
         $svg.=$circles;
-        if($lastPt && $idx<10){
-            $svg.='<text x="'.($w-$padR+8).'" y="'.($lastPt[1]+4).'" font-size="11" fill="'.$color.'" font-weight="600">'.e(mb_strimwidth($s['pseudo'],0,14,'…').' ('.$lastPt[2].')').'</text>';
-        }
+        if($lastPt)$lastByValue[$lastPt[2]][]=['pseudo'=>$s['pseudo'],'color'=>$color];
     }
-    $avgCoords=[];
+    // One label per final value: a member's name when alone, else the count; pushed apart when values are close.
+    krsort($lastByValue);$labelY=-INF;
+    foreach($lastByValue as $v=>$group){
+        $text=count($group)===1?mb_strimwidth($group[0]['pseudo'],0,14,'…').' ('.$v.')':$v.' · '.count($group).' membres';
+        $labelY=max(round($yOf((float)$v),1)+4,$labelY+12);
+        $svg.='<text x="'.($w-$padR+8).'" y="'.$labelY.'" font-size="11" fill="'.(count($group)===1?$group[0]['color']:'#52514e').'" font-weight="600">'.e($text).'</text>';
+    }
+    $avgCoords=[];$hits='';
+    $half=$nDays>1?$plotW/($nDays-1)/2:$plotW/2;
     foreach($days as $i=>$dStr){
-        $dayVals=[];
-        foreach($series as $s)if(isset($s['points'][$dStr])&&$s['points'][$dStr]!==null)$dayVals[]=$s['points'][$dStr];
-        if(!$dayVals)continue;
-        $mean=array_sum($dayVals)/count($dayVals);
-        $avgCoords[]=round($xOf($i),1).','.round($yOf($mean),1);
+        $byValue=[];
+        foreach($series as $s)if(isset($s['points'][$dStr])&&$s['points'][$dStr]!==null)$byValue[$s['points'][$dStr]][]=$s['pseudo'];
+        if(!$byValue)continue;
+        krsort($byValue);
+        $count=array_sum(array_map('count',$byValue));
+        $mean=array_sum(array_map(static fn($v,$names)=>$v*count($names),array_keys($byValue),$byValue))/$count;
+        $x=round($xOf($i),1);
+        $avgCoords[]=$x.','.round($yOf($mean),1);
+        $date=substr($dStr,8,2).'/'.substr($dStr,5,2).'/'.substr($dStr,0,4);$moyenne=number_format($mean,1,',','');
+        $groups=[];$spoken=[];
+        foreach($byValue as $v=>$names){natcasesort($names);$names=array_values($names);$groups[]=[$v,$names];$spoken[]=$v.' : '.implode(', ',$names);}
+        $left=max($padL,$x-$half);$right=min($w-$padR,$x+$half);
+        $hits.='<rect class="tdp-hit" tabindex="0" x="'.round($left,1).'" y="'.$padT.'" width="'.round($right-$left,1).'" height="'.$plotH.'" data-x="'.$x.'" data-tip="'.e(json_encode(['date'=>$date,'moyenne'=>$moyenne,'groupes'=>$groups],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)).'" aria-label="'.e($date.' · moyenne '.$moyenne.' · '.implode(' ; ',$spoken)).'"/>';
     }
     if(count($avgCoords)>1){
-        $svg.='<polyline fill="none" stroke="#0b0b0b" stroke-width="2.5" stroke-dasharray="6 4" points="'.implode(' ',$avgCoords).'"><title>Moyenne de l’alliance</title></polyline>';
+        $svg.='<polyline fill="none" stroke="#0b0b0b" stroke-width="2.5" stroke-dasharray="6 4" points="'.implode(' ',$avgCoords).'"/>';
     }
-    $svg.='</svg>';
-    return $svg;
+    $svg.='<line class="tdp-guide" x1="0" x2="0" y1="'.$padT.'" y2="'.($padT+$plotH).'"/>'.$hits.'</svg>';
+    return '<div class="tdp-chart">'.$svg.'<div class="tdp-tooltip" hidden></div></div>';
 }
 
 workspaceStart($u,'Statistiques');
 ?>
 <link rel="stylesheet" href="/assets/convoy-daily.css?v=9">
-<link rel="stylesheet" href="/assets/ressources.css?v=10">
+<link rel="stylesheet" href="/assets/ressources.css?v=11">
 <section class="resources-page">
 <h1>Statistiques</h1>
 <p class="admin-intro">Analyses des ressources, convois, gains de l’alliance, temps de ponte (TdP) et activités sur la période choisie.</p>
@@ -507,7 +522,7 @@ try{
 <section class="users-panel stats-panel-spaced">
 <div class="users-panel-heading"><h3>Évolution des TdP (du <?= e($pInfo['start']->format('d/m/Y')) ?> au <?= e($pInfo['end_day']->format('d/m/Y')) ?>)</h3><span class="user-count">Courbe noire pointillée = moyenne alliance</span></div>
 <div class="conso-scroll" tabindex="0" role="region" aria-label="Graphique d’évolution des TdP"><?= statsTdpSvg($tdpData) ?></div>
-<p class="daily-note">Historique reconstitué à partir des synchronisations de bâtiments (Solarium, Couveuse) et de laboratoire (Technique de ponte) enregistrées dans <code>member_stat_history</code>. Survole un point pour afficher le détail du joueur et la date.</p>
+<p class="daily-note">Historique reconstitué à partir des synchronisations de bâtiments (Solarium, Couveuse) et de laboratoire (Technique de ponte) enregistrées dans <code>member_stat_history</code>. Survole le graphique pour voir, jour par jour, les membres regroupés par TdP.</p>
 </section>
 
 <section class="users-panel">
@@ -650,4 +665,5 @@ statsPeriodForm($tab,$pInfo,($sort!=='ecart'||$asc)?['tri'=>$sort,'ordre'=>$asc?
 <?php endif; ?>
 </section>
 <script src="/assets/convoy-tables.js?v=1" defer></script>
+<script src="/assets/stats-tdp.js?v=1" defer></script>
 <?php workspaceEnd(); ?>
