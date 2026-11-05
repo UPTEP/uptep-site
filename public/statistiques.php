@@ -340,7 +340,9 @@ workspaceStart($u,'Statistiques');
 
 <?php if($tab==='repartition'): ?>
 <?php
-$scope=($input('perimetre')==='materiaux')?'materiaux':'tous';
+// Materials only by default, as the Bilan matériaux: apples are opt-in.
+$scope=($input('perimetre')==='tous')?'tous':'materiaux';
+$consoLabel=static fn(string $k,string $label):string=>!str_starts_with($k,'conv_')?$label:($scope==='materiaux'?str_replace('Convois','Convois de matériaux',$label):$label.' (pommes + matériaux)');
 $consoError=null;$conso=null;$pInfo=null;
 try{
     $pInfo=convoyDailyPeriod($_GET,null,defined('CONSUMPTION_FIRST_DAY')?CONSUMPTION_FIRST_DAY:'2026-10-11');
@@ -353,10 +355,10 @@ try{
     $consoError='Le graphique de répartition est momentanément indisponible.';
     $pInfo=convoyDailyPeriod([],null,defined('CONSUMPTION_FIRST_DAY')?CONSUMPTION_FIRST_DAY:'2026-10-11');
 }
-$scopeSelect='<label>Convois pris en compte<select name="perimetre"><option value="tous"'.($scope==='tous'?' selected':'').'>Pommes + Matériaux</option><option value="materiaux"'.($scope==='materiaux'?' selected':'').'>Matériaux uniquement</option></select></label>';
+$scopeSelect='<label>Convois pris en compte<select name="perimetre"><option value="materiaux"'.($scope==='materiaux'?' selected':'').'>Matériaux uniquement</option><option value="tous"'.($scope==='tous'?' selected':'').'>Pommes + Matériaux</option></select></label>';
 ?>
 <section class="conso" aria-labelledby="conso-title">
-<?php statsPeriodForm('repartition',$pInfo,$scope==='materiaux'?['perimetre'=>'materiaux']:[],$scopeSelect); ?>
+<?php statsPeriodForm('repartition',$pInfo,$scope==='tous'?['perimetre'=>'tous']:[],$scopeSelect); ?>
 <?php if($consoError!==null): ?><div class="form-error" role="alert"><?= e($consoError) ?></div>
 <?php elseif($conso): ?>
 <h2 id="conso-title">Consommation et répartition des membres : ce qui entre et ce qui sort (<?= e($conso['from']->format('d/m H\h')) ?> → <?= e($conso['end']->format('d/m H\h')) ?>)</h2>
@@ -364,13 +366,13 @@ $scopeSelect='<label>Convois pris en compte<select name="perimetre"><option valu
 <?php if(!$conso['rows']): ?><p class="chaine-empty">Aucun relevé de terrain sur cette période.</p>
 <?php else: ?>
 <ul class="conso-legend" aria-label="Légende">
-<?php foreach(CONSUMPTION_LABELS as $k=>$label): ?><li><svg width="14" height="14" aria-hidden="true"><rect width="14" height="14" rx="3" fill="<?= CONSUMPTION_COLORS[$k] ?>"/></svg><?= e($scope==='materiaux'&&str_starts_with($k,'conv_')?str_replace('Convois','Convois de matériaux',$label):$label) ?></li><?php endforeach; ?>
+<?php foreach(CONSUMPTION_LABELS as $k=>$label): ?><li><svg width="14" height="14" aria-hidden="true"><rect width="14" height="14" rx="3" fill="<?= CONSUMPTION_COLORS[$k] ?>"/></svg><?= e($consoLabel($k,$label)) ?></li><?php endforeach; ?>
 <li><svg width="14" height="14" aria-hidden="true"><rect x="5.5" width="3" height="14" fill="#0b0b0b"/></svg>Conso (= entrées − sorties)</li>
 <li><svg width="18" height="14" aria-hidden="true"><line x1="0" x2="18" y1="7" y2="7" stroke="#52514e" stroke-width="1.5" stroke-dasharray="6 4"/></svg>Conso moyenne<?php if($conso['average']!==null): ?> (<?= e(consumptionK($conso['average'])) ?>k/j)<?php endif; ?></li>
 </ul>
 <div class="conso-scroll" tabindex="0" role="region" aria-label="Graphique de consommation, défilant horizontalement"><?= convoyConsumptionSvg($conso) ?></div>
 <p class="daily-note">Nom · TdC moyen, greniers en gras. Production = 48 × TdC par jour (exports horaires Fourmizzz, plafond théorique : une ressource par cm² et par cycle de 30 min). Taxe de colonie : 20 % de la production de la colonie, + 1 point par niveau d’étable à pucerons du colonisateur quand il est connu<?= $conso['assumed_rates']?' (20 % sinon)':'' ?>. Convois déclarés (bot, site, UPTEP+), comptés à leur date de départ. <?= (int)$conso['exports'] ?> exports sur <?= e(number_format($conso['days'],1,',',' ')) ?> jours. Survole une ligne pour le détail.</p>
-<details class="conso-table"><summary>Voir les chiffres détaillés</summary><div class="users-panel users-scroll"><table class="users-table"><thead><tr><th scope="col">Joueur</th><th scope="col">TdC moyen</th><?php foreach(CONSUMPTION_LABELS as $label): ?><th scope="col"><?= e($label) ?> / j</th><?php endforeach; ?><th scope="col">Conso / j</th></tr></thead><tbody>
+<details class="conso-table"><summary>Voir les chiffres détaillés</summary><div class="users-panel users-scroll"><table class="users-table"><thead><tr><th scope="col">Joueur</th><th scope="col">TdC moyen</th><?php foreach(CONSUMPTION_LABELS as $k=>$label): ?><th scope="col"><?= e($consoLabel($k,$label)) ?> / j</th><?php endforeach; ?><th scope="col">Conso / j</th></tr></thead><tbody>
 <?php foreach($conso['rows'] as $r): ?><tr><th scope="row"><?= e($r['pseudo']) ?></th><td><?= convoyStatCompact((string)round($r['tdc'])) ?></td><?php foreach(array_keys(CONSUMPTION_LABELS) as $k): ?><td><?= convoyStatCompact((string)round($r[$k])) ?></td><?php endforeach; ?><td><strong><?= $r['conso']<0?'−':'' ?><?= convoyStatCompact((string)round(abs($r['conso']))) ?></strong></td></tr><?php endforeach; ?>
 </tbody></table></div></details>
 <?php endif; ?>
