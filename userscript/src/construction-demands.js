@@ -15,6 +15,19 @@ function readConstructionDemand(row){
  if(apples==='0'&&wood==='0')throw Error('Aucun coût en ressources reconnu.');
  return {object:title,level:String(Number(level[1])+1),apples,wood};
 }
+// Launch dates come from PostgreSQL ("2026-11-11 10:43:57+00"): normalised so every browser reads them.
+function uptepLaunchTime(raw){const ms=Date.parse(String(raw||'').replace(' ','T').replace(/([+-]\d{2})$/,'$1:00'));return Number.isFinite(ms)?ms:null;}
+function uptepLaunchDate(raw){const ms=uptepLaunchTime(raw);return ms===null?'—':new Date(ms).toLocaleString('fr-FR',{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}
+// This demand's launch, and the requester's previous one of the same kind ("Construction précédente :
+// Couveuse niv. 16 · en cours jusqu’au 07/11 08:36"): shown while running, or always on a detail view.
+function uptepLaunchLines(doc,d,detail){
+ const kind=d.type_construction==='recherche'?'Recherche':'Construction',lines=[],now=Date.now();
+ const line=text=>{const p=doc.createElement('p');p.textContent=text;p.style.cssText='margin:0 0 6px;font-size:12px;color:#5a4a1e;';lines.push(p);};
+ if(d.lancement_construction)line(`🏗 ${kind} lancée le ${uptepLaunchDate(d.lancement_construction)} · ${uptepLaunchTime(d.fin_construction)>now?'fin prévue le':'terminée le'} ${uptepLaunchDate(d.fin_construction)}`);
+ const prev=d.lancement_precedent;
+ if(prev){const running=uptepLaunchTime(prev.fin_construction)>now;if(running||detail)line(`⏳ ${kind} précédente : ${prev.objet||'#'+prev.id}${prev.niveau?' niv. '+prev.niveau:''} · ${running?'en cours jusqu’au':'terminée le'} ${uptepLaunchDate(prev.fin_construction)}`);}
+ return lines;
+}
 function mountConstructionDemands(context,auth){
  const {document:doc,window:win}=context;
  const page=win.location.pathname.toLowerCase(),laboratory=page==='/laboratoire.php';
@@ -24,6 +37,45 @@ function mountConstructionDemands(context,auth){
  const el=(tag,text)=>{const n=doc.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
  const style=el('style');style.textContent=`.uptep-building-demand button,.uptep-building-modal button{box-sizing:border-box;padding:5px 9px;border:1px solid #938355;border-radius:3px;background:#ffffff38;color:#302b18;font:11px/1.4 Verdana,sans-serif;cursor:pointer}.uptep-building-demand button:hover,.uptep-building-modal button:hover{background:#ffffff65}.uptep-building-modal button[type=submit]{background:#525543;border-color:#525543;color:#fff3d3}.uptep-building-demand button:disabled,.uptep-building-modal button:disabled{opacity:.5;cursor:default}.uptep-building-demand button:focus-visible,.uptep-building-modal :focus-visible{outline:2px solid #254e59;outline-offset:2px}.uptep-building-modal{box-sizing:border-box;width:min(440px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;padding:18px;border:1px solid #887749;border-radius:6px;background:#e2d29e;color:#302b18;font:13px/1.5 Verdana,sans-serif}.uptep-building-modal::backdrop{background:#171b15a6}.uptep-building-modal h2{margin:0 0 8px;font-size:17px}.uptep-building-modal p{margin:8px 0}.uptep-building-modal input[type=checkbox]{accent-color:#525543}.uptep-building-modal .uptep-building-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}`;
  root.append(style);
+ // Delivered demands whose launch is not confirmed yet: one click once the work is started in the game.
+ const served=Date.parse(typeof uptepTrafficServerTime==='undefined'?'':uptepTrafficServerTime),loadedAt=win.performance.now();
+ const serverNow=()=>(Number.isFinite(served)?served:Date.now())+(win.performance.now()-loadedAt);
+ // The page counts the running work down with reste(seconds,"<id>"), as for hunts; used only when unambiguous.
+ const countdowns=[];for(const script of root.querySelectorAll('script'))for(const m of script.textContent.matchAll(/reste\(\s*(\d+)\s*,\s*["']([^"']+)["']\s*\)/g))if(!m[2].startsWith('chasse_'))countdowns.push(Number(m[1]));
+ const countdown=countdowns.length===1?countdowns[0]:null,countdownEnd=countdown===null?null:serverNow()+countdown*1000;
+ const isoTime=ms=>new Date(Math.round(ms/1000)*1000).toISOString().replace(/\.\d{3}Z$/,'Z');
+ const span=total=>[[86400,'j'],[3600,'h'],[60,'m'],[1,'s']].reduce((text,[factor,unit])=>{const n=Math.floor(total/factor);total%=factor;return n?text+n+unit+' ':text;},'').trim();
+ const banner=el('div');banner.className='uptep-building-demand';banner.style.cssText='margin:0 0 12px;padding:8px 10px;border:1px solid #938355;border-radius:4px;background:#f1e6bf;color:#302b18;font:12px/1.5 Verdana,sans-serif;text-align:left;';
+ async function loadLaunches(){
+  let result;try{result=await request({action:'convoy-list',scope:'mine',state:'terminee'});}catch{return;}
+  if(stopped)return;const kind=laboratory?'recherche':'construction';
+  // The server decides which demands await a launch: delivered since the feature, within 30 days.
+  const todo=(result.demands||[]).filter(d=>d.lancement_attendu&&d.type_construction===kind).slice(0,3);
+  if(!todo.length)return;banner.replaceChildren();root.prepend(banner);
+  for(const d of todo){
+   const name=`#${d.id} · ${d.objet||'Ressources'}${d.niveau?' niv. '+d.niveau:''}`;
+   const item=el('div'),label=el('span',`Ta demande ${name} est complète. `),open=el('button',laboratory?'Confirmer le lancement de la recherche':'Confirmer le lancement de la construction');
+   open.type='button';item.style.cssText='padding:3px 0;';item.append(label,open);banner.append(item);
+   open.addEventListener('click',()=>{
+    open.remove();
+    const form=el('form'),remaining=el('input'),submit=el('button','Confirmer'),status=el('span');
+    form.style.cssText='display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:4px;';remaining.required=true;remaining.placeholder='Ex. 12h26m';remaining.style.cssText='width:120px;font:12px Verdana,sans-serif;';
+    if(countdown!==null)remaining.value=span(countdown);submit.type='submit';status.setAttribute('role','status');
+    form.append(el('span','Temps restant affiché dans le jeu :'),remaining,submit,status);item.append(form);remaining.focus();
+    form.addEventListener('submit',async event=>{
+     event.preventDefault();const seconds=parseHuntDuration(remaining.value);
+     if(!seconds){status.textContent='Durée non reconnue (ex. 12h26m).';return;}
+     submit.disabled=true;status.textContent='Enregistrement…';const now=serverNow();
+     // The untouched countdown keeps its exact end; a typed value counts from now.
+     const end=countdownEnd!==null&&remaining.value===span(countdown)?countdownEnd:now+seconds*1000;
+     try{const out=await request({action:'convoy-manage',demand_id:d.id,operation:'lancement',request_key:win.crypto.randomUUID(),confirmed:true,launched_at:isoTime(Math.min(now,end-1000)),ends_at:isoTime(end)});
+      form.remove();label.textContent=`✓ ${name} : lancement confirmé, fin prévue le ${uptepLaunchDate(out.demande?.fin_construction)}. Visible sur ta prochaine demande.`;}
+     catch(e){submit.disabled=false;status.textContent=e.message;}
+    });
+   });
+  }
+ }
+ loadLaunches();
  function alive(){if(stopped)throw Error('Module rechargé.');if(doc.getElementById('pseudo')?.textContent.trim()!==context.pseudo||doc.getElementById('tag_alliance')?.textContent.trim()!=='UPTEP')throw Error('Le compte connecté a changé.');}
  function request(payload){return new Promise((resolve,reject)=>{
   try{alive();}catch(e){reject(e);return;}

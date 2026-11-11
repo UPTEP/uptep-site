@@ -29,7 +29,7 @@ function convoyDuration(string $raw): int {
 }
 function convoyPrepare(array $m): array {
     $action=post('operation');
-    if(!in_array($action,['demande','modification','ajustement','validation','suspension','annulation','terminaison','convoi','annulation_convoi'],true))throw new DomainException('Action inconnue.',422);
+    if(!in_array($action,['demande','modification','ajustement','validation','suspension','annulation','terminaison','convoi','annulation_convoi','lancement'],true))throw new DomainException('Action inconnue.',422);
     $id=$action==='demande'?null:botNumber(post('id'),true);
     $body=['commande_id'=>'web:'.bin2hex(random_bytes(24)),'discord_id'=>$m['discord_id']];
     if(in_array($action,['demande','modification','convoi'],true)){
@@ -53,11 +53,27 @@ function convoyPrepare(array $m): array {
         }
         $body['date_convoi']=$now->format('c');$body['date_arrivee']=$now->modify('+'.convoyDuration($duration).' seconds')->format('c');
     }
+    if($action==='lancement'){
+        // Paris wall-clock inputs. The end comes from the remaining time shown in the game, else from a date.
+        $now=new DateTimeImmutable('now',new DateTimeZone('Europe/Paris'));
+        $launch=post('lance_le')!==''?convoyLocalTime(post('lance_le')):$now;
+        if(post('reste')!=='')$end=$now->modify('+'.convoyDuration(post('reste')).' seconds');
+        elseif(post('fin_le')!=='')$end=convoyLocalTime(post('fin_le'));
+        else throw new DomainException('Indique le temps restant affiché dans le jeu, ou la date de fin.',422);
+        $body['date_lancement']=$launch->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z');
+        $body['date_fin_construction']=$end->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z');
+    }
     $excess=$action==='convoi'?botConvoyOverage(botDemand(db(),$id),$body['nbpomme'],$body['nbmateriaux']):null;
     return ['overage'=>$excess,'action'=>$action,'id'=>$id,'body'=>$body,'auto_warning'=>$action==='convoi'&&(bool)botDemand(db(),$id)['auto_production'],'expires'=>time()+3600];
 }
 function convoyEvent(PDO $p,string $kind,array $payload): void {
     $q=$p->prepare('INSERT INTO convoy_web_events(kind,payload) VALUES(?,?::jsonb)');$q->execute([$kind,json_encode($payload,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE)]);
+}
+/** A datetime-local input (AAAA-MM-JJTHH:MM), read in Paris time. */
+function convoyLocalTime(string $raw): DateTimeImmutable {
+    $date=DateTimeImmutable::createFromFormat('!Y-m-d\TH:i',$raw,new DateTimeZone('Europe/Paris'));
+    if(!$date||$date->format('Y-m-d\TH:i')!==$raw)throw new DomainException('Date et heure invalides : utilise le sélecteur.',422);
+    return $date;
 }
 function convoyDate(?string $raw): string {
     return $raw?(new DateTimeImmutable($raw))->setTimezone(new DateTimeZone('Europe/Paris'))->format('d/m/Y H:i'):'—';

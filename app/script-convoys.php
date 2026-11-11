@@ -54,6 +54,8 @@ function scriptConvoys(PDO $p,PDO $game,array $actor,array $body):array {
         $q=$game->prepare("SELECT pseudo,field::text,imported_at,alliance_tag FROM players WHERE server='s5' AND player_id=? AND is_present");$production=[];
         foreach($rows as &$row){$row['date_demande']=(new DateTimeImmutable($row['date_demande']))->format('c');$id=(string)$row['iddemandeur'];$q->execute([$id]);$player=$q->fetch(PDO::FETCH_ASSOC)?:[];$row['target']=$player['pseudo']??null;$row['self']=$id===(string)$member['id'];
             if($action==='convoy-demands'){$production[$id]??=scriptConvoyProduction($player);$row['production']=$production[$id];$cp=$colonyPlayers;if(!isset($cp[$id]))$cp[$id]=$player;$row['production']['capacity_per_cycle']=scriptConvoyColonyCapacity($id,$cp,$colonyLevels);$row['production']['colonies_included']=true;$row['production']['projection']=scriptConvoyProjection($p,$game,$row,$projectionNow);}
+            $row['type_construction']=botConstructionKind($row['objet']);
+            $row['lancement_precedent']=botPreviousLaunch($p,(string)$row['iddemandeur'],(string)$row['id'],$row['type_construction']);
         }unset($row);
         return ['demands'=>$rows,'permissions'=>['is_chaine'=>$member['is_chaine'],'player_id'=>(string)$member['id']]];
     }
