@@ -77,7 +77,8 @@ try {
             if(!$pids){$where.=' AND false';}
             else{$where.=' AND h.player_id IN ('.implode(',',array_fill(0,count($pids),'?')).')';$args=array_merge($args,$pids);}
         }
-        $sql="SELECT h.id::text,h.player_id::text,h.area::text,h.arrival_at,h.source FROM script_hunts h WHERE $where ORDER BY h.arrival_at DESC,h.id DESC";
+        // The game only shows a countdown: first_seen_at, read by UPTEP+ right after the launch, stands for it.
+        $sql="SELECT h.id::text,h.player_id::text,h.area::text,h.first_seen_at,h.arrival_at,h.source FROM script_hunts h WHERE $where ORDER BY h.arrival_at DESC,h.id DESC";
         $res=botReportRows(db(),$sql,$args,$pageNum,true,50);
         if($res['lignes']){
             $ids=array_values(array_unique(array_column($res['lignes'],'player_id')));$names=[];
@@ -130,9 +131,10 @@ foreach($filterFields as $key=>$label): ?><label><?= e($label) ?><input name="<?
 <?php foreach($data['lignes']??[] as $row): ?><tr><td>#<?= e((string)$row['id']) ?></td><td><?= e($row['sender_pseudo']) ?></td><td><?= e($row['target_pseudo']) ?></td><td><?= e($row['location']??'—') ?></td><td><?php $troops=resourceTroops($row['troops']); ?><?= $troops===null?'Non renseignées':convoyAmount((string)(int)$troops) ?></td><td><?= e(convoyDate($row['arrival_at'])) ?></td><td><?= e(convoyDate($row['created_at'])) ?></td></tr><?php endforeach; ?>
 </tbody></table><?php if(empty($data['lignes'])): ?><p class="chaine-empty">Aucun flood sur cette période.</p><?php endif; ?></div>
 <?php elseif($tab==='chasses'): ?>
-<div class="users-panel users-scroll"><table class="users-table"><thead><tr><th>#</th><th>Joueur</th><th>Surface chassée</th><th>Arrivée</th><th>Source</th></tr></thead><tbody>
-<?php foreach($data['lignes']??[] as $row): ?><tr><td>#<?= e((string)$row['id']) ?></td><td><?= e($row['pseudo']) ?></td><td><?= convoyAmount($row['area']) ?> cm²</td><td><?= e(convoyDate($row['arrival_at'])) ?></td><td><?= e(($row['source']??'')==='discord'?'Discord':'UPTEP+') ?></td></tr><?php endforeach; ?>
+<div class="users-panel users-scroll"><table class="users-table"><thead><tr><th>#</th><th>Joueur</th><th>Surface chassée</th><th>Lancement</th><th>Arrivée</th><th>Source</th></tr></thead><tbody>
+<?php foreach($data['lignes']??[] as $row): ?><tr><td>#<?= e((string)$row['id']) ?></td><td><?= e($row['pseudo']) ?></td><td><?= convoyAmount($row['area']) ?> cm²</td><td><?= e(convoyDate($row['first_seen_at'])) ?></td><td><?= e(convoyDate($row['arrival_at'])) ?></td><td><?= e(($row['source']??'')==='discord'?'Discord':'UPTEP+') ?></td></tr><?php endforeach; ?>
 </tbody></table><?php if(empty($data['lignes'])): ?><p class="chaine-empty">Aucune chasse sur cette période.</p><?php endif; ?></div>
+<p>Lancement : heure à laquelle la chasse a été relevée la première fois, par UPTEP+ ou sur Discord. Elle correspond au lancement quand la chasse est lancée avec UPTEP+ actif, ou déclarée aussitôt sur Discord.</p>
 <?php else:
 $columns=$tab==='demandes'?['id'=>'Demande','pseudo_demandeur'=>'Joueur','objet'=>'Objet','niveau'=>'Niveau','auto_production'=>'Auto production','nbpomme_original'=>'Pommes demandées','nbmateriaux_original'=>'Matériaux demandés','nbpomme_restant'=>'Pommes restantes','nbmateriaux_restant'=>'Matériaux restants','etat'=>'État','date_demande'=>'Date']:['pseudo'=>'Joueur','demandes_effectuees'=>'Demandes','demandes_validees'=>'Validées','demandes_terminees'=>'Terminées','demandes_annulees'=>'Annulées','derniere_demande'=>'Dernière demande']; ?>
 <div class="users-panel users-scroll"><table class="users-table"><thead><tr><?php foreach($columns as $label): ?><th><?= e($label) ?></th><?php endforeach; ?></tr></thead><tbody><?php foreach($data['lignes']??[] as $row): ?><tr><?php foreach($columns as $key=>$label): ?><td><?php if($key==='id'): ?><a href="/convois.php?id=<?= e((string)$row[$key]) ?>">#<?= e((string)$row[$key]) ?></a><?php elseif($key==='auto_production'): ?><?= ($row[$key]??false)?'Auto production':'—' ?><?php elseif(in_array($key,['date_demande','derniere_demande'],true)): ?><?= e(convoyDate($row[$key])) ?><?php elseif(str_starts_with($key,'nb')): ?><?= convoyAmount($row[$key]) ?><?php else: ?><?= e((string)($row[$key]??'—')) ?><?php endif; ?></td><?php endforeach; ?></tr><?php endforeach; ?></tbody></table><?php if(empty($data['lignes'])): ?><p class="chaine-empty">Aucun résultat pour ces critères.</p><?php endif; ?></div>
