@@ -159,7 +159,7 @@ function mountMultiflood(context,data,auth){
  const fmt=n=>BigInt(n).toLocaleString('fr-FR');
  const read=name=>{try{return JSON.parse(win.sessionStorage.getItem(key+name));}catch{return null;}};
  const write=(name,value)=>{try{win.sessionStorage.setItem(key+name,JSON.stringify(value));}catch{throw Error('Le navigateur bloque la mémorisation de cette préparation.');}};
- const cleanPlayer=p=>({id:p.id,pseudo:p.pseudo,field:p.field,blocked:p.blocked,x:p.x,y:p.y,distance:p.distance});
+ const cleanPlayer=p=>({id:p.id,pseudo:p.pseudo,field:p.field,gameField:p.field,blocked:p.blocked,x:p.x,y:p.y,distance:p.distance});
  let disposed=false,timer=null;const controllers=new Set(),added=new Set(),hidden=new Map();
  const style=make('style',`#uptep-multiflood{font:12px/1.5 Verdana,sans-serif;color:#302b18;padding:15px 10px;text-align:left;max-width:100%;box-sizing:border-box}#uptep-multiflood *{box-sizing:border-box}#uptep-multiflood h2{font-size:21px;margin:8px 0}#uptep-multiflood h3{font-size:14px;margin:15px 0 8px}#uptep-multiflood button,.uptep-mf-tools button,.uptep-mf-cell button{cursor:pointer;width:auto;background:#4f5940;color:#fff4d3;border:1px solid #465037;border-radius:3px;padding:6px 10px;font:11px Verdana,sans-serif}#uptep-multiflood button:disabled,.uptep-mf-tools button:disabled,.uptep-mf-cell button:disabled{opacity:.5;cursor:default}#uptep-multiflood .uptep-mf-toolbar,.uptep-mf-tools{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 0}#uptep-multiflood fieldset{padding:0;margin:0;border:0;min-width:0}#uptep-multiflood .uptep-mf-scroll{overflow-x:auto;max-width:100%;margin:12px 0}#uptep-multiflood table{border-collapse:collapse;width:100%;font:12px Verdana,sans-serif}#uptep-multiflood th,#uptep-multiflood td{border:1px solid #a59259;padding:8px;text-align:center;white-space:nowrap}#uptep-multiflood th{background:#bda364;color:#302b18}#uptep-multiflood td{background:#e0d3a2}#uptep-multiflood input:not([type=checkbox]),#uptep-multiflood select{width:125px;max-width:100%;padding:5px;border:1px solid #a59259;border-radius:2px;background:#f3ebce;color:#302b18;font:12px Verdana,sans-serif;text-align:center}#uptep-multiflood input[readonly]{background:#d6c58e}#uptep-multiflood label{cursor:pointer}#uptep-multiflood .uptep-mf-options[hidden]{display:none}#uptep-multiflood .uptep-mf-summary{padding:12px;background:#d4ddba;border-left:4px solid #4f5940;margin:12px 0;white-space:pre-line}#uptep-multiflood .uptep-mf-note{font-size:11px;color:#655a36}#uptep-multiflood .uptep-mf-status{margin:10px 0;padding:10px;background:#e7d8a5;border-left:3px solid #91702a;white-space:pre-line}#uptep-multiflood .uptep-mf-status:empty{display:none}#uptep-multiflood a{color:#385848}.uptep-mf-cell{text-align:center!important;width:38px!important;white-space:nowrap;padding:2px 4px!important}.uptep-mf-cell input{cursor:pointer}.uptep-mf-cell button{padding:4px 6px}.uptep-mf-tools{font:12px Verdana,sans-serif}#uptep-multiflood .uptep-mf-timing{padding:10px;background:#e3d7ad;border-left:4px solid #907338;margin:10px 0 22px}#uptep-multiflood .uptep-mf-timing[data-ready="true"]{background:#d4e0b5;border-color:#3d713a}#uptep-multiflood .uptep-mf-countdown{font-variant-numeric:tabular-nums;margin:5px 0}#uptep-multiflood .uptep-mf-unchecked td{opacity:.55}#uptep-multiflood :focus-visible,.uptep-mf-tools :focus-visible,.uptep-mf-cell :focus-visible{outline:2px solid #316276;outline-offset:2px}`,doc.head);
  let current=null;const savedSelection=read('selection'),selected=new Set(Array.isArray(savedSelection)?savedSelection:[]);
@@ -253,6 +253,7 @@ function mountMultiflood(context,data,auth){
     const p=draft.targets[i],id='joueur'+(i+1)+suffix;let control;
     if(property==='rounding'){const td=make('td',null,row);control=make('select',null,td);control.id=id;control.setAttribute('aria-label','Arrondi · '+p.pseudo);for(const [v,l] of [[1,'Fort'],[2,'Normal'],[3,'Faible'],[4,'Aucun']]){const opt=make('option',l,control);opt.value=String(v);}control.value=String(p.rounding??4);}
     else control=inputCell(row,id,p[property]??'',label+' · '+p.pseudo);
+    if(property==='field'&&p.fieldManual&&p.gameField!==undefined){let game=p.gameField;try{game=multifloodNumber(p.gameField).toLocaleString('fr-FR');}catch{}const note=make('div','saisi · jeu : '+game,control.parentNode);note.className='uptep-mf-note';note.title='Terrain saisi à la main : il est gardé quand le jeu est relu. Vide le champ pour reprendre le terrain du jeu.';}
     control.disabled=!!ledger.targets[p.id];
    }
   }
@@ -260,9 +261,15 @@ function mountMultiflood(context,data,auth){
   draft.targets.forEach((p,i)=>{const input=inputCell(durations,'joueur'+(i+1)+'duration',p.duration||defaultDuration(p),'Durée exacte HH:MM:SS · '+p.pseudo);input.inputMode='text';input.placeholder='HH:MM:SS';input.title='Durée du trajet préremplie, modifiable au format HH:MM:SS.';input.disabled=!!ledger.targets[p.id];});
   options.setAttribute('aria-expanded',String(!!draft.options));
  }
+ function sameField(a,b){try{return multifloodNumber(a)===multifloodNumber(b);}catch{return false;}}
  function capture(){
   for(const [suffix,property] of [['TDC','field'],['final','final'],['max','max']])draft.self[property]=form.querySelector('#joueur0'+suffix).value;
-  draft.targets.forEach((p,i)=>{for(const [suffix,property] of [['TDC','field'],['final','final'],['max','max'],['arrondi','rounding']])p[property]=form.querySelector('#joueur'+(i+1)+suffix).value;const duration=form.querySelector('#joueur'+(i+1)+'duration').value;p.duration=duration===defaultDuration(p)?'':duration;});
+  draft.targets.forEach((p,i)=>{
+   // A target terrain typed by the player (a hunt about to land, say) is kept when the game is read again;
+   // an empty field goes back to the game's terrain.
+   const typed=form.querySelector('#joueur'+(i+1)+'TDC').value.trim();p.gameField??=p.field;
+   if(typed===''){p.field=p.gameField;p.fieldManual=false;}else{p.field=typed;p.fieldManual=!sameField(typed,p.gameField);}
+   for(const [suffix,property] of [['final','final'],['max','max'],['arrondi','rounding']])p[property]=form.querySelector('#joueur'+(i+1)+suffix).value;const duration=form.querySelector('#joueur'+(i+1)+'duration').value;p.duration=duration===defaultDuration(p)?'':duration;});
  }
  function campaignPlans(targetId,at){
   const now=serverNow(),arrivals={};
@@ -343,7 +350,7 @@ function mountMultiflood(context,data,auth){
    const choices=JSON.parse(await request('/appelAjaxFlood.php?'+new URLSearchParams({term:p.pseudo})));
    const player=Array.isArray(choices)?choices.find(choice=>String(choice.id)===p.id&&choice.value===p.pseudo):null;
    if(!player)throw Error(p.pseudo+' n’a pas été trouvé dans le simulateur du jeu. Actualise ou retire cette cible.');
-   updates.push([p,{field:String(multifloodNumber(player.terrain))}]);allowed.set(p.id,['type1','type3'].includes(player.type));
+   const game=String(multifloodNumber(player.terrain));updates.push([p,p.fieldManual?{gameField:game}:{field:game,gameField:game}]);allowed.set(p.id,['type1','type3'].includes(player.type));
   }
   for(const [target,values] of updates)Object.assign(target,values);
   draft.self.field=live.field;draft.observed=Date.now();draft.observedServer=serverNow();
@@ -368,7 +375,7 @@ function mountMultiflood(context,data,auth){
    const payload=new URLSearchParams({t:native.token,codeFlood:result.attacks.map(r=>r.id+'|'+r.amount+'|').join('')});
    if(payload.toString().length>7000)throw Error('Sélectionne moins d’attaques pour cette cible.');
    prepared={id,plan:result,payload,checkedAt:win.performance.now(),seconds,before:{...native}};
-   targetStatus.delete(id);showStatus(target.pseudo+' : '+result.attacks.length+' attaque(s) prête(s). Vérifie les quantités puis clique sur Envoyer à la seconde indiquée.');
+   targetStatus.delete(id);showStatus(target.pseudo+' : '+result.attacks.length+' attaque(s) prête(s)'+(target.fieldManual?' sur ton terrain saisi de '+multifloodNumber(target.field).toLocaleString('fr-FR')+' (jeu : '+multifloodNumber(target.gameField).toLocaleString('fr-FR')+')':'')+'. Vérifie les quantités puis clique sur Envoyer à la seconde indiquée.');
   }catch(e){showStatus(e.message,id);}
   finally{if(!disposed){renderForm();calculate();lock(false);}}
  }
