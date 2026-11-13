@@ -126,6 +126,23 @@ try {
         }
         header('Allow: GET, POST');botReply(405,['ok'=>false,'error'=>'method_not_allowed']);
     }
+    if($path==='/api/bot/v1/alertes-guerre'||$path==='/api/bot/v1/alertes-guerre/evaluation'){
+        // GET : événements à publier ; POST : acquittement ; POST /evaluation : évalue le dernier relevé (idempotent).
+        $evaluation=$path==='/api/bot/v1/alertes-guerre/evaluation';
+        if(!in_array($method,$evaluation?['POST']:['GET','POST'],true)){header('Allow: '.($evaluation?'POST':'GET, POST'));botReply(405,['ok'=>false,'error'=>'method_not_allowed']);}
+        if(!in_array($method==='GET'?'alertes:read':'alertes:write',$config['scopes']??[],true))botReply(403,['ok'=>false,'error'=>'forbidden']);
+        define('UPTEP_SCRIPT_API',true);require '/home/uptep/private/app/bootstrap.php';require '/home/uptep/private/app/war-alerts.php';
+        header('Content-Type: application/json; charset=utf-8');
+        $settings=warAlertSettings(config()['war_alerts']??[]);
+        if($method==='GET')botReply(200,['ok'=>true,'events'=>warAlertPending(db())]);
+        if(strtolower(trim(explode(';',$_SERVER['CONTENT_TYPE']??'')[0]))!=='application/json')botReply(415,['ok'=>false,'error'=>'application_json_required']);
+        $raw=file_get_contents('php://input',false,null,0,1025);if(strlen($raw)>1024)botReply(413,['ok'=>false,'error'=>'payload_too_large']);
+        $body=json_decode($raw,true,8,JSON_THROW_ON_ERROR);if(!is_array($body))botReply(400,['ok'=>false,'error'=>'json_object_required']);
+        if($evaluation)botReply(200,['ok'=>true]+warAlertEvaluate(db(),db(true),$settings));
+        $message=$body['message_id']??null;if(!is_string($body['id']??null)||($message!==null&&!is_string($message)))botReply(422,['ok'=>false,'error'=>'invalid_id']);
+        if(!warAlertAck(db(),$body['id'],$message))botReply(404,['ok'=>false,'error'=>'not_found']);
+        botReply(200,['ok'=>true]);
+    }
     $id=null;$reportKind=null;
     if(preg_match('~\A/api/bot/v1/rapports/(demandes|convois|statistiques|recap-demandes)(?:/([1-9][0-9]{0,18}))?\z~',$path,$reportMatch)){
         $reportKind=$reportMatch[1];$id=$reportMatch[2]??null;
