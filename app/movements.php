@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/bot-convoys.php';
 
 /* "Mouvements": the alliance's arrivals of one day — declared floods, declared convoys and hunts
  * recorded by UPTEP+ or Discord — including those already arrived. */
@@ -8,7 +9,7 @@ function movementsFormat(int|string $n): string { return number_format((float)$n
 function movementsTime(string $value): int { return (new DateTimeImmutable($value))->getTimestamp(); }
 
 /** Arrivals in [from, to), sorted. Each one: type, at (timestamp), label, players (game ids), details. */
-function movementsData(DateTimeImmutable $from,DateTimeImmutable $to): array {
+function movementsData(DateTimeImmutable $from,DateTimeImmutable $to,?string $viewer=null): array {
     $events=[];$range=[$from->format('c'),$to->format('c')];
     $q=db()->prepare("SELECT id,sender_id::text,sender_pseudo,target_id::text,target_pseudo,location,troops,arrival_at,created_at FROM floods WHERE arrival_at>=?::timestamptz AND arrival_at<?::timestamptz ORDER BY arrival_at,id");$q->execute($range);
     foreach($q as $f){
@@ -19,7 +20,7 @@ function movementsData(DateTimeImmutable $from,DateTimeImmutable $to): array {
     }
     $q=db()->prepare("SELECT c.id,c.iddemande,c.idenvoyeur::text,c.pseudo_envoyeur,d.iddemandeur::text,d.pseudo_demandeur,c.nbpomme,c.nbmateriaux,c.date_convoi,c.date_arrivee
         FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande
-        WHERE NOT c.annule AND c.date_arrivee>=?::timestamptz AND c.date_arrivee<?::timestamptz ORDER BY c.date_arrivee,c.id");$q->execute($range);
+        WHERE NOT c.annule AND c.date_arrivee>=?::timestamptz AND c.date_arrivee<?::timestamptz".botHiddenSql(db(),$viewer,'c.iddemande')." ORDER BY c.date_arrivee,c.id");$q->execute($range);
     foreach($q as $c){
         $total=(int)$c['nbpomme']+(int)$c['nbmateriaux'];
         $events[]=['type'=>'convoy','at'=>movementsTime($c['date_arrivee']),'label'=>$c['pseudo_envoyeur'].' → '.$c['pseudo_demandeur'],'amount'=>$total,
@@ -69,7 +70,7 @@ function scriptMovements(array $actor,array $body): array {
     $events=array_map(static function(array $e):array{
         $details=[];foreach($e['details'] as $k=>$v)$details[]=[$k,(string)$v];
         return ['type'=>$e['type'],'at'=>$e['at'],'label'=>$e['label'],'amount'=>$e['amount']??null,'players'=>$e['players'],'people'=>$e['people'],'details'=>$details];
-    },movementsData($day,$day->modify('+1 day')));
+    },movementsData($day,$day->modify('+1 day'),(string)$actor['game_player_id']));
     return ['day'=>$day->format('Y-m-d'),'label'=>movementsDay($day,$today),'today'=>$today->format('Y-m-d'),'first'=>$first->format('Y-m-d'),'last'=>$last->format('Y-m-d'),
         'prev'=>$nav($day->modify('-1 day')),'next'=>$nav($day->modify('+1 day')),'now'=>$now->getTimestamp(),'me'=>(string)$actor['game_player_id'],'events'=>$events];
 }

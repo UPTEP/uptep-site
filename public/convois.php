@@ -13,7 +13,11 @@ try {
     if($_SERVER['REQUEST_METHOD']==='POST'){
         if(!validCsrf())throw new DomainException('Le formulaire a expiré. Recharge la page.',403);
         if(isset($u['_preview']))throw new DomainException('Le mode visualisation est en lecture seule.',403);
-        if(post('action')==='confirmer'){
+        if(post('action')==='visibilite'){
+            $id=botNumber(post('id'),true);$stillVisible=convoySetVisibility($u,$member,$id,post('visible_par'));
+            $_SESSION['convoy_success']=$stillVisible?'Visibilité enregistrée.':'Visibilité enregistrée. Tu ne fais pas partie de la liste : la demande #'.$id.' t’est désormais masquée.';
+            redirect('/convois.php'.($stillVisible?'?id='.$id:''));
+        }elseif(post('action')==='confirmer'){
             $key=post('confirmation');$job=$_SESSION['convoy_pending'][$key]??null;
             if(!$job||$job['expires']<time()||$job['body']['discord_id']!==$member['discord_id'])throw new DomainException('Confirmation expirée. Recommence depuis la demande.',409);
             if($job['action']==='convoi'&&isset($job['overage'])&&($job['overage']['pommes']!=='0'||$job['overage']['materiaux']!=='0')){if(post('overage_confirmed')!=='1')throw new DomainException('Confirme explicitement le dépassement.',422);$job['body']['overage_confirmed']=$job['overage'];}
@@ -40,8 +44,8 @@ try {
     }
     $page=is_string($_GET['page']??null)?$_GET['page']:'1';$after=is_string($_GET['apres']??null)?$_GET['apres']:'0';
     if($tab==='tableau'){
-        if(isset($_GET['id'])){$id=botNumber($_GET['id'],true);$data=['demandes'=>[botDemand(db(),$id)],'suite_apres'=>null];$cv=botListConvoys(db(),$id,['apres'=>$after]);$data['demandes'][0]['convois']=array_map(fn($c)=>$c+['pseudo_demandeur'=>$data['demandes'][0]['pseudo_demandeur']],$cv['convois']);$data['convoy_next']=$cv['suite_apres'];}
-        else $data=botListDemands(db(),['apres'=>$after,'etat'=>is_string($_GET['etat']??null)?$_GET['etat']:'les_deux']);
+        if(isset($_GET['id'])){$id=botNumber($_GET['id'],true);if(in_array($id,botHiddenDemandIds(db(),$member['player_id']),true))throw new DomainException('Demande introuvable.',404);$data=['demandes'=>[botDemand(db(),$id)],'suite_apres'=>null];$cv=botListConvoys(db(),$id,['apres'=>$after]);$data['demandes'][0]['convois']=array_map(fn($c)=>$c+['pseudo_demandeur'=>$data['demandes'][0]['pseudo_demandeur']],$cv['convois']);$data['convoy_next']=$cv['suite_apres'];}
+        else $data=botListDemands(db(),['apres'=>$after,'etat'=>is_string($_GET['etat']??null)?$_GET['etat']:'les_deux'],$member['player_id']);
         if(!isset($_GET['id'])){
             $q=db()->prepare("SELECT id::text FROM demandes_convois WHERE iddemandeur=? AND fini AND NOT annulee AND lancement_construction IS NULL AND date_fin>=GREATEST(?::timestamptz,now()-interval '30 days') ORDER BY id DESC LIMIT 10");$q->execute([$member['player_id'],CONSTRUCTION_LAUNCH_SINCE]);
             $data['a_confirmer']=array_map(fn($id)=>botDemand(db(),$id),$q->fetchAll(PDO::FETCH_COLUMN));
@@ -52,7 +56,7 @@ try {
         foreach($data['lignes'] as &$r){$q->execute([$r['id']]);$r['lancement_precedent']=botPreviousLaunch(db(),$r['iddemandeur'],$r['id'],botConstructionKind($q->fetchColumn()?:null));}unset($r);
     }elseif($tab==='en-cours'){
         $cursor=botNumber($after);
-        $q=db()->prepare('SELECT c.*,d.pseudo_demandeur FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande WHERE NOT c.annule AND c.date_arrivee>now() AND c.id>? ORDER BY c.id LIMIT 51');
+        $q=db()->prepare('SELECT c.*,d.pseudo_demandeur FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande WHERE NOT c.annule AND c.date_arrivee>now() AND c.id>?'.botHiddenSql(db(),$member['player_id'],'c.iddemande').' ORDER BY c.id LIMIT 51');
         $q->execute([$cursor]);$rows=$q->fetchAll(PDO::FETCH_ASSOC);$more=count($rows)>50;$rows=array_slice($rows,0,50);
         $data=['lignes'=>$rows,'suite_apres'=>$more?(string)end($rows)['id']:null];
     }
@@ -93,10 +97,12 @@ workspaceStart($u,'Demandes et convois'); ?>
 <article class="users-panel convoy-card convoy-status-<?= e($d['etat']) ?><?= !isset($_GET['id'])?' convoy-list-card':'' ?>"><header class="convoy-heading"><div><h2><a href="/convois.php?id=<?= e($d['id']) ?>"><span class="convoy-number">#<?= e($d['id']) ?></span> <span class="convoy-player"><?= e($d['pseudo_demandeur']) ?></span></a><?= $own?' · Votre demande':'' ?></h2><?php convoyAutoBadge($d); ?><p><?= e($d['objet']??'Ressources') ?><?= $d['niveau']?' · niveau '.e((string)$d['niveau']):'' ?></p></div><span class="convoy-state state-<?= e($d['etat']) ?>"><?= e(['attente'=>'En attente de validation','en_cours'=>'En cours','terminee'=>'Terminée','annulee'=>'Annulée'][$d['etat']]) ?></span></header>
 <div class="convoy-resources"><div>🍎 <strong><?= convoyAmount($d['nbpomme_restant']) ?></strong><small>restantes sur <?= convoyAmount($d['nbpomme_original']) ?> pommes</small></div><div>🪵 <strong><?= convoyAmount($d['nbmateriaux_restant']) ?></strong><small>restants sur <?= convoyAmount($d['nbmateriaux_original']) ?> matériaux</small></div></div>
 <?php convoyLaunchInfo($d,isset($_GET['id'])); ?>
+<?php if($d['visible_par']): ?><p class="convoy-meta">🔒 Visible uniquement par <?= e(implode(', ',array_values(array_unique(array_merge([$d['pseudo_demandeur']],$d['visible_par_pseudos']))))) ?></p><?php endif; ?>
 <?php if(!isset($_GET['id'])): ?><details class="convoy-list-more"><summary>Actions et détails</summary><?php endif; ?>
 <div class="convoy-progress"><?php foreach(['nbpomme'=>'Pommes','nbmateriaux'=>'Matériaux'] as $resource=>$label): $original=(float)$d[$resource.'_original'];$ratio=$original>0?max(0,min(100,100*(1-(float)$d[$resource.'_restant']/$original))):100; ?><label><?= e($label) ?> · <?= number_format($ratio,1,',','') ?> %<progress max="100" value="<?= e((string)$ratio) ?>" aria-label="<?= e($label.' déclarés') ?>"></progress></label><?php endforeach; ?></div>
 <p class="convoy-meta">Demandée le <?= e(convoyDate($d['date_demande'])) ?> · Souhaitée : <?= e($d['date_souhaitee']??'non renseignée') ?><?php if($d['valide']): ?> · Validée par <?= e($d['pseudo_validateur']??'—') ?><?php endif; ?></p>
 <div class="convoy-actions">
+<?php if(isset($_GET['id']) && $u['role']==='admin' && !isset($u['_preview'])): ?><details><summary>🔒 Visibilité (admin)</summary><form class="convoy-form" method="post"><input type="hidden" name="csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="visibilite"><input type="hidden" name="id" value="<?= e($d['id']) ?>"><label class="convoy-wide">Visible uniquement par (pseudos séparés par des virgules, vide = tous les membres)<input name="visible_par" maxlength="2000" value="<?= e(implode(', ',$d['visible_par_pseudos'])) ?>" placeholder="Ex. Ckiar, Achak, Hardware"></label><p class="convoy-meta">Le demandeur la voit toujours. Les membres absents de la liste ne la voient plus nulle part (site, script UPTEP+, Discord), administrateurs compris.</p><button class="save-user">Enregistrer la visibilité</button></form></details><?php endif; ?>
 <?php if(($d['lancement_attendu'] || $d['lancement_construction']) && !$d['annulee'] && $editable && isset($_GET['id'])): ?><details><summary><?= $d['lancement_construction']?'Corriger le lancement':'Confirmer le lancement' ?></summary><?php convoyLaunchForm($d); ?></details><?php endif; ?>
 <?php if($open && !$d['valide'] && $manage): ?><form method="post"><?php convoyHidden('validation',$d); ?><button class="save-user">Valider</button></form><?php endif; ?>
 <?php if($open && $d['valide'] && $member['suspend']): ?><form method="post"><?php convoyHidden('suspension',$d); ?><button class="save-user">Suspendre la validation</button></form><?php endif; ?>

@@ -8,7 +8,7 @@ $zone=new DateTimeZone('Europe/Paris');$now=new DateTimeImmutable('now',$zone);$
 $day=movementsDayParam($_GET['jour']??null,$today);$next=$day->modify('+1 day');$prev=$day->modify('-1 day');
 $first=new DateTimeImmutable(MOVEMENTS_FIRST_DAY,$zone);$last=$today->modify('+31 days');
 $events=[];$unavailable=false;
-try{$events=movementsData($day,$next);}catch(Throwable $ex){error_log('UPTEP mouvements: '.$ex->getMessage());http_response_code(503);$unavailable=true;}
+try{$events=movementsData($day,$next,(string)$u['game_player_id']);}catch(Throwable $ex){error_log('UPTEP mouvements: '.$ex->getMessage());http_response_code(503);$unavailable=true;}
 $me=$u['game_player_id']!==null?(string)$u['game_player_id']:null;
 $types=['flood'=>['Floods','Flood'],'convoy'=>['Convois','Convoi'],'hunt'=>['Chasses','Chasse']];
 $counts=array_fill_keys(array_keys($types),0);$hours=[];

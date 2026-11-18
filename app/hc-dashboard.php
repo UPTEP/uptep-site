@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/stats.php';
 require_once __DIR__.'/chaine.php';
+require_once __DIR__.'/bot-convoys.php';
 
 /** Compact figure with 3 significant digits and k/M/G/T/P suffix (French decimal comma). */
 function hcCompact(int|string $value):string{
@@ -63,7 +64,7 @@ function hcSection(string $title,string $body,string $note=''):string{
 }
 
 /** Loads everything that is not already in the dashboard rows, once for all members. */
-function hcDetailSources(array $ids):array{
+function hcDetailSources(array $ids,?string $viewer=null):array{
     $out=['game'=>[],'users'=>[],'tokens'=>[],'stats'=>[],'convoys_out'=>[],'convoys_in'=>[],'floods_out'=>[],'floods_in'=>[],'hunts'=>[],'hunts_sync'=>[]];
     $q=db(true)->prepare("SELECT player_id,x,y,field,grade,building_score,technology_score,trophy_score,on_holiday,is_banned,export_version FROM players WHERE server=? AND upper(alliance_tag)='UPTEP' AND is_present=true");
     $q->execute([CHAINE_SERVER]);
@@ -75,7 +76,7 @@ function hcDetailSources(array $ids):array{
     $q=db()->query('SELECT user_id,data,buildings_synced_at,research_synced_at,army_synced_at,resources_synced_at,workers_synced_at FROM user_stats');
     foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r)$out['stats'][(string)$r['user_id']]=$r;
     // Convoys on their way: sent by a member (idenvoyeur) and received by the requester of the demand.
-    $q=db()->query("SELECT c.idenvoyeur,c.pseudo_envoyeur,d.iddemandeur,d.pseudo_demandeur,c.nbpomme,c.nbmateriaux,c.date_convoi,c.date_arrivee FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande WHERE c.annule=false AND c.date_convoi<=now() AND c.date_arrivee>now() ORDER BY c.date_arrivee,c.id");
+    $q=db()->query("SELECT c.idenvoyeur,c.pseudo_envoyeur,d.iddemandeur,d.pseudo_demandeur,c.nbpomme,c.nbmateriaux,c.date_convoi,c.date_arrivee FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande WHERE c.annule=false AND c.date_convoi<=now() AND c.date_arrivee>now()".botHiddenSql(db(),$viewer,'c.iddemande')." ORDER BY c.date_arrivee,c.id");
     foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r){
         $out['convoys_out'][(string)$r['idenvoyeur']][]=$r;
         $out['convoys_in'][(string)$r['iddemandeur']][]=$r;

@@ -76,7 +76,10 @@ function botReports(PDO $p,PDO $game,string $kind,array $query,?string $id=null,
         ORDER BY coalesce(r.demandes_effectuees,0) DESC,coalesce(nullif(j.pseudo,''),r.pseudo,'Joueur '||j.player_id::text),coalesce(j.player_id,r.id_joueur)";
         return ['ok'=>true]+botReportRows($p,$sql,[],$page,$paginate,$pageSize);
     }
+    // Restricted demands stay out of the detailed lists; statistics and recaps keep counting them.
+    $viewer=$siteUser!==null?(string)($siteUser['game_player_id']??''):botActor($p,$game,botNumber($query['discord_id']??null,true),false)['id'];
     if($id!==null){
+        if(in_array(botNumber($id,true),botHiddenDemandIds($p,$viewer),true))throw new DomainException('Demande introuvable.',404);
         $d=botDemand($p,botNumber($id,true));
         return ['ok'=>true,'demande'=>$d]+botReportRows($p,'SELECT c.* FROM convois_effectues c WHERE c.iddemande=? ORDER BY c.date_convoi DESC,c.id DESC',[$id],$page,true,$pageSize);
     }
@@ -87,7 +90,7 @@ function botReports(PDO $p,PDO $game,string $kind,array $query,?string $id=null,
         $args[]=trim($query[$key]);return " AND lower($column)=lower(?)";
     };
     if($kind==='demandes'){
-        $where='d.date_demande>=?::timestamptz AND d.date_demande<?::timestamptz'.$filter('joueur','d.pseudo_demandeur');
+        $where='d.date_demande>=?::timestamptz AND d.date_demande<?::timestamptz'.$filter('joueur','d.pseudo_demandeur').botHiddenSql($p,$viewer,'d.id');
         $state=$query['etat']??'toutes';
         $conditions=['toutes'=>'true','attente'=>'NOT d.annulee AND NOT d.valide','en_cours'=>'NOT d.annulee AND d.valide AND NOT d.fini','terminee'=>'d.fini','annulee'=>'d.annulee'];
         if(!is_string($state)||!isset($conditions[$state]))throw new DomainException('État de demande invalide.',422);
@@ -95,6 +98,7 @@ function botReports(PDO $p,PDO $game,string $kind,array $query,?string $id=null,
     }elseif($kind==='convois'){
         $where='c.date_convoi>=?::timestamptz AND c.date_convoi<?::timestamptz'.$filter('expediteur','c.pseudo_envoyeur').$filter('destinataire','d.pseudo_demandeur');
         if(isset($query['demande'])){$where.=' AND c.iddemande=?';$args[]=botNumber($query['demande'],true);}
+        $where.=botHiddenSql($p,$viewer,'c.iddemande');
         $sql="SELECT c.*,d.pseudo_demandeur FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande WHERE $where ORDER BY c.date_convoi DESC,c.id DESC";
     }else{
         // Numeric SUM stays exact even when totals exceed bigint. Cancelled declarations never count.

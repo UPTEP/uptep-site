@@ -29,7 +29,7 @@ try{
         'workers'=>$r['workers_synced_at'],'army'=>$r['army_synced_at'],
         'buildings'=>$r['buildings_synced_at'],'research'=>$r['research_synced_at'],
     ]];
-    $sources=hcDetailSources([]);
+    $sources=hcDetailSources([],(string)$u['game_player_id']);
     // Base attack per army key (official unit order and values from the combat engine in combat-analyze.cjs).
     $attack=['jsn'=>3,'sn'=>5,'ne'=>7,'js'=>10,'s'=>15,'c'=>1,'ce'=>1,'a'=>30,'ae'=>35,'se'=>24,'t'=>55,'te'=>80,'tu'=>50,'tue'=>55];
     $level=static fn($v):?int=>is_string($v)&&preg_match('/^[0-9]{1,4}$/D',$v)?(int)$v:null;

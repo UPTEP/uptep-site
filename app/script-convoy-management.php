@@ -24,7 +24,7 @@ function scriptConvoyManagement(PDO $p,PDO $game,array $member,array $body):arra
         $params=(!$descending||$after!=='0')?[$after]:[];
         $where='';if($scope==='mine'){$where=' AND iddemandeur=?';$params[]=$member['id'];}
         if(isset($body['player_id'])){$where.=' AND iddemandeur=?';$params[]=botNumber($body['player_id'],true);}
-        $q=$p->prepare('SELECT id::text FROM demandes_convois WHERE serveur=\'s5\''.$cursor.$where.$filter[$state].' ORDER BY demandes_convois.id '.($descending?'DESC':'ASC').' LIMIT 21');$q->execute($params);$ids=$q->fetchAll(PDO::FETCH_COLUMN);
+        $q=$p->prepare('SELECT id::text FROM demandes_convois WHERE serveur=\'s5\''.$cursor.$where.$filter[$state].botHiddenSql($p,(string)$member['id'],'id').' ORDER BY demandes_convois.id '.($descending?'DESC':'ASC').' LIMIT 21');$q->execute($params);$ids=$q->fetchAll(PDO::FETCH_COLUMN);
         $more=count($ids)>20;$ids=array_slice($ids,0,20);
         $rows=array_map(fn($id)=>botDemand($p,$id),$ids);
         $players=[];
@@ -36,7 +36,7 @@ function scriptConvoyManagement(PDO $p,PDO $game,array $member,array $body):arra
         return ['demands'=>$rows,'next'=>$more?end($ids):null,'permissions'=>$permissions,'players'=>$players];
     }
     if($action==='convoy-detail'){
-        $id=botNumber($body['demand_id']??null,true);$d=botDemand($p,$id);
+        $id=botNumber($body['demand_id']??null,true);if(in_array($id,botHiddenDemandIds($p,(string)$member['id']),true))throw new DomainException('Demande introuvable.',404);$d=botDemand($p,$id);
         if($d['serveur']!=='s5')throw new DomainException('Demande S5 introuvable.',404);
         $page=botListConvoys($p,$id,['apres'=>botNumber($body['after']??'0'),'limite'=>'20']);
         return ['demand'=>$d,'convoys'=>$page['convois'],'next'=>$page['suite_apres'],'permissions'=>$permissions];

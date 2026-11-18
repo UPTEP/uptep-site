@@ -31,6 +31,7 @@ function convoyPrepare(array $m): array {
     $action=post('operation');
     if(!in_array($action,['demande','modification','ajustement','validation','suspension','annulation','terminaison','convoi','annulation_convoi','lancement'],true))throw new DomainException('Action inconnue.',422);
     $id=$action==='demande'?null:botNumber(post('id'),true);
+    if($id!==null&&$action!=='annulation_convoi'&&in_array($id,botHiddenDemandIds(db(),$m['player_id']),true))throw new DomainException('Demande introuvable.',404);
     $body=['commande_id'=>'web:'.bin2hex(random_bytes(24)),'discord_id'=>$m['discord_id']];
     if(in_array($action,['demande','modification','convoi'],true)){
         $body['nbpomme']=convoyQuantity(post('pommes'));$body['nbmateriaux']=convoyQuantity(post('materiaux'));
@@ -65,6 +66,26 @@ function convoyPrepare(array $m): array {
     }
     $excess=$action==='convoi'?botConvoyOverage(botDemand(db(),$id),$body['nbpomme'],$body['nbmateriaux']):null;
     return ['overage'=>$excess,'action'=>$action,'id'=>$id,'body'=>$body,'auto_warning'=>$action==='convoi'&&(bool)botDemand(db(),$id)['auto_production'],'expires'=>time()+3600];
+}
+/** Admins restrict a demand to listed players (pseudos separated by commas); an empty list makes it public.
+ * Returns whether the admin can still see it. The requester always sees their demand. */
+function convoySetVisibility(array $u,array $m,string $id,string $raw): bool {
+    if(($u['role']??'')!=='admin')throw new DomainException('Seuls les administrateurs règlent la visibilité d’une demande.',403);
+    if(in_array($id,botHiddenDemandIds(db(),$m['player_id']),true))throw new DomainException('Demande introuvable.',404);
+    $names=array_values(array_unique(array_filter(array_map('trim',preg_split('/[,;\n]+/',$raw)),'strlen')));
+    if(count($names)>50)throw new DomainException('50 joueurs au plus.',422);
+    $players=[];$unknown=[];$q=db()->prepare("SELECT player_id::text,pseudo FROM chaine_members WHERE server='s5' AND lower(pseudo)=lower(?)");
+    foreach($names as $name){$q->execute([$name]);$r=$q->fetch(PDO::FETCH_ASSOC);if($r)$players[$r['player_id']]=$r['pseudo'];else $unknown[]=$name;}
+    if($unknown)throw new DomainException('Joueur(s) inconnu(s) dans l’alliance : '.implode(', ',$unknown).'.',422);
+    $p=db();$p->beginTransaction();
+    try{
+        $q=$p->prepare('SELECT iddemandeur::text FROM demandes_convois WHERE id=? FOR UPDATE');$q->execute([$id]);$owner=$q->fetchColumn();
+        if($owner===false)throw new DomainException('Demande introuvable.',404);
+        $p->prepare('DELETE FROM demandes_visibilite WHERE iddemande=?')->execute([$id]);
+        $q=$p->prepare('INSERT INTO demandes_visibilite(iddemande,player_id,pseudo) VALUES(?,?,?)');foreach($players as $player=>$pseudo)$q->execute([$id,$player,$pseudo]);
+        $p->commit();
+    }catch(Throwable $e){if($p->inTransaction())$p->rollBack();throw $e;}
+    return !$players||$owner===$m['player_id']||isset($players[$m['player_id']]);
 }
 function convoyEvent(PDO $p,string $kind,array $payload): void {
     $q=$p->prepare('INSERT INTO convoy_web_events(kind,payload) VALUES(?,?::jsonb)');$q->execute([$kind,json_encode($payload,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE)]);

@@ -55,6 +55,16 @@ function botPreviousLaunch(PDO $p,string $player,string $before,string $kind): ?
     foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r)if(botConstructionKind($r['objet'])===$kind)return $r;
     return null;
 }
+// Restricted demands (demandes_visibilite): shown only to their requester and the listed players.
+function botHiddenDemandIds(PDO $p,?string $viewer): array {
+    $viewer=$viewer!==null&&preg_match('/\A[1-9][0-9]{0,18}\z/',$viewer)?$viewer:'0';
+    $q=$p->prepare('SELECT v.iddemande::text FROM demandes_visibilite v JOIN demandes_convois d ON d.id=v.iddemande GROUP BY v.iddemande,d.iddemandeur HAVING d.iddemandeur<>?::bigint AND NOT bool_or(v.player_id=?::bigint)');$q->execute([$viewer,$viewer]);
+    return $q->fetchAll(PDO::FETCH_COLUMN);
+}
+// Condition excluding them from a query; the ids come from the database and are cast to integers.
+function botHiddenSql(PDO $p,?string $viewer,string $column): string {
+    $ids=botHiddenDemandIds($p,$viewer);return $ids?' AND '.$column.' NOT IN ('.implode(',',array_map('intval',$ids)).')':'';
+}
 function botDemand(PDO $p,string $id): array {
     $q=$p->prepare('SELECT * FROM demandes_convois WHERE id=?');$q->execute([$id]);$r=$q->fetch(PDO::FETCH_ASSOC);
     if(!$r)throw new DomainException('Demande introuvable.',404);
@@ -64,6 +74,8 @@ function botDemand(PDO $p,string $id): array {
     $r['type_construction']=botConstructionKind($r['objet']);
     $r['lancement_precedent']=botPreviousLaunch($p,$r['iddemandeur'],$r['id'],$r['type_construction']);
     $r['lancement_attendu']=botLaunchExpected($r);
+    $q=$p->prepare('SELECT player_id::text,pseudo FROM demandes_visibilite WHERE iddemande=? ORDER BY lower(pseudo)');$q->execute([$id]);$visible=$q->fetchAll(PDO::FETCH_ASSOC);
+    $r['visible_par']=array_column($visible,'player_id');$r['visible_par_pseudos']=array_column($visible,'pseudo');
     $q=$p->prepare('SELECT id::text,discord_acteur::text,pseudo_acteur,pommes_avant::text,pommes_apres::text,materiaux_avant::text,materiaux_apres::text,date_ajustement FROM demandes_ajustements WHERE iddemande=? ORDER BY id DESC LIMIT 10');$q->execute([$id]);$r['ajustements']=$q->fetchAll(PDO::FETCH_ASSOC);
     return $r;
 }
@@ -149,6 +161,8 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
         }else{
             $q=$p->prepare('SELECT * FROM demandes_convois WHERE id=? FOR UPDATE');$q->execute([$id]);$d=$q->fetch(PDO::FETCH_ASSOC);
             if(!$d)throw new DomainException('Demande introuvable.',404);
+            // A restricted demand does not exist for members outside its list, admins included.
+            if(in_array((string)$id,botHiddenDemandIds($p,$actor['id']),true))throw new DomainException('Demande introuvable.',404);
             if($action==='ajustement'&&$auto!==null&&!hash_equals(botDemandVersion($d),$payload['version_attendue']))throw new DomainException('La demande a changé. Rouvre le formulaire de modification.',409);
             if($d['annulee'])throw new DomainException('Cette demande a été annulée.',409);
             if($action==='modification'){
@@ -211,7 +225,7 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
         $p->commit();return [$status,$out,false];
     }catch(Throwable $e){if($p->inTransaction())$p->rollBack();throw $e;}
 }
-function botListDemands(PDO $p,array $query): array {
+function botListDemands(PDO $p,array $query,?string $viewer=null): array {
     if(array_diff(array_keys($query),['etat','limite','apres','include','terminees_depuis']))throw new DomainException('Paramètre inconnu.',422);
     $state=$query['etat']??'les_deux';if(!is_string($state)||!in_array($state,['attente','en_cours','les_deux'],true))throw new DomainException('etat attendu : attente, en_cours ou les_deux.',422);
     $limit=botNumber($query['limite']??'100',true);if((int)$limit>100)throw new DomainException('limite doit être comprise entre 1 et 100.',422);
@@ -220,7 +234,8 @@ function botListDemands(PDO $p,array $query): array {
     $params=[$after];$closed='';
     if(isset($query['terminees_depuis'])){$since=botTimestamp($query['terminees_depuis']);$closed=' OR (fini AND date_fin>=?::timestamptz)';$params[]=$since;}
     if(isset($query['include'])&&$query['include']!=='convois')throw new DomainException('include attendu : convois.',422);
-    $q=$p->prepare('SELECT id::text FROM demandes_convois WHERE NOT annulee AND id>? AND ((NOT fini'.$where.')'.$closed.') ORDER BY demandes_convois.id LIMIT '.((int)$limit+1));$q->execute($params);$ids=$q->fetchAll(PDO::FETCH_COLUMN);$more=count($ids)>(int)$limit;$ids=array_slice($ids,0,(int)$limit);
+    // The bot API reads everything (the bot filters per member); the site passes its viewer.
+    $q=$p->prepare('SELECT id::text FROM demandes_convois WHERE NOT annulee AND id>?'.($viewer!==null?botHiddenSql($p,$viewer,'id'):'').' AND ((NOT fini'.$where.')'.$closed.') ORDER BY demandes_convois.id LIMIT '.((int)$limit+1));$q->execute($params);$ids=$q->fetchAll(PDO::FETCH_COLUMN);$more=count($ids)>(int)$limit;$ids=array_slice($ids,0,(int)$limit);
     $demands=array_map(fn($id)=>botDemand($p,$id),$ids);
     if(($query['include']??null)==='convois'){
         // All selected requests in one query; no HTTP request per player.
@@ -261,7 +276,7 @@ function botCancelableConvoys(PDO $p,PDO $game,array $query): array {
     $member=botMember($p,$game,botNumber($query['discord_id']??null,true))['membre'];
     $after=botNumber($query['apres']??'0');$limit=botNumber($query['limite']??'100',true);
     if((int)$limit>100)throw new DomainException('limite doit être comprise entre 1 et 100.',422);
-    $params=[$after];$where='';if(!$member['is_chaine']){$where=' AND c.idenvoyeur=?';$params[]=$member['player_id'];}
+    $params=[$after];$where=botHiddenSql($p,$member['player_id'],'c.iddemande');if(!$member['is_chaine']){$where.=' AND c.idenvoyeur=?';$params[]=$member['player_id'];}
     $q=$p->prepare('SELECT c.id::text,c.iddemande::text,c.idenvoyeur::text,c.pseudo_envoyeur,c.nbpomme::text,c.nbmateriaux::text,c.date_convoi,c.date_arrivee,d.pseudo_demandeur FROM convois_effectues c JOIN demandes_convois d ON d.id=c.iddemande WHERE NOT c.annule AND c.id>?'.$where.' ORDER BY c.id LIMIT '.((int)$limit+1));$q->execute($params);$rows=$q->fetchAll(PDO::FETCH_ASSOC);$more=count($rows)>(int)$limit;$rows=array_slice($rows,0,(int)$limit);
     return ['ok'=>true,'convois'=>$rows,'suite_apres'=>$more?end($rows)['id']:null];
 }
@@ -276,6 +291,7 @@ function botCancelConvoy(PDO $p,PDO $game,string $id,array $body,bool $chainOnly
         $q=$p->prepare('SELECT pg_advisory_xact_lock(hashtextextended(?,0))');$q->execute(['uptep-bot:'.$command]);
         $q=$p->prepare('SELECT iddemande::text,idenvoyeur::text FROM convois_effectues WHERE id=?');$q->execute([$id]);$link=$q->fetch(PDO::FETCH_ASSOC);
         if(!$link)throw new DomainException('Convoi introuvable.',404);
+        if(in_array($link['iddemande'],botHiddenDemandIds($p,$actor['id']),true))throw new DomainException('Convoi introuvable.',404);
         if($actor['id']!==$link['idenvoyeur'])botActor($p,$game,$discord,true,$chainOnly);
         $q=$p->prepare('SELECT empreinte,statut,reponse FROM bot_commandes WHERE commande_id=?');$q->execute([$command]);$prior=$q->fetch(PDO::FETCH_ASSOC);
         if($prior){if(!hash_equals($prior['empreinte'],$hash))throw new DomainException('commande_id déjà utilisé pour un autre contenu.',409);$p->commit();return [(int)$prior['statut'],json_decode($prior['reponse'],true,512,JSON_THROW_ON_ERROR),true];}
