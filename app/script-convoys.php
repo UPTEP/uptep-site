@@ -32,16 +32,16 @@ function scriptConvoys(PDO $p,PDO $game,array $actor,array $body):array {
     $action=$body['action']??'';if(!in_array($action,SCRIPT_CONVOY_ACTIONS,true))throw new DomainException('Action inconnue.',422);
     $member=scriptConvoyIdentity($p,$game,$actor);
     if(in_array($action,['convoy-list','convoy-detail','convoy-manage'],true))return scriptConvoyManagement($p,$game,$member,$body);
-    if(array_diff(array_keys($body),['action','pseudo','alliance','game_id','target','apples','wood','arrival','demand_id','confirmed','sent_at','request_key','object','level','wanted_date','auto_production']))throw new DomainException('Champ inconnu.',422);
+    if(array_diff(array_keys($body),['action','pseudo','alliance','game_id','target','apples','wood','arrival','demand_id','confirmed','sent_at','request_key','object','level','wanted_date','wanted_time','auto_production']))throw new DomainException('Champ inconnu.',422);
     if($action==='convoy-create'){
         $key=$body['request_key']??null;if(!is_string($key)||!preg_match('/\A[a-f0-9-]{36}\z/',$key))throw new DomainException('Identifiant de demande invalide.',422);
         if(($body['confirmed']??false)!==true)throw new DomainException('Confirme la création de la demande.',422);
-        $payload=['commande_id'=>'script-demand:'.$member['id'].':'.$key,'discord_id'=>$member['discord'],'nbpomme'=>botNumber($body['apples']??null),'nbmateriaux'=>botNumber($body['wood']??null),'objet'=>$body['object']??'','niveau'=>$body['level']??'','date_souhaitee'=>$body['wanted_date']??null];
+        $payload=['commande_id'=>'script-demand:'.$member['id'].':'.$key,'discord_id'=>$member['discord'],'nbpomme'=>botNumber($body['apples']??null),'nbmateriaux'=>botNumber($body['wood']??null),'objet'=>$body['object']??'','niveau'=>$body['level']??'','date_souhaitee'=>$body['wanted_date']??null];if(($body['wanted_time']??null)!==null)$payload['heure_souhaitee']=$body['wanted_time'];
         if(array_key_exists('auto_production',$body))$payload['auto_production']=$body['auto_production'];
         $q=$p->prepare("SELECT reponse FROM bot_commandes WHERE commande_id=? AND action='demande'");$q->execute([$payload['commande_id']]);$prior=$q->fetchColumn();
         if($prior!==false){
             $d=json_decode($prior,true,512,JSON_THROW_ON_ERROR)['demande'];
-            if(!is_bool($payload['auto_production']??false)||(bool)($d['auto_production']??false)!==($payload['auto_production']??false)||!is_string($payload['objet'])||$d['nbpomme_original']!==$payload['nbpomme']||$d['nbmateriaux_original']!==$payload['nbmateriaux']||$d['objet']!==trim($payload['objet'])||(string)$d['niveau']!==$payload['niveau']||$d['date_souhaitee']!==$payload['date_souhaitee'])throw new DomainException('Cette création est déjà enregistrée avec un autre contenu.',409);
+            if(!is_bool($payload['auto_production']??false)||(bool)($d['auto_production']??false)!==($payload['auto_production']??false)||!is_string($payload['objet'])||$d['nbpomme_original']!==$payload['nbpomme']||$d['nbmateriaux_original']!==$payload['nbmateriaux']||$d['objet']!==trim($payload['objet'])||(string)$d['niveau']!==$payload['niveau']||$d['date_souhaitee']!==$payload['date_souhaitee']||($d['heure_souhaitee']??null)!==($payload['heure_souhaitee']??null))throw new DomainException('Cette création est déjà enregistrée avec un autre contenu.',409);
             return ['demand_id'=>$d['id'],'state'=>$d['etat']];
         }
         $out=botConvoyAction($p,$game,'demande',null,$payload)[1];
@@ -50,7 +50,7 @@ function scriptConvoys(PDO $p,PDO $game,array $actor,array $body):array {
     if(in_array($action,['convoy-demands','convoy-pending'],true)){
         $validation=$action==='convoy-pending'?'NOT valide':'valide';
         $hidden=botHiddenSql($p,(string)$member['id'],'id');$lastValidated=null;
-        $rows=$p->query("SELECT id::text,iddemandeur::text,pseudo_demandeur,objet,niveau,auto_production,nbpomme_restant::text,nbmateriaux_restant::text,date_demande,date_validation,(SELECT max(date_ajustement) FROM demandes_ajustements a WHERE a.iddemande=demandes_convois.id) AS adjusted_at FROM demandes_convois WHERE ".$validation." AND NOT fini AND NOT annulee".$hidden." ORDER BY ".($action==='convoy-demands'?'date_validation NULLS FIRST,id':'id'))->fetchAll(PDO::FETCH_ASSOC);
+        $rows=$p->query("SELECT id::text,iddemandeur::text,pseudo_demandeur,objet,niveau,auto_production,nbpomme_restant::text,nbmateriaux_restant::text,date_demande,date_validation,date_souhaitee::text,heure_souhaitee,(SELECT max(date_ajustement) FROM demandes_ajustements a WHERE a.iddemande=demandes_convois.id) AS adjusted_at FROM demandes_convois WHERE ".$validation." AND NOT fini AND NOT annulee".$hidden." ORDER BY ".($action==='convoy-demands'?'date_validation NULLS FIRST,id':'id'))->fetchAll(PDO::FETCH_ASSOC);
         $projectionNow=gmdate('c');$colonyPlayers=[];$colonyLevels=[];if($action==='convoy-demands'){$colonyLevels=scriptConvoyCurrentColonyLevels($p);foreach($game->query("SELECT player_id::text,field::text,master_player_id::text,alliance_tag FROM players WHERE server='s5' AND is_present AND upper(alliance_tag)='UPTEP'")->fetchAll(PDO::FETCH_ASSOC) as $cp)$colonyPlayers[$cp['player_id']]=$cp;}
         $q=$game->prepare("SELECT pseudo,field::text,imported_at,alliance_tag FROM players WHERE server='s5' AND player_id=? AND is_present");$production=[];
         foreach($rows as &$row){$row['date_demande']=(new DateTimeImmutable($row['date_demande']))->format('c');$id=(string)$row['iddemandeur'];$q->execute([$id]);$player=$q->fetch(PDO::FETCH_ASSOC)?:[];$row['target']=$player['pseudo']??null;$row['self']=$id===(string)$member['id'];

@@ -35,6 +35,7 @@ function botDemandVersion(array $d): string {
     $values=[];
     foreach(['id','nbpomme_original','nbmateriaux_original','objet','niveau','date_souhaitee'] as $key)$values[$key]=$d[$key]===null?null:(string)$d[$key];
     $values['auto_production']=(bool)($d['auto_production']??false);
+    if(($d['heure_souhaitee']??null)!==null)$values['heure_souhaitee']=(string)$d['heure_souhaitee'];
     return hash('sha256',json_encode($values,JSON_THROW_ON_ERROR));
 }
 // Launch confirmations start with this feature: demands delivered earlier are never asked for one.
@@ -86,7 +87,7 @@ function botOverageMessage(array $excess): string {
     return 'Attention, dépassement du restant demandé : '.$excess['pommes'].' pommes et '.$excess['materiaux'].' matériaux en trop. Vérifie les montants puis confirme explicitement le dépassement.';
 }
 function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body,?callable $eventSink=null,bool $chainOnly=false): array {
-    $allowed=['suspension'=>['commande_id','discord_id'],'modification'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee','version_attendue','auto_production'],'ajustement'=>['commande_id','discord_id','nbpomme_restant','nbmateriaux_restant','nbpomme_attendu','nbmateriaux_attendu','auto_production','version_attendue'],'terminaison'=>['commande_id','discord_id'],'demande'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee','auto_production'],'annulation'=>['commande_id','discord_id'],'validation'=>['commande_id','discord_id','version_attendue'],'convoi'=>['commande_id','discord_id','nbpomme','nbmateriaux','date_convoi','date_arrivee','auto_production_confirmed','overage_confirmed'],'lancement'=>['commande_id','discord_id','date_lancement','date_fin_construction']][$action];
+    $allowed=['suspension'=>['commande_id','discord_id'],'modification'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee','heure_souhaitee','version_attendue','auto_production'],'ajustement'=>['commande_id','discord_id','nbpomme_restant','nbmateriaux_restant','nbpomme_attendu','nbmateriaux_attendu','auto_production','version_attendue'],'terminaison'=>['commande_id','discord_id'],'demande'=>['commande_id','discord_id','nbpomme','nbmateriaux','objet','niveau','date_souhaitee','heure_souhaitee','auto_production'],'annulation'=>['commande_id','discord_id'],'validation'=>['commande_id','discord_id','version_attendue'],'convoi'=>['commande_id','discord_id','nbpomme','nbmateriaux','date_convoi','date_arrivee','auto_production_confirmed','overage_confirmed'],'lancement'=>['commande_id','discord_id','date_lancement','date_fin_construction']][$action];
     if(array_diff(array_keys($body),$allowed))throw new DomainException('Champ inconnu dans la requête.',422);
     $command=$body['commande_id']??null;
     if(!is_string($command)||!preg_match('/\A[A-Za-z0-9_.:-]{1,100}\z/',$command))throw new DomainException('commande_id obligatoire : identifiant unique de la commande Discord.',422);
@@ -121,17 +122,25 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
         $date=$parsed->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:sP');
     }
     if($action==='convoi')$payload['date_convoi']=$date;
-    $objet=null;$niveau=null;$souhaitee=null;$arrivee=null;
+    $objet=null;$niveau=null;$souhaitee=null;$heure=null;$arrivee=null;
     if(in_array($action,['demande','modification'],true)){
         if(isset($body['objet'])){if(!is_string($body['objet']) || !($objet=trim($body['objet'])) || mb_strlen($objet)>160)throw new DomainException('Objet de la demande invalide (1 à 160 caractères).',422);$payload['objet']=$objet;}
         if(isset($body['niveau'])){$niveau=botNumber($body['niveau'],true);if((int)$niveau>999)throw new DomainException('Niveau attendu entre 1 et 999.',422);$payload['niveau']=$niveau;}
         if(($objet===null)!==($niveau===null))throw new DomainException('Renseigne ensemble la construction/recherche et son niveau.',422);
         if(isset($body['date_souhaitee'])){
             $souhaitee=$body['date_souhaitee'];
-            if(!is_string($souhaitee)||!preg_match('/\A(\d{4})-(\d{2})-(\d{2})\z/',$souhaitee,$parts)||!checkdate((int)$parts[2],(int)$parts[3],(int)$parts[1]))throw new DomainException('Date souhaitée invalide (AAAA-MM-JJ).',422);
-            if($souhaitee<(new DateTimeImmutable('now',new DateTimeZone('Europe/Paris')))->format('Y-m-d'))throw new DomainException('La date souhaitée est déjà passée.',422);
+            if(!is_string($souhaitee)||!preg_match('/\A(\d{4})-(\d{2})-(\d{2})\z/',$souhaitee,$parts)||!checkdate((int)$parts[2],(int)$parts[3],(int)$parts[1]))throw new DomainException('Date de validation souhaitée invalide (AAAA-MM-JJ).',422);
+            if($souhaitee<(new DateTimeImmutable('now',new DateTimeZone('Europe/Paris')))->format('Y-m-d'))throw new DomainException('La date de validation souhaitée est déjà passée.',422);
             $payload['date_souhaitee']=$souhaitee;
         }
+        // Optional time (Paris, HH:MM), only with a date. Without the key (Discord bot), a modification keeps the stored time.
+        if(isset($body['heure_souhaitee'])){
+            $heure=$body['heure_souhaitee'];
+            if(!is_string($heure)||!preg_match('/\A([01][0-9]|2[0-3]):[0-5][0-9]\z/',$heure))throw new DomainException('Heure de validation souhaitée invalide (HH:MM).',422);
+            if($souhaitee===null)throw new DomainException('Renseigne une date de validation souhaitée avec l’heure.',422);
+            if($souhaitee.' '.$heure<=(new DateTimeImmutable('now',new DateTimeZone('Europe/Paris')))->format('Y-m-d H:i'))throw new DomainException('L’heure de validation souhaitée est déjà passée.',422);
+            $payload['heure_souhaitee']=$heure;
+        }elseif(array_key_exists('heure_souhaitee',$body))$payload['heure_souhaitee']=null;
     }
     if($action==='modification'){
         foreach(['objet','niveau','date_souhaitee'] as $key)if(!array_key_exists($key,$body))throw new DomainException('Renseigne tous les champs de la demande à modifier.',422);
@@ -156,8 +165,8 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
         if($prior){if(in_array($action,['annulation','terminaison','ajustement','modification','lancement'],true)){$priorDemand=botDemand($p,$id);if($actor['id']!==$priorDemand['iddemandeur'])botActor($p,$game,$discord,true,$chainOnly);}if(!hash_equals($prior['empreinte'],$hash))throw new DomainException('commande_id déjà utilisé pour une autre action ou un autre contenu.',409);$p->commit();return [(int)$prior['statut'],json_decode($prior['reponse'],true,512,JSON_THROW_ON_ERROR),true];}
         $status=200;
         if($action==='demande'){
-            $q=$p->prepare('INSERT INTO demandes_convois(iddemandeur,pseudo_demandeur,discord_demandeur,nbpomme_original,nbpomme_restant,nbmateriaux_original,nbmateriaux_restant,objet,niveau,date_souhaitee,auto_production) VALUES(?,?,?,?,?,?,?,?,?,?,?) RETURNING id');
-            $q->execute([$actor['id'],$actor['pseudo'],$discord,$apple,$apple,$wood,$wood,$objet,$niveau,$souhaitee,($auto??false)?'true':'false']);$id=(string)$q->fetchColumn();$status=201;
+            $q=$p->prepare('INSERT INTO demandes_convois(iddemandeur,pseudo_demandeur,discord_demandeur,nbpomme_original,nbpomme_restant,nbmateriaux_original,nbmateriaux_restant,objet,niveau,date_souhaitee,heure_souhaitee,auto_production) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id');
+            $q->execute([$actor['id'],$actor['pseudo'],$discord,$apple,$apple,$wood,$wood,$objet,$niveau,$souhaitee,$heure,($auto??false)?'true':'false']);$id=(string)$q->fetchColumn();$status=201;
         }else{
             $q=$p->prepare('SELECT * FROM demandes_convois WHERE id=? FOR UPDATE');$q->execute([$id]);$d=$q->fetch(PDO::FETCH_ASSOC);
             if(!$d)throw new DomainException('Demande introuvable.',404);
@@ -170,8 +179,9 @@ function botConvoyAction(PDO $p,PDO $game,string $action,?string $id,array $body
                 if($d['valide']||$d['fini'])throw new DomainException('Seule une demande en attente de validation peut être modifiée. Rouvre le tableau.',409);
                 if((string)$d['nbpomme_restant']!==(string)$d['nbpomme_original']||(string)$d['nbmateriaux_restant']!==(string)$d['nbmateriaux_original'])throw new DomainException('Cette demande conserve des livraisons ou ajustements : valide-la à nouveau avant de modifier son restant.',409);
                 if(!hash_equals(botDemandVersion($d),$payload['version_attendue']))throw new DomainException('La demande a changé depuis l’ouverture du formulaire. Rouvre Modifier une demande.',409);
-                $q=$p->prepare('UPDATE demandes_convois SET nbpomme_original=?,nbpomme_restant=?,nbmateriaux_original=?,nbmateriaux_restant=?,objet=?,niveau=?,date_souhaitee=? WHERE id=?');
-                $q->execute([$apple,$apple,$wood,$wood,$objet,$niveau,$souhaitee,$id]);
+                if(!array_key_exists('heure_souhaitee',$body))$heure=$souhaitee!==null&&$souhaitee===(string)$d['date_souhaitee']?$d['heure_souhaitee']:null;
+                $q=$p->prepare('UPDATE demandes_convois SET nbpomme_original=?,nbpomme_restant=?,nbmateriaux_original=?,nbmateriaux_restant=?,objet=?,niveau=?,date_souhaitee=?,heure_souhaitee=? WHERE id=?');
+                $q->execute([$apple,$apple,$wood,$wood,$objet,$niveau,$souhaitee,$heure,$id]);
             }elseif($action==='ajustement'){
                 if($actor['id']!==(string)$d['iddemandeur'])botActor($p,$game,$discord,true,$chainOnly);
                 if(!$d['valide']||$d['fini'])throw new DomainException('Seule une demande validée et en cours peut être ajustée.',409);

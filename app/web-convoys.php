@@ -37,7 +37,7 @@ function convoyPrepare(array $m): array {
         $body['nbpomme']=convoyQuantity(post('pommes'));$body['nbmateriaux']=convoyQuantity(post('materiaux'));
     }
     if(in_array($action,['demande','modification'],true)){
-        $body['objet']=trim(post('objet'));$body['niveau']=post('niveau');$body['date_souhaitee']=post('date_souhaitee')?:null;
+        $body['objet']=trim(post('objet'));$body['niveau']=post('niveau');$body['date_souhaitee']=post('date_souhaitee')?:null;$body['heure_souhaitee']=post('heure_souhaitee')?:null;
     }
     if(in_array($action,['demande','modification','ajustement'],true))$body['auto_production']=post('auto_production')==='1';
     if(in_array($action,['validation','modification','ajustement'],true))$body['version_attendue']=post('version');

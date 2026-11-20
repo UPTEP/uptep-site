@@ -17,6 +17,9 @@ function readConstructionDemand(row){
 }
 // Launch dates come from PostgreSQL ("2026-11-11 10:43:57+00"): normalised so every browser reads them.
 function uptepLaunchTime(raw){const ms=Date.parse(String(raw||'').replace(' ','T').replace(/([+-]\d{2})$/,'$1:00'));return Number.isFinite(ms)?ms:null;}
+// Wanted validation date ("2026-11-25") and optional Paris time ("14:00"): "25/11/2026 à 14:00".
+function uptepWantedLabel(date,time){if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return 'Non renseignée';return date.split('-').reverse().join('/')+(/^\d{2}:\d{2}$/.test(time||'')?' à '+time:'');}
+function uptepWantedError(date,time){return time&&!date?'Renseigne une date de validation souhaitée avec l’heure.':'';}
 function uptepLaunchDate(raw){const ms=uptepLaunchTime(raw);return ms===null?'—':new Date(ms).toLocaleString('fr-FR',{timeZone:'Europe/Paris',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});}
 // This demand's launch, and the requester's previous one of the same kind ("Construction précédente :
 // Couveuse niv. 16 · en cours jusqu’au 07/11 08:36"): shown while running, or always on a detail view.
@@ -129,22 +132,25 @@ function mountConstructionDemands(context,auth){
   const amounts=el('p');
   for(const [name,label,icon] of [['apples','nourriture','icone_pomme.png'],['wood','matériaux','icone_bois.png']]){const image=el('img');image.src='/images/icone/'+icon;image.alt='';image.width=18;image.style.cssText='vertical-align:middle;margin-right:4px';amounts.append(image,doc.createTextNode(BigInt(shown[name]).toLocaleString('fr-FR')+' '+label+(name==='apples'?' · ':'')));}modal.append(amounts);
   modal.append(el('p','Coût total de cette amélioration. La demande sera créée pour '+context.pseudo+', en attente de validation.'));
-  const form=el('form'),label=el('label'),auto=el('input');auto.type='checkbox';auto.name='auto_production';auto.checked=saved?.payload.auto_production===true;auto.disabled=!!saved;label.append(auto,doc.createTextNode(' Auto production'));form.append(label);
+  // Optional wanted validation date, as in Commerce; kept with the pending record so a retry sends the same one.
+  const form=el('form'),wantedLabel=el('label','Date de validation souhaitée (facultative)'),wanted=el('input');wanted.type='date';wanted.name='wanted_date';wanted.min=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Paris'}).format(new Date());wanted.value=saved?.payload.wanted_date||'';wanted.disabled=!!saved;wanted.style.cssText='display:block;margin:4px 0 10px;padding:3px 5px;font:12px Verdana,sans-serif;';wantedLabel.style.cssText='display:block;';wantedLabel.append(wanted);form.append(wantedLabel);
+  const timeLabel=el('label','Heure de validation souhaitée (facultative)'),wantedTime=el('input');wantedTime.type='time';wantedTime.name='wanted_time';wantedTime.value=saved?.payload.wanted_time||'';wantedTime.disabled=!!saved;wantedTime.style.cssText=wanted.style.cssText;timeLabel.style.cssText='display:block;';timeLabel.append(wantedTime);form.append(timeLabel);
+  const label=el('label'),auto=el('input');auto.type='checkbox';auto.name='auto_production';auto.checked=saved?.payload.auto_production===true;auto.disabled=!!saved;label.append(auto,doc.createTextNode(' Auto production'));form.append(label);
   const status=el('p');status.setAttribute('role','status');form.append(status);
   const actions=el('div');actions.className='uptep-building-actions';const cancel=el('button','Annuler'),submit=el('button',saved?.state==='done'?'Demande déjà créée':saved?'Réessayer la création':'Confirmer la demande');cancel.type='button';submit.type='submit';submit.disabled=saved?.state==='done';actions.append(cancel,submit);form.append(actions);modal.append(form);
-  function completed(record){status.textContent='✓ Demande #'+record.demand_id+' · '+(record.demand_state==='en_cours'?'En cours.':'En attente de validation.');notice.textContent='Demande #'+record.demand_id+' créée';button.textContent='Voir ma demande';submit.textContent='Demande créée';submit.disabled=true;auto.disabled=true;cancel.textContent='Fermer';const link=el('a','Consulter mes demandes');link.href='/commerce.php';status.append(doc.createTextNode(' '),link);}
+  function completed(record){status.textContent='✓ Demande #'+record.demand_id+' · '+(record.demand_state==='en_cours'?'En cours.':'En attente de validation.');notice.textContent='Demande #'+record.demand_id+' créée';button.textContent='Voir ma demande';submit.textContent='Demande créée';submit.disabled=true;auto.disabled=true;wanted.disabled=true;wantedTime.disabled=true;cancel.textContent='Fermer';const link=el('a','Consulter mes demandes');link.href='/commerce.php';status.append(doc.createTextNode(' '),link);}
   if(saved?.state==='done')completed(saved);else if(saved)status.textContent='La confirmation de cette création est en attente. Réessayer reprend la même demande, sans doublon.';
   cancel.addEventListener('click',close);modal.addEventListener('close',()=>{if(dialog===modal)dialog=null;modal.remove();button.focus();});modal.addEventListener('cancel',event=>{if(busy)event.preventDefault();});modal.addEventListener('click',event=>{if(event.target===modal&&!busy){const r=modal.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)close();}});
   form.addEventListener('submit',async event=>{
-   event.preventDefault();if(busy||submit.disabled)return;busy=true;submit.disabled=true;cancel.disabled=true;auto.disabled=true;status.textContent='Création de la demande…';
+   event.preventDefault();if(busy||submit.disabled)return;if(wanted.value&&(!/^\d{4}-\d{2}-\d{2}$/.test(wanted.value)||wanted.value<wanted.min)){status.textContent='La date de validation souhaitée doit être aujourd’hui ou plus tard.';return;}if(uptepWantedError(wanted.value,wantedTime.value)){status.textContent=uptepWantedError(wanted.value,wantedTime.value);return;}busy=true;submit.disabled=true;cancel.disabled=true;auto.disabled=true;wanted.disabled=true;wantedTime.disabled=true;status.textContent='Création de la demande…';
    try{await exclusive(key,async()=>{
     let record=await current(key);if(record?.state==='done'){completed(record);close();return;}
-    if(!record){const current=readConstructionDemand(row);if(JSON.stringify(current)!==JSON.stringify(offer))throw Error('Le coût a changé. Ferme puis rouvre la confirmation.');record={state:'pending',payload:{action:'convoy-create',request_key:win.crypto.randomUUID(),confirmed:true,...current,wanted_date:null,auto_production:auto.checked}};win.localStorage.setItem(key,JSON.stringify(record));}
+    if(!record){const current=readConstructionDemand(row);if(JSON.stringify(current)!==JSON.stringify(offer))throw Error('Le coût a changé. Ferme puis rouvre la confirmation.');record={state:'pending',payload:{action:'convoy-create',request_key:win.crypto.randomUUID(),confirmed:true,...current,wanted_date:wanted.value||null,wanted_time:wantedTime.value||null,auto_production:auto.checked}};win.localStorage.setItem(key,JSON.stringify(record));}
     saved=record;
     try{const result=await request(record.payload);alive();if(!/^[1-9]\d*$/.test(String(result.demand_id)))throw Error('Confirmation de demande illisible. Réessaie la même demande.');const done={...record,state:'done',demand_id:String(result.demand_id)};win.localStorage.setItem(key,JSON.stringify(done));completed(done);saved=done;close();}
     catch(e){if(e.status===400||e.status===422){win.localStorage.removeItem(key);saved=null;}throw e;}
    });}catch(e){if(!stopped){status.textContent=e.message;submit.textContent=saved?'Réessayer la création':'Confirmer la demande';}}
-   finally{busy=false;if(!stopped){cancel.disabled=false;submit.disabled=saved?.state==='done';auto.disabled=!!saved;}}
+   finally{busy=false;if(!stopped){cancel.disabled=false;submit.disabled=saved?.state==='done';auto.disabled=!!saved;wanted.disabled=!!saved;wantedTime.disabled=!!saved;}}
   });
   doc.body.append(modal);modal.showModal();
  }
