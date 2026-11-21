@@ -18,6 +18,7 @@ try{
  $actor=authorizeScript($token,$body['pseudo'],$body['alliance']);
  if(($body['action']??'')==='member-report')$result=memberReport(db(),db(true),$actor,$body);
  elseif(($body['action']??'')==='movements')$result=scriptMovements($actor,$body);
+ elseif(($body['action']??'')==='movements-prefs')$result=scriptMovementsPrefs($actor,$body);
  elseif(in_array($body['action']??'', SCRIPT_CONVOY_ACTIONS,true))$result=scriptConvoys(db(),db(true),$actor,$body);
  elseif(in_array($body['action']??'', ['flood-check','flood-declare'],true))$result=scriptFloods(db(),db(true),$actor,$body);
  elseif(in_array($body['action']??'', ['settings','save-settings','collect'],true))$result=scriptSettingsAction($actor,$body);

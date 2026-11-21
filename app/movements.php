@@ -61,6 +61,56 @@ function movementsDay(DateTimeImmutable $day,DateTimeImmutable $today): string {
     return ($diff===0?'Aujourd’hui · ':($diff===1?'Demain · ':($diff===-1?'Hier · ':''))).$label;
 }
 
+const MOVEMENTS_TARGET_LEVELS=5;
+/** "Mes cibles": the chain players below the viewer, by level (one grade position = one level, ties share it),
+ * as on the userscript's Chaîne page: Grenier 1→n, Passeur n→1, Chasseur, A flooder. A player is in range when
+ * his TDC is between half and three times the viewer's. Returns null when the viewer is not ranked in the chain. */
+function movementsTargets(?string $me): ?array {
+    if($me===null||!preg_match('/\A[1-9][0-9]{0,17}\z/',$me))return null;
+    $ranks=['Grenier','Passeur','Chasseur','A flooder'];
+    $chain=db()->query("SELECT player_id::text AS id,grade,sort_order FROM chaine_members WHERE server='s5' AND grade IN ('Grenier','Passeur','Chasseur','A flooder')")->fetchAll(PDO::FETCH_ASSOC);
+    if(!$chain)return null;
+    $q=db(true)->prepare("SELECT player_id::text,pseudo,field::text FROM players WHERE server='s5' AND is_present AND player_id IN (".implode(',',array_fill(0,count($chain),'?')).")");$q->execute(array_column($chain,'id'));
+    $players=[];foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r)$players[$r['player_id']]=$r;
+    $level=static fn(array $r):array=>[array_search($r['grade'],$ranks,true),$r['sort_order']===null?PHP_INT_MAX:($r['grade']==='Passeur'?-(int)$r['sort_order']:(int)$r['sort_order'])];
+    $self=null;foreach($chain as $r)if($r['id']===$me)$self=$r;
+    if(!$self||!isset($players[$me]))return null;
+    $mine=$level($self);$field=(int)$players[$me]['field'];$below=[];
+    foreach($chain as $r){
+        if($r['id']===$me||!isset($players[$r['id']])||(int)$players[$r['id']]['field']<=0)continue;
+        $l=$level($r);
+        // Same grade without a position on either side: not ordered, so not a target (Chasseurs between themselves).
+        if($l[0]<$mine[0]||($l[0]===$mine[0]&&($l[1]===PHP_INT_MAX||$mine[1]===PHP_INT_MAX||$l[1]<=$mine[1])))continue;
+        $below[]=['level'=>$l,'row'=>$r];
+    }
+    usort($below,static fn($a,$b)=>$a['level']<=>$b['level']?:strnatcasecmp($players[$a['row']['id']]['pseudo'],$players[$b['row']['id']]['pseudo']));
+    $targets=[];$levels=[];
+    foreach($below as $b){
+        $key=implode(':',$b['level']);$levels[$key]??=count($levels)+1;if($levels[$key]>MOVEMENTS_TARGET_LEVELS)break;
+        $r=$b['row'];$t=(int)$players[$r['id']]['field'];
+        $targets[]=['id'=>$r['id'],'pseudo'=>$players[$r['id']]['pseudo'],'grade'=>$r['grade'],'order'=>$r['sort_order']===null?null:(int)$r['sort_order'],'level'=>$levels[$key],'field'=>$t,'in_range'=>$field>0&&$t*2>=$field&&$t<=$field*3];
+    }
+    return ['grade'=>$self['grade'],'order'=>$self['sort_order']===null?null:(int)$self['sort_order'],'field'=>$field,'targets'=>$targets];
+}
+
+/** Saved Mouvements filters of an account, normalised: shown types, "Seulement moi", "Mes cibles", levels, members. */
+function movementsPrefsNormalize(mixed $raw): array {
+    $raw=is_array($raw)?$raw:[];$types=['flood','convoy','hunt'];
+    $shown=is_array($raw['types']??null)?array_values(array_intersect($types,$raw['types'])):$types;
+    $members=is_array($raw['members']??null)?array_values(array_unique(array_filter($raw['members'],static fn($v)=>is_string($v)&&preg_match('/\A[1-9][0-9]{0,17}\z/',$v)))):[];
+    $depth=is_int($raw['depth']??null)&&$raw['depth']>=3&&$raw['depth']<=MOVEMENTS_TARGET_LEVELS?$raw['depth']:4;
+    return ['types'=>$shown,'me'=>($raw['me']??false)===true,'targets'=>($raw['targets']??false)===true,'depth'=>$depth,'members'=>array_slice($members,0,60)];
+}
+function movementsPrefs(int $user): ?array {
+    $q=db()->prepare("SELECT value FROM user_preferences WHERE user_id=? AND page='mouvements'");$q->execute([$user]);$v=$q->fetchColumn();
+    return $v===false?null:movementsPrefsNormalize(json_decode((string)$v,true));
+}
+/** Saves (or, with null, forgets) the account's Mouvements filters. */
+function movementsSavePrefs(int $user,?array $raw): void {
+    if($raw===null){db()->prepare("DELETE FROM user_preferences WHERE user_id=? AND page='mouvements'")->execute([$user]);return;}
+    db()->prepare("INSERT INTO user_preferences(user_id,page,value) VALUES(?,'mouvements',?::jsonb) ON CONFLICT(user_id,page) DO UPDATE SET value=EXCLUDED.value,updated_at=now()")->execute([$user,json_encode(movementsPrefsNormalize($raw),JSON_THROW_ON_ERROR)]);
+}
+
 /** UPTEP+ in the game (Alliance › Mouvements): the same day view, as JSON for the portal iframe. */
 function scriptMovements(array $actor,array $body): array {
     if(array_diff(array_keys($body),['action','pseudo','alliance','day']))throw new DomainException('Champ inconnu.',422);
@@ -72,5 +122,19 @@ function scriptMovements(array $actor,array $body): array {
         return ['type'=>$e['type'],'at'=>$e['at'],'label'=>$e['label'],'amount'=>$e['amount']??null,'players'=>$e['players'],'people'=>$e['people'],'details'=>$details];
     },movementsData($day,$day->modify('+1 day'),(string)$actor['game_player_id']));
     return ['day'=>$day->format('Y-m-d'),'label'=>movementsDay($day,$today),'today'=>$today->format('Y-m-d'),'first'=>$first->format('Y-m-d'),'last'=>$last->format('Y-m-d'),
-        'prev'=>$nav($day->modify('-1 day')),'next'=>$nav($day->modify('+1 day')),'now'=>$now->getTimestamp(),'me'=>(string)$actor['game_player_id'],'events'=>$events];
+        'prev'=>$nav($day->modify('-1 day')),'next'=>$nav($day->modify('+1 day')),'now'=>$now->getTimestamp(),'me'=>(string)$actor['game_player_id'],'events'=>$events,
+        'targets'=>movementsTargets((string)$actor['game_player_id']),'prefs'=>movementsPrefsWithNames((int)$actor['id'])];
+}
+/** Saved filters plus the names of saved members, so they can be listed on a day they do not appear. */
+function movementsPrefsWithNames(int $user): array {
+    $prefs=movementsPrefs($user)??movementsPrefsNormalize(null);$names=[];
+    if($prefs['members']){$q=db(true)->prepare("SELECT player_id::text,pseudo FROM players WHERE server='s5' AND player_id IN (".implode(',',array_fill(0,count($prefs['members']),'?')).")");$q->execute($prefs['members']);foreach($q->fetchAll(PDO::FETCH_ASSOC) as $r)$names[$r['player_id']]=$r['pseudo'];}
+    return $prefs+['names'=>(object)$names];
+}
+/** UPTEP+ in the game: saves (or with reset, forgets) the same Mouvements filters as on uptep.top. */
+function scriptMovementsPrefs(array $actor,array $body): array {
+    if(array_diff(array_keys($body),['action','pseudo','alliance','prefs','reset']))throw new DomainException('Champ inconnu.',422);
+    if(($body['reset']??false)===true){movementsSavePrefs((int)$actor['id'],null);return ['saved'=>true];}
+    if(!is_array($body['prefs']??null))throw new DomainException('Préférences invalides.',422);
+    movementsSavePrefs((int)$actor['id'],$body['prefs']);return ['saved'=>true];
 }

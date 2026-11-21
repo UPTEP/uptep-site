@@ -57,3 +57,16 @@
 .pm-members li label>span:nth-of-type(1){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pm-members li .pm-count{flex:none;min-width:22px;padding:1px 6px;border-radius:9px;background:#e2d29e;font-size:10px;font-weight:bold;text-align:center}
 .pm-members li label:has(input:checked){background:#ece2bf;font-weight:bold}
+.pm-targets[aria-pressed=false]{opacity:1;text-decoration:none;font-weight:normal}
+.pm-targets[aria-pressed=true]{background:#7a3b1d;border-color:#7a3b1d;color:#fff3d3}
+.pm-reset{margin-left:auto;padding:4px 6px;border:0;background:none;color:#5a4a1e;font:11px Verdana,sans-serif;text-decoration:underline;cursor:pointer}
+.pm-targets-panel{margin:0 0 8px;padding:7px 10px;border:1px solid #b39b61;border-radius:4px;background:#fffdf3;font-size:12px;text-align:left}
+.pm-targets-panel p{margin:0 0 5px}
+.pm-targets-panel select{margin:0 3px;padding:1px 3px;border:1px solid #b39b61;border-radius:3px;background:#fff;font:12px Verdana,sans-serif}
+.pm-targets-list{display:flex;flex-wrap:wrap;gap:5px;list-style:none;margin:4px 0;padding:0}
+.pm-targets-list li{display:inline-flex;align-items:center;gap:5px;padding:2px 8px 2px 3px;border:1px solid #b39b61;border-radius:10px;background:#fff;font-weight:bold}
+.pm-targets-list li.is-out{color:#8a7f5c;font-weight:normal;border-style:dashed}
+.pm-targets-list li small{font-size:10px}
+.pm-targets-level{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:#7a3b1d;color:#fff3d3;font-size:10px;font-weight:bold}
+.pm-targets-list li.is-out .pm-targets-level{background:#c8b98c}
+.pm-targets-note{color:#655a37;font-size:11px}

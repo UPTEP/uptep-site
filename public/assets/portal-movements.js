@@ -19,10 +19,18 @@ window.uptepMovements=(()=>{
   if(box.bottom>height-6&&item.getBoundingClientRect().top>box.height+12){tip.style.top='auto';tip.style.bottom='calc(100% + 5px)';}
  }
 
- const shown=new Set(Object.keys(TYPES));let onlyMe=false;
+ const shown=new Set(Object.keys(TYPES));let onlyMe=false,withTargets=false,depth=4,prefsLoaded=false,saveTimer=null;
+ // Filters are saved on the UPTEP account, as on uptep.top › Mouvements; they are read once, on the first day loaded.
+ function applyPrefs(p){
+  if(prefsLoaded||!p)return;prefsLoaded=true;
+  shown.clear();for(const t of p.types||[])if(TYPES[t])shown.add(t);onlyMe=p.me===true;withTargets=p.targets===true;depth=[3,4,5].includes(p.depth)?p.depth:4;
+  selected.clear();for(const id of p.members||[]){selected.add(String(id));if(p.names?.[id])names.set(String(id),p.names[id]);}
+ }
+ function save(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{api({action:'movements-prefs',prefs:{types:Object.keys(TYPES).filter(t=>shown.has(t)),me:onlyMe,targets:withTargets,depth,members:[...selected]}}).catch(()=>{});},600);}
+ function reset(){clearTimeout(saveTimer);shown.clear();for(const t of Object.keys(TYPES))shown.add(t);onlyMe=false;withTargets=false;depth=4;selected.clear();render();api({action:'movements-prefs',reset:true}).catch(()=>{});}
  async function load(day){
   const turn=++version;root.setAttribute('aria-busy','true');
-  try{const result=await api({action:'movements',...(day?{day}:{})});if(turn!==version)return;if(result.day!==data?.day)showEarlier=false;data=result;render();}
+  try{const result=await api({action:'movements',...(day?{day}:{})});if(turn!==version)return;if(result.day!==data?.day)showEarlier=false;data=result;applyPrefs(result.prefs);render();}
   catch(e){if(turn===version){root.replaceChildren(el('p','pm-error',e.message||'Mouvements indisponibles.'));}}
   finally{if(turn===version)root.removeAttribute('aria-busy');}
  }
@@ -43,15 +51,30 @@ window.uptepMovements=(()=>{
   if(!isToday){const today=el('button','pm-today','Aujourd’hui');today.type='button';today.addEventListener('click',()=>load(null));form.append(today);}
   nav.append(navButton(data.prev,'‹ '+(data.prev?.label??''),'prev'),form,navButton(data.next,(data.next?.label??'')+' ›','next'));
   const filters=el('div','pm-filters');filters.setAttribute('role','group');filters.setAttribute('aria-label','Filtrer les mouvements');
-  for(const [type,[plural]] of Object.entries(TYPES)){const b=el('button','pm-filter');b.type='button';b.setAttribute('aria-pressed',String(shown.has(type)));b.append(el('span','pm-dot is-'+type),document.createTextNode(plural+' '),el('span','pm-count',String(counts[type])));b.addEventListener('click',()=>{shown.has(type)?shown.delete(type):shown.add(type);render();});filters.append(b);}
-  const me=el('button','pm-filter pm-me','Seulement moi');me.type='button';me.setAttribute('aria-pressed',String(onlyMe));me.addEventListener('click',()=>{onlyMe=!onlyMe;render();});filters.append(me);
+  for(const [type,[plural]] of Object.entries(TYPES)){const b=el('button','pm-filter');b.type='button';b.setAttribute('aria-pressed',String(shown.has(type)));b.append(el('span','pm-dot is-'+type),document.createTextNode(plural+' '),el('span','pm-count',String(counts[type])));b.addEventListener('click',()=>{shown.has(type)?shown.delete(type):shown.add(type);render();save();});filters.append(b);}
+  const me=el('button','pm-filter pm-me','Seulement moi');me.type='button';me.setAttribute('aria-pressed',String(onlyMe));me.addEventListener('click',()=>{onlyMe=!onlyMe;render();save();});filters.append(me);
+  // "Mes cibles": chain players below the viewer (level 1 = next position down), floods and hunts only.
+  const chain=data.targets,targetIds=new Set((chain?.targets||[]).filter(t=>t.level<=depth).map(t=>String(t.id)));let targetsPanel=null;
+  if(chain){
+   const tb=el('button','pm-filter pm-targets','🎯 Mes cibles');tb.type='button';tb.setAttribute('aria-pressed',String(withTargets));tb.addEventListener('click',()=>{withTargets=!withTargets;render();save();});filters.append(tb);
+   if(withTargets){
+    targetsPanel=el('div','pm-targets-panel');const head=el('p');head.append(el('strong','','Mes cibles'),document.createTextNode(' · '+chain.grade+(chain.order!==null?' '+chain.order:'')+' · TDC '+fmt(chain.field)));
+    if(chain.targets.length){const label=el('label','',' · jusqu’à '),select=el('select');for(const n of [3,4,5]){const o=el('option','',n+' rangs');o.value=String(n);o.selected=n===depth;select.append(o);}select.addEventListener('change',()=>{depth=Number(select.value);render();save();});label.append(select,document.createTextNode(' en dessous'));head.append(label);}
+    targetsPanel.append(head);
+    if(!chain.targets.length)targetsPanel.append(el('p','pm-targets-note','Aucune cible : personne n’est classé en dessous de toi dans la chaîne'+(chain.grade==='Chasseur'?' (les Chasseurs n’ont que les joueurs « A flooder » en dessous)':'')+'.'));
+    else{const ul=el('ul','pm-targets-list');for(const t of chain.targets){if(t.level>depth)continue;const li=el('li',t.in_range?'':'is-out');li.title=t.grade+(t.order!==null?' '+t.order:'')+' · TDC '+fmt(t.field)+(t.in_range?'':' · hors portée');li.append(el('span','pm-targets-level',String(t.level)),document.createTextNode(t.pseudo));if(!t.in_range)li.append(el('small','',' hors portée'));ul.append(li);}targetsPanel.append(ul,el('p','pm-targets-note','Floods et chasses où une de ces cibles est concernée. Portée : TDC entre la moitié et 3 fois le tien.'));}
+   }
+  }
+  const resetButton=el('button','pm-reset','Réinitialiser');resetButton.type='button';resetButton.addEventListener('click',reset);filters.append(resetButton);
   // Today: hours already past are folded behind a button.
   const currentHour=isToday?parseInt(paris(data.now,{hour:'2-digit',hourCycle:'h23'}),10):-1;let folded=0,foldedHours=0;
   const list=el('ol','pm-hours');let visible=0,n=0;
   for(const hour of [...hours.keys()].sort((a,b)=>a-b)){
    const items=el('div','pm-items');
    for(const e of hours.get(hour).values()){
-    if(!shown.has(e.type)||(onlyMe&&!e.players.includes(data.me))||(selected.size&&!e.players.some(p=>selected.has(String(p)))))continue;visible++;n++;
+    // "Mes cibles" and chosen members add up; "Seulement moi" narrows both.
+    const byTargets=withTargets&&!!chain&&e.type!=='convoy'&&e.players.some(p=>targetIds.has(String(p))),byMembers=selected.size>0&&e.players.some(p=>selected.has(String(p)));
+    if(!shown.has(e.type)||(onlyMe&&!e.players.includes(data.me))||((withTargets&&chain)||selected.size?!(byTargets||byMembers):false))continue;visible++;n++;
     const chip=el('div','pm-item is-'+e.type+(isToday&&e.at<=data.now?' is-past':''));chip.tabIndex=0;const tipId='pm-tip-'+n;chip.setAttribute('aria-describedby',tipId);chip.dataset.at=e.at;
     chip.append(el('span','pm-dot is-'+e.type),el('span','pm-time',e.minute),el('span','pm-label',e.label+(e.type==='convoy'?' · '+fmt(e.amount):'')));
     if(e.count>1)chip.append(el('span','pm-times','×'+e.count));
@@ -74,16 +97,16 @@ window.uptepMovements=(()=>{
   const chosen=[...selected].map(id=>names.get(id)||id);
   const summary=el('summary','','Membres : ');summary.append(el('span','pm-members-label',!chosen.length?'tous':chosen.length<=3?chosen.join(', '):chosen.length+' membres'));members.append(summary);
   const panel=el('div','pm-members-panel'),actions=el('div','pm-members-actions'),search=el('input');search.type='search';search.placeholder='Rechercher un membre';search.setAttribute('aria-label','Rechercher un membre');search.value=membersQuery;
-  const clear=el('button','','Tout effacer');clear.type='button';clear.addEventListener('click',()=>{selected.clear();render();});actions.append(search,clear);panel.append(actions);
+  const clear=el('button','','Tout effacer');clear.type='button';clear.addEventListener('click',()=>{selected.clear();render();save();});actions.append(search,clear);panel.append(actions);
   const ul=el('ul');
   for(const [id,count] of [...people].sort((a,b)=>(names.get(a[0])||'').localeCompare(names.get(b[0])||'','fr',{sensitivity:'base'}))){
    const li=el('li'),label=el('label'),box=el('input');box.type='checkbox';box.value=id;box.checked=selected.has(id);
-   box.addEventListener('change',()=>{box.checked?selected.add(id):selected.delete(id);render();});
+   box.addEventListener('change',()=>{box.checked?selected.add(id):selected.delete(id);render();save();});
    label.append(box,el('span','',names.get(id)||id),el('span','pm-count',String(count)));li.append(label);li.hidden=!!membersQuery&&!(names.get(id)||'').toLowerCase().includes(membersQuery);ul.append(li);
   }
   search.addEventListener('input',()=>{membersQuery=search.value.trim().toLowerCase();for(const li of ul.children)li.hidden=!!membersQuery&&!li.textContent.toLowerCase().includes(membersQuery);});
   panel.append(ul);members.append(panel);
-  const body=[nav,el('h2','pm-title',data.label),filters,members];
+  const body=[nav,el('h2','pm-title',data.label),filters,...(targetsPanel?[targetsPanel]:[]),members];
   if(folded){const toggle=el('button','pm-earlier',showEarlier?`Masquer les heures précédentes (${folded} mouvement${folded>1?'s':''})`:`Afficher les heures précédentes · ${foldedHours} heure${foldedHours>1?'s':''}, ${folded} mouvement${folded>1?'s':''}`);toggle.type='button';toggle.setAttribute('aria-expanded',String(showEarlier));toggle.addEventListener('click',()=>{showEarlier=!showEarlier;render();});body.push(toggle);}
   if(!data.events.length)body.push(el('p','pm-empty',data.day<data.today?'Aucune arrivée enregistrée ce jour-là.':'Aucune arrivée prévue ce jour-là pour le moment.'));
   else if(!visible)body.push(el('p','pm-empty',folded&&!showEarlier?'Plus aucune arrivée prévue pour le reste de la journée.':'Aucun mouvement pour ces filtres.'));

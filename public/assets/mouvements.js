@@ -6,6 +6,20 @@
   const items = [...page.querySelectorAll('.moves-item')];
   const none = page.querySelector('[data-moves-none]');
   const status = page.querySelector('[data-moves-status]');
+  // "Mes cibles": chain players below the viewer, each with its level (1 = next position down).
+  const targetsPanel = page.querySelector('[data-moves-targets]');
+  const targetRows = targetsPanel ? [...targetsPanel.querySelectorAll('li[data-player]')] : [];
+  const depthSelect = targetsPanel?.querySelector('[data-targets-depth]');
+  const depth = () => Number(depthSelect?.value || 4);
+  const targetSet = () => new Set(targetRows.filter(r => Number(r.dataset.level) <= depth()).map(r => r.dataset.player));
+  const pressed = name => filters.some(b => b.dataset.filter === name && b.getAttribute('aria-pressed') === 'true');
+  // Filters are saved on the account, shortly after each change.
+  let saveTimer = null;
+  const post = fields => { const body = new FormData(); body.set('csrf', page.dataset.csrf || ''); body.set('action', 'preferences'); for (const [k, v] of Object.entries(fields)) body.set(k, v); return fetch(location.pathname, { method: 'POST', body, credentials: 'same-origin', cache: 'no-store' }).catch(() => {}); };
+  const save = () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => post({ prefs: JSON.stringify({ types: filters.filter(b => ['flood', 'convoy', 'hunt'].includes(b.dataset.filter) && b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.filter), me: pressed('me'), targets: pressed('targets'), depth: depth(), members: memberChecks.filter(c => c.checked).map(c => c.value) }) }), 600);
+  };
   // Keep a tooltip inside the window: shift it left at the right edge, show it above when there is no room below.
   const fitTip = (item, tip) => {
     tip.style.left = ''; tip.style.top = ''; tip.style.bottom = '';
@@ -43,8 +57,8 @@
     if (form) { let hidden = form.querySelector('input[name=membres]'); if (!hidden) { hidden = document.createElement('input'); hidden.type = 'hidden'; hidden.name = 'membres'; form.append(hidden); } hidden.value = ids; hidden.disabled = !ids; }
   };
   if (membersBox) {
-    membersBox.addEventListener('change', () => { syncMembers(); apply(); });
-    membersBox.querySelector('[data-members-clear]')?.addEventListener('click', () => { for (const c of memberChecks) c.checked = false; syncMembers(); apply(); });
+    membersBox.addEventListener('change', () => { syncMembers(); apply(); save(); });
+    membersBox.querySelector('[data-members-clear]')?.addEventListener('click', () => { for (const c of memberChecks) c.checked = false; syncMembers(); apply(); save(); });
     const search = membersBox.querySelector('[data-members-search]');
     search?.addEventListener('input', () => { const q = search.value.trim().toLowerCase(); for (const c of memberChecks) c.closest('li').hidden = !!q && !c.parentNode.textContent.toLowerCase().includes(q); });
     syncMembers();
@@ -54,12 +68,16 @@
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && membersBox.open) { membersBox.open = false; membersBox.querySelector('summary').focus(); } });
   }
   const apply = () => {
-    const shown = new Set(filters.filter(b => b.dataset.filter !== 'me' && b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.filter));
-    const onlyMe = filters.some(b => b.dataset.filter === 'me' && b.getAttribute('aria-pressed') === 'true');
-    let visible = 0;const members = selectedMembers();
+    const shown = new Set(filters.filter(b => !['me', 'targets'].includes(b.dataset.filter) && b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.filter));
+    const onlyMe = pressed('me'), withTargets = !!targetsPanel && pressed('targets');
+    let visible = 0;const members = selectedMembers(), targets = withTargets ? targetSet() : new Set();
+    if (targetsPanel) { targetsPanel.hidden = !withTargets; for (const row of targetRows) row.hidden = Number(row.dataset.level) > depth(); }
     for (const item of items) {
       const players = item.dataset.players.split(',');
-      const ok = shown.has(item.dataset.type) && (!onlyMe || players.includes(me)) && (!members.size || players.some(p => members.has(p)));
+      // "Mes cibles" (floods and hunts of the targets) and chosen members add up; "Seulement moi" narrows both.
+      const byTargets = withTargets && item.dataset.type !== 'convoy' && players.some(p => targets.has(p));
+      const byMembers = members.size > 0 && players.some(p => members.has(p));
+      const ok = shown.has(item.dataset.type) && (!onlyMe || players.includes(me)) && (withTargets || members.size ? byTargets || byMembers : true);
       item.hidden = !ok; if (ok) visible++;
     }
     // Hide hours and days left empty by the filters.
@@ -92,7 +110,18 @@
   let lastHour = isToday ? parisHour() : null;
   for (const button of filters) button.addEventListener('click', () => {
     button.setAttribute('aria-pressed', button.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
-    apply();
+    apply(); save();
+  });
+  depthSelect?.addEventListener('change', () => { apply(); save(); });
+  // Back to the default view, and the saved filters are forgotten.
+  page.querySelector('[data-moves-reset]')?.addEventListener('click', () => {
+    clearTimeout(saveTimer);
+    for (const button of filters) button.setAttribute('aria-pressed', ['me', 'targets'].includes(button.dataset.filter) ? 'false' : 'true');
+    if (depthSelect) depthSelect.value = '4';
+    for (const c of memberChecks) c.checked = false;
+    if (membersBox) syncMembers();
+    apply(); post({ reset: '1' });
+    if (status) status.textContent = 'Filtres réinitialisés.';
   });
   // Items are focusable: a tap or Tab shows the tooltip, Escape hides it.
   for (const item of items) item.addEventListener('keydown', e => { if (e.key === 'Escape') item.blur(); });
